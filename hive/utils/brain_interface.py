@@ -74,6 +74,8 @@ class BrainInterface:
                     result = self._consult_gemini(prompt, system_prompt, effective_model)
                 elif provider in ["claude", "anthropic"]:
                     result = self._consult_claude(prompt, system_prompt, effective_model)
+                elif provider == "ollama":
+                    result = self._consult_ollama(prompt, system_prompt, effective_model)
                 else:
                     # 默认使用 OpenAI 兼容格式 (DeepSeek, Local LLMs, etc.)
                     result = self._consult_openai_compatible(prompt, system_prompt, effective_model)
@@ -129,6 +131,47 @@ class BrainInterface:
             raise Exception("HTTP 429 Too Many Requests")
         else:
             logger.error(f"OpenAI 接口报错: {response.status_code} - {response.text}")
+            return None
+
+    def _consult_ollama(
+        self,
+        prompt: str,
+        system_prompt: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """
+        Phase 2 P4: Ollama 本地模型接口
+
+        Ollama 使用 OpenAI-compatible API，但不需要 Authorization header。
+        默认地址: http://localhost:11434/v1/chat/completions
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        # Ollama 可能使用不同的 base_url（默认 localhost:11434）
+        base = self.base_url or "http://localhost:11434"
+
+        response = requests.post(
+            f"{base}/v1/chat/completions",
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": model,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 2000
+            },
+            timeout=60
+        )
+
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        elif response.status_code == 404:
+            logger.error(f"🤖 [Ollama] 模型 {model} 未找到，请运行: ollama pull {model}")
+            return None
+        else:
+            logger.error(f"🤖 [Ollama] 接口报错: {response.status_code} - {response.text[:200]}")
             return None
 
     def _consult_gemini(
