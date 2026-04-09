@@ -3,12 +3,17 @@
 WorkerManager - Worker 进程管理器
 
 专注负责 Worker 蜜蜂的生命周期管理。
+
+Phase 3 P3: 自然选择机制 — 接入 SwarmEvolutionCoordinator 淘汰闭环
+- 订阅 bee_culled ALERT 消息
+- 收到淘汰警报时立即终止对应 Worker 进程
+- 触发替换孵化（可选：自动补充被淘汰的蜂）
 """
 
 import multiprocessing
 import time
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from hive.core.dna import BeeDNA
 from hive.core.bee_factory import BeeFactory
@@ -31,6 +36,11 @@ class WorkerManager:
         self.MAX_ACTIVE_WORKERS = get_settings().MAX_WORKERS
         # BeeFactory 处理 dna.role / dna.species -> Bee 类路由
         self._bee_factory = BeeFactory()
+
+        # Phase 3 P3: 注册到蜂群通信，订阅淘汰警报
+        self._swarm: Optional[Any] = None
+        self._auto_respawn = True  # 被淘汰后是否自动补充
+        self._register_swarm()
 
     def register_species(self, species_dict: dict[str, type[BaseBee]]) -> None:
         """注册蜜蜂种类（同时更新 WorkerManager 注册表和 BeeFactory）"""
@@ -211,6 +221,102 @@ class WorkerManager:
 
         self.active_workers.clear()
         return terminated
+
+    # ===== Phase 3 P3: 自然选择机制 =====
+
+    def _register_swarm(self):
+        """Phase 3 P3: 注册到蜂群通信，订阅淘汰警报"""
+        try:
+            from hive.core.swarm_communication import get_swarm_communication, MessageType, SwarmMessage
+            self._swarm = get_swarm_communication()
+            self._swarm.register_bee("WorkerManager", self)
+            self._swarm.subscribe(MessageType.ALERT, self._on_swarm_alert)
+            logger.info("🔪 [WorkerManager] 已注册到蜂群网络，订阅淘汰警报")
+        except ImportError:
+            logger.warning("🔪 [WorkerManager] SwarmCommunication 未安装，自然选择机制不可用")
+
+    def _on_swarm_alert(self, message: Any):
+        """Phase 3 P3: 处理蜂群警报（淘汰通知）"""
+        try:
+            content = message.content if hasattr(message, 'content') else {}
+            topic = content.get("topic", "")
+            if topic == "bee_culled":
+                bee_id = content.get("bee_id")
+                bee_type = content.get("bee_type", "unknown")
+                reason = content.get("reason", "unknown")
+                logger.info(f"🔪 [WorkerManager] 收到淘汰警报: {bee_id} ({bee_type}) reason={reason}")
+                terminated = self.terminate_worker(bee_id)
+                if terminated:
+                    logger.info(f"🔪 [WorkerManager] 已执行自然淘汰: {bee_id}")
+                    # 可选：自动补充被淘汰的蜂
+                    if self._auto_respawn and bee_type:
+                        self._respawn_worker(bee_type)
+                else:
+                    logger.debug(f"🔪 [WorkerManager] {bee_id} 不在活动worker列表中")
+        except Exception as e:
+            logger.error(f"🔪 [WorkerManager] 处理淘汰警报失败: {e}")
+
+    def terminate_worker(self, bee_id: str) -> bool:
+        """
+        Phase 3 P3: 根据 bee_id 终止对应 Worker
+
+        Args:
+            bee_id: 要终止的蜂 ID (即 WorkerManager 中的 worker_id)
+
+        Returns:
+            True 如果成功终止，False 如果未找到
+        """
+        # bee_id 就是 worker_id (格式: Worker-{dna.id} 或 DarwinBee.id)
+        # 先在进程 workers 中查找
+        if bee_id in self.active_workers:
+            proc = self.active_workers[bee_id]
+            try:
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join(timeout=2.0)
+                    if proc.is_alive():
+                        proc.kill()
+                        proc.join(timeout=1.0)
+                    logger.info(f"🔪 [WorkerManager] 已终止进程 Worker: {bee_id}")
+                else:
+                    logger.debug(f"🔪 [WorkerManager] Worker {bee_id} 已经结束")
+            except Exception as e:
+                logger.error(f"🔪 [WorkerManager] 终止 {bee_id} 失败: {e}")
+            finally:
+                self.active_workers.pop(bee_id, None)
+                self._update_worker_end_status(bee_id)
+                return True
+
+        # 再在异步 workers 中查找
+        if bee_id in self.active_async_workers:
+            del self.active_async_workers[bee_id]
+            self._update_worker_end_status(bee_id)
+            logger.info(f"🔪 [WorkerManager] 已移除异步 Worker: {bee_id}")
+            return True
+
+        return False
+
+    def _respawn_worker(self, bee_type: str):
+        """
+        Phase 3 P3: 自动补充被淘汰的蜂
+
+        Args:
+            bee_type: 蜂种类型名 (如 "DarwinBee", "SentinelBee")
+        """
+        if not self.has_available_slot():
+            logger.warning(f"🔪 [WorkerManager] 无可用槽位，无法补充 {bee_type}")
+            return
+
+        try:
+            from hive.core.dna import BeeDNA
+            dna = BeeDNA(id=f"{bee_type}_respawn_{int(time.time())}", role=bee_type.lower(), species=bee_type.lower())
+            new_id = self.spawn_worker(dna)
+            if new_id:
+                logger.info(f"🔪 [WorkerManager] 已补充 {bee_type} -> {new_id}")
+            else:
+                logger.warning(f"🔪 [WorkerManager] 补充 {bee_type} 失败")
+        except Exception as e:
+            logger.error(f"🔪 [WorkerManager] 补充 Worker 异常: {e}")
 
     def get_status(self) -> dict[str, Any]:
         """获取管理器状态"""
