@@ -28,7 +28,8 @@ class DarwinBee(BaseBee):
     1. 读取 VectorVault 中的优秀代码片段。
     2. 使用 LLM (Brain) 杂交/变异这些代码。
     3. 生成完整的 Python 脚本产卵到 `hive/incubation/larvae`。
-    4. Phase 2: 通过蜂群网络向 SentinelBee 请求安全扫描，在进化前验证代码安全性
+    4. Phase 2: 通过蜂群网络向 SentinelBee 请求安全扫描
+    5. Phase 3: 集成 SwarmEvolutionCoordinator，使用 GEP 适应度引导进化
     """
 
     def __init__(self, dna: BeeDNA, id: str, result_queue: Any):
@@ -44,7 +45,38 @@ class DarwinBee(BaseBee):
         self._swarm.register_bee(self.id, self)
         self._pending_security_results: Dict[str, Any] = {}
         self._swarm.subscribe(MessageType.KNOWLEDGE, self._on_security_knowledge)
+
+        # Phase 3: 注册到进化协调器
+        self._evolution = None  # 懒加载
+        self._register_evolution()
+
         logger.info(f"🧬 [Darwin] 已注册到蜂群网络，ID={self.id}")
+
+    def _register_evolution(self):
+        """Phase 3: 注册到 SwarmEvolutionCoordinator"""
+        try:
+            from hive.core.swarm_evolution import get_swarm_evolution_coordinator
+            self._evolution = get_swarm_evolution_coordinator()
+            self._evolution.register_bee(
+                bee_id=self.id,
+                bee_type="DarwinBee",
+                generation=self._get_generation(),
+            )
+            self._evolution.start()  # 确保协调器在运行
+            logger.info(f"🧬 [Darwin] 已注册到进化协调器")
+        except ImportError:
+            logger.warning(f"🧬 [Darwin] SwarmEvolutionCoordinator 未安装")
+
+    def _get_generation(self) -> int:
+        """从 DNA 中解析代数"""
+        if "Gen" in self.dna.id:
+            try:
+                for part in self.dna.id.split("_"):
+                    if part.startswith("Gen") and part[3:].isdigit():
+                        return int(part[3:])
+            except (ValueError, IndexError):
+                pass
+        return 0
 
     def _on_security_knowledge(self, message: SwarmMessage):
         """Phase 2: 接收 SentinelBee 的安全知识消息"""
@@ -183,6 +215,10 @@ New Agent Name: MutantBee_{int(time.time())}
                 return {"error": "Invalid larva path"}
             larva_path.write_text(new_code, encoding='utf-8')
 
+            # Phase 3: 报告进化成功到适应度追踪
+            if self._evolution:
+                self._evolution.report_task_result(self.id, success=True, duration=0.0)
+
             if is_medic_mission:
                 logger.info(f"🩹 [Medic] 修复补丁已生成: {larva_name}")
             else:
@@ -197,6 +233,9 @@ New Agent Name: MutantBee_{int(time.time())}
             }
 
         except Exception as e:
+            # Phase 3: 报告进化失败到适应度追踪
+            if self._evolution:
+                self._evolution.report_task_result(self.id, success=False, duration=0.0, error=str(e))
             logger.error(f"❌ 进化失败: {e}")
             return {"error": str(e)}
 
