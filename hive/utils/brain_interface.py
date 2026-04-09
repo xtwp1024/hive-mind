@@ -408,7 +408,176 @@ class BrainInterface:
                 logger.error(f"🖼️ [Vision] 视觉推理异常 (Attempt {attempt+1}): {e}")
                 if attempt == max_retries - 1:
                     return None
-        return None 
+        return None
+
+    # ===== Phase 4 P2: 音频处理 =====
+
+    def transcribe_audio(
+        self,
+        audio_path: str,
+        prompt: Optional[str] = None,
+        language: Optional[str] = None,
+        model: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Phase 4 P2: 音频转录
+
+        支持多种音频provider:
+        - openai-compatible: Whisper API (OpenAI兼容格式)
+        - gemini: Gemini 音频理解 (如果支持)
+        - ollama: Ollama whisper 模型 (本地)
+
+        Args:
+            audio_path: 音频文件路径
+            prompt: 可选提示，引导转录方向
+            language: 可选语言代码 (如 "zh", "en")
+            model: 可选模型名覆盖
+
+        Returns:
+            转录文本
+        """
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = self._transcribe_audio(audio_path, prompt, language, model)
+                if result:
+                    return result
+            except Exception as e:
+                logger.error(f"🎙️ [Audio] 转录异常 (Attempt {attempt+1}): {e}")
+                if attempt == max_retries - 1:
+                    return None
+        return None
+
+    def _transcribe_audio(
+        self,
+        audio_path: str,
+        prompt: Optional[str],
+        language: Optional[str],
+        model: Optional[str]
+    ) -> Optional[str]:
+        """内部音频转录路由"""
+        import os
+
+        if not os.path.exists(audio_path):
+            logger.error(f"🎙️ [Audio] 音频文件不存在: {audio_path}")
+            return None
+
+        provider = self.provider.lower()
+        effective_model = model or self.config.get("audio_model", "whisper-1")
+
+        # Ollama whisper (本地)
+        if provider == "ollama":
+            return self._transcribe_ollama_whisper(audio_path, prompt, language, effective_model)
+        else:
+            # 默认使用 OpenAI 兼容 Whisper API
+            return self._transcribe_whisper(audio_path, prompt, language, effective_model)
+
+    def _transcribe_whisper(
+        self,
+        audio_path: str,
+        prompt: Optional[str],
+        language: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """OpenAI 兼容格式 Whisper API 转录"""
+        import base64
+
+        with open(audio_path, "rb") as f:
+            audio_bytes = f.read()
+
+        # 检测格式
+        import mimetypes
+        mime_type = mimetypes.guess_type(audio_path)[0] or "audio/mp3"
+
+        data = {
+            "model": model,
+        }
+        if prompt:
+            data["prompt"] = prompt
+        if language:
+            data["language"] = language
+
+        # 区分 OpenAI vs DeepSeek 等兼容服务
+        # OpenAI 用 files 参数，其他用 base64
+        base_url_lower = (self.base_url or "").lower()
+
+        if "openai" in base_url_lower or "api.deepseek" in base_url_lower:
+            # OpenAI/DeepSeek: 用 multipart form
+            import requests
+            files = {"file": (audio_path, audio_bytes, mime_type)}
+            response = requests.post(
+                f"{self.base_url}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                data=data,
+                files=files,
+                timeout=60
+            )
+        else:
+            # 其他兼容服务: base64 编码
+            audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+            data["file_data"] = f"data:{mime_type};base64,{audio_base64}"
+            response = requests.post(
+                f"{self.base_url}/audio/transcriptions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
+                json=data,
+                timeout=60
+            )
+
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("text", "")
+        else:
+            logger.error(f"🎙️ [Whisper] API错误: {response.status_code} - {response.text[:200]}")
+            return None
+
+    def _transcribe_ollama_whisper(
+        self,
+        audio_path: str,
+        prompt: Optional[str],
+        language: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """Ollama whisper 本地转录"""
+        try:
+            from hive.utils.ollama_interface import get_ollama
+            ollama = get_ollama()
+            if not ollama or not ollama.is_available():
+                logger.warning(f"🎙️ [Ollama] 服务不可用")
+                return None
+
+            effective_model = model or "whisper"
+            # Ollama 用 /api/whisper 端点
+            import mimetypes
+            mime_type = mimetypes.guess_type(audio_path)[0] or "audio/mp3"
+
+            with open(audio_path, "rb") as f:
+                audio_bytes = f.read()
+
+            # Ollama whisper API: POST /api/whisper
+            import requests
+            files = {"file": (audio_path, audio_bytes, mime_type)}
+            data = {"model": effective_model}
+            if prompt:
+                data["prompt"] = prompt
+
+            response = requests.post(
+                f"{self.base_url or 'http://localhost:11434'}/api/whisper",
+                data=data,
+                files=files,
+                timeout=120
+            )
+
+            if response.status_code == 200:
+                return response.json().get("text", "")
+            else:
+                logger.error(f"🎙️ [Ollama whisper] API错误: {response.status_code} - {response.text[:200]}")
+                return None
+        except Exception as e:
+            logger.error(f"🎙️ [Ollama whisper] 转录失败: {e}")
+            return None 
 
     SENSITIVE_PATTERNS = [
         "api_key", "apikey", "password", "secret", "token", "authorization",
