@@ -162,6 +162,9 @@ class HiveFederation:
         self._knowledge_base: list[dict] = []
         self._kb_lock = threading.RLock()
 
+        # 知识同步回调 (Phase 5 P2: 集成 KnowledgeSync)
+        self._knowledge_callback: Optional[callable] = None
+
         # 任务追踪
         self._pending_tasks: dict[str, dict] = {}
         self._tasks_lock = threading.RLock()
@@ -482,6 +485,22 @@ class HiveFederation:
                     "timestamp": time.time(),
                     "origin": payload.get("origin"),
                 })
+            # Phase 5 P2: 通知知识同步回调
+            if self._knowledge_callback:
+                try:
+                    self._knowledge_callback("broadcast", payload.get("knowledge"))
+                except Exception as e:
+                    logger.error(f"🔗 [Federation] 知识回调异常: {e}")
+            return None
+        elif msg_type == "knowledge_push":
+            # Phase 5 P2: 处理知识推送 (KnowledgeSync 结构化条目)
+            entries = payload.get("entries", [])
+            if self._knowledge_callback:
+                for entry in entries:
+                    try:
+                        self._knowledge_callback("push", entry)
+                    except Exception as e:
+                        logger.error(f"🔗 [Federation] 知识推送回调异常: {e}")
             return None
         elif msg_type == self.MSG_TASK_DELEGATE:
             # 收到委托任务，执行并返回结果 (这里只是模拟)
@@ -652,6 +671,23 @@ class HiveFederation:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception:
             return None
+
+    # ===== Phase 5 P2: 知识同步集成 =====
+
+    def set_knowledge_callback(self, callback: Optional[callable]):
+        """
+        设置知识同步回调 (Phase 5 P2)
+
+        callback(msg_type, data) 会被调用:
+          - msg_type="broadcast": data 是 {"knowledge": ..., "origin": ...}
+          - msg_type="push": data 是 KnowledgeEntry dict
+        """
+        self._knowledge_callback = callback
+
+    def get_knowledge_base(self) -> list:
+        """获取本地知识库"""
+        with self._kb_lock:
+            return list(self._knowledge_base)
 
     # ===== 状态 =====
 
