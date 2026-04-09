@@ -577,7 +577,182 @@ class BrainInterface:
                 return None
         except Exception as e:
             logger.error(f"🎙️ [Ollama whisper] 转录失败: {e}")
-            return None 
+            return None
+
+    # ===== Phase 4 P3: 多模态融合 =====
+
+    def consult_multimodal(
+        self,
+        prompt: str,
+        text: Optional[str] = None,
+        images: Optional[list[str]] = None,
+        audio_path: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Phase 4 P3: 统一多模态接口
+
+        在单一 LLM 调用中组合文本、图片、音频输入。
+
+        Args:
+            prompt: 主要询问
+            text: 可选文本片段
+            images: 可选图片路径列表
+            audio_path: 可选音频路径 (会先转录)
+            system_prompt: 可选系统提示
+            model: 可选模型覆盖
+
+        Returns:
+            LLM 对多模态输入的统一分析结果
+        """
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = self._consult_multimodal(
+                    prompt, text, images, audio_path, system_prompt, model
+                )
+                if result:
+                    return result
+            except Exception as e:
+                logger.error(f"🔮 [Multimodal] 多模态推理异常 (Attempt {attempt+1}): {e}")
+                if attempt == max_retries - 1:
+                    return None
+        return None
+
+    def _consult_multimodal(
+        self,
+        prompt: str,
+        text: Optional[str],
+        images: Optional[list[str]],
+        audio_path: Optional[str],
+        system_prompt: Optional[str],
+        model: Optional[str]
+    ) -> Optional[str]:
+        """内部多模态融合路由"""
+        import os
+
+        # 1. 处理音频转录 (如果提供)
+        audio_transcript = None
+        if audio_path and os.path.exists(audio_path):
+            audio_transcript = self.transcribe_audio(audio_path)
+            if not audio_transcript:
+                logger.warning(f"🔮 [Multimodal] 音频转录失败，继续处理其他模态")
+
+        # 2. 构建多模态内容
+        content_parts = []
+
+        # 文本部分
+        context_parts = []
+        if text:
+            context_parts.append(f"[文本内容]\n{text}")
+        if audio_transcript:
+            context_parts.append(f"[音频转录]\n{audio_transcript}")
+
+        if context_parts:
+            combined_context = "\n\n".join(context_parts)
+            content_parts.append({
+                "type": "text",
+                "text": f"上下文信息:\n{combined_context}\n\n用户问题: {prompt}"
+            })
+        else:
+            content_parts.append({"type": "text", "text": prompt})
+
+        # 图片部分 (Claude Vision / GPT-4V 格式)
+        if images:
+            import base64
+            for img_path in images:
+                if not os.path.exists(img_path):
+                    logger.warning(f"🔮 [Multimodal] 图片不存在，跳过: {img_path}")
+                    continue
+                with open(img_path, "rb") as f:
+                    img_base64 = base64.b64encode(f.read()).decode("utf-8")
+
+                # 根据 provider 选择格式
+                provider = self.provider.lower()
+                if provider in ["claude", "anthropic"]:
+                    content_parts.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": img_base64
+                        }
+                    })
+                else:
+                    # OpenAI 兼容格式
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"}
+                    })
+
+        # 3. 调用对应 provider
+        effective_model = model or self.config.get("multimodal_model")
+        provider = self.provider.lower()
+
+        if provider in ["claude", "anthropic"]:
+            return self._multimodal_claude(content_parts, system_prompt, effective_model)
+        else:
+            return self._multimodal_openai(content_parts, system_prompt, effective_model)
+
+    def _multimodal_claude(
+        self,
+        content: list,
+        system_prompt: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """Claude 多模态调用"""
+        url = f"{self.base_url}/messages"
+        headers = {
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        data = {
+            "model": model or "claude-3-sonnet-20240229",
+            "max_tokens": 2048,
+            "system": system_prompt or "你是一个专业的多模态分析专家。",
+            "messages": [{"role": "user", "content": content}]
+        }
+
+        response = requests.post(url, headers=headers, json=data, timeout=60)
+        if response.status_code == 200:
+            return response.json().get('content', [{}])[0].get('text', '')
+        else:
+            logger.error(f"🔮 [Claude Multimodal] API错误: {response.status_code} - {response.text[:200]}")
+            return None
+
+    def _multimodal_openai(
+        self,
+        content: list,
+        system_prompt: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """OpenAI 兼容多模态调用 (GPT-4V 等)"""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": content})
+
+        response = requests.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model or "gpt-4o",
+                "messages": messages,
+                "max_tokens": 2000
+            },
+            timeout=60
+        )
+
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        else:
+            logger.error(f"🔮 [OpenAI Multimodal] API错误: {response.status_code} - {response.text[:200]}")
+            return None
 
     SENSITIVE_PATTERNS = [
         "api_key", "apikey", "password", "secret", "token", "authorization",
