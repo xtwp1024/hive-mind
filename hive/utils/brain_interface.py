@@ -212,10 +212,202 @@ class BrainInterface:
             "system": system_prompt if system_prompt else "",
             "messages": [{"role": "user", "content": prompt}]
         }
-        
+
         response = requests.post(url, headers=headers, json=data, timeout=45)
         if response.status_code == 200:
             return response.json().get('content', [{}])[0].get('text', '')
+        return None
+
+    def _consult_vision(
+        self,
+        prompt: str,
+        image_path: str,
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Phase 4 P1: 多模态视觉推理
+
+        支持三种视觉provider:
+        - claude/anthropic: Claude Vision (base64编码)
+        - gemini: Gemini Pro Vision (inline image)
+        - openai-compatible: GPT-4V (base64编码)
+
+        Args:
+            prompt: 询问内容
+            image_path: 图片路径
+            system_prompt: 可选系统提示
+            model: 视觉模型名 (默认使用配置中的vision模型)
+
+        Returns:
+            LLM 对图片的分析结果
+        """
+        import base64
+        import os
+
+        effective_model = model or self.config.get("vision_model", "claude-3-sonnet-20240229")
+        provider = self.provider.lower()
+
+        # 读取并编码图片
+        if not os.path.exists(image_path):
+            logger.error(f"🖼️ [Vision] 图片不存在: {image_path}")
+            return None
+
+        with open(image_path, "rb") as f:
+            img_bytes = f.read()
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+        if provider in ["claude", "anthropic"]:
+            return self._consult_claude_vision(prompt, img_base64, system_prompt, effective_model)
+        elif provider == "gemini":
+            return self._consult_gemini_vision(prompt, img_base64, system_prompt, effective_model)
+        else:
+            # 默认使用 OpenAI 兼容格式 (支持 GPT-4V, Local LLMs 等)
+            return self._consult_openai_vision(prompt, img_base64, system_prompt, effective_model)
+
+    def _consult_claude_vision(
+        self,
+        prompt: str,
+        img_base64: str,
+        system_prompt: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """Claude Vision API (Anthropic)"""
+        url = f"{self.base_url}/messages"
+        headers = {
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        content = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": img_base64
+                }
+            },
+            {"type": "text", "text": prompt}
+        ]
+
+        data = {
+            "model": model,
+            "max_tokens": 2048,
+            "system": system_prompt or "你是一个专业的代码架构分析专家。",
+            "messages": [{"role": "user", "content": content}]
+        }
+
+        response = requests.post(url, headers=headers, json=data, timeout=60)
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('content', [{}])[0].get('text', '')
+        else:
+            logger.error(f"🖼️ [Claude Vision] API错误: {response.status_code} - {response.text[:200]}")
+            return None
+
+    def _consult_gemini_vision(
+        self,
+        prompt: str,
+        img_base64: str,
+        system_prompt: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """Gemini Pro Vision API"""
+        import json
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "contents": [{
+                "parts": [
+                    {"inline_data": {"mime_type": "image/png", "data": img_base64}},
+                    {"text": prompt}
+                ]
+            }],
+            "system_instruction": {"parts": [{"text": system_prompt or ""}]} if system_prompt else None
+        }
+        data = {k: v for k, v in data.items() if v is not None}
+
+        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=60) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                return result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+        except Exception as e:
+            logger.error(f"🖼️ [Gemini Vision] API错误: {e}")
+            return None
+
+    def _consult_openai_vision(
+        self,
+        prompt: str,
+        img_base64: str,
+        system_prompt: Optional[str],
+        model: str
+    ) -> Optional[str]:
+        """OpenAI 兼容格式 (GPT-4V 等)"""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{img_base64}"}
+                }
+            ]
+        })
+
+        response = requests.post(
+            f"{self.base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": messages,
+                "max_tokens": 2000
+            },
+            timeout=60
+        )
+
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        else:
+            logger.error(f"🖼️ [OpenAI Vision] API错误: {response.status_code} - {response.text[:200]}")
+            return None
+
+    def consult_vision(
+        self,
+        prompt: str,
+        image_path: str,
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Phase 4 P1: 视觉推理公开接口
+
+        Args:
+            prompt: 要询问的问题
+            image_path: 图片文件路径
+            system_prompt: 可选系统提示
+            model: 可选视觉模型覆盖
+
+        Returns:
+            LLM 对图片的分析结果字符串
+        """
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = self._consult_vision(prompt, image_path, system_prompt, model)
+                if result:
+                    return result
+            except Exception as e:
+                logger.error(f"🖼️ [Vision] 视觉推理异常 (Attempt {attempt+1}): {e}")
+                if attempt == max_retries - 1:
+                    return None
         return None 
 
     SENSITIVE_PATTERNS = [

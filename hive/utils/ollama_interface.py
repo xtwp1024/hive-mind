@@ -179,7 +179,20 @@ class OllamaInterface:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+
+        # 支持 images 参数 (多模态模型如 llava)
+        images = kwargs.pop("images", None)
+        if images:
+            # llava 等多模态模型: content 可以是 list [{type: "image_url"}, {type: "text"}]
+            content = [
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img}"}}
+                for img in images
+            ]
+            if prompt:
+                content.append({"type": "text", "text": prompt})
+            messages.append({"role": "user", "content": content})
+        else:
+            messages.append({"role": "user", "content": prompt})
 
         payload = {
             "model": effective_model,
@@ -253,6 +266,11 @@ class OllamaInterface:
             "system": system_prompt,
             **kwargs
         }
+
+        # 支持 images 参数 (Ollama 多模态模型如 llava)
+        images = kwargs.pop("images", None)
+        if images:
+            payload["images"] = images
 
         try:
             response = self._session.post(
