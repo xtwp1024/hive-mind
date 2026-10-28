@@ -1,0 +1,9 @@
+{
+    "servers": {
+        "example_file_server": {
+            "command": "python",
+            "args": ["-c", "print('{\\\"jsonrpc\\\": \\\"2.0\\\", \\\"id\\\": 1, \\\"result\\\": {\\\"message\\\": \\\"This is a mock MCP response\\\"}}')"],
+            "env": {}
+        }
+    }
+}
