@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  hive:
+    build: .
+    container_name: hive-mind
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - MAX_WORKERS=10
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ./hive:/app/hive
+      - ./data:/app/data
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    networks:
+      - hive-network
+
+  hive-dashboard:
+    build: .
+    container_name: hive-dashboard
+    command: python web_dashboard.py
+    environment:
+      - FLASK_ENV=production
+      - HIVE_DASHBOARD_AUTH=true
+      - HIVE_DASHBOARD_DEBUG=false
+    ports:
+      - "5001:5000"
+    depends_on:
+      - hive
+    restart: unless-stopped
+    networks:
+      - hive-network
+
+networks:
+  hive-network:
+    driver: bridge

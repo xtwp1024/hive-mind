@@ -1,0 +1,128 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+      name: Checkout code
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e ".[dev]"
+
+    - name: Check code formatting with black
+      id: black
+      run: |
+        black --check hive/
+      continue-on-error: true
+
+    - name: Check import order with isort
+      id: isort
+      run: |
+        isort --check-only hive/
+      continue-on-error: true
+
+    - name: Lint with ruff (fast)
+      id: ruff
+      run: |
+        pip install ruff
+        ruff check hive/
+      continue-on-error: true
+
+    - name: Static type check with mypy
+      id: mypy
+      run: |
+        mypy hive/ --ignore-missing-imports --warn-unused-configs
+      continue-on-error: true
+
+    - name: Check for security issues with bandit
+      id: bandit
+      run: |
+        pip install bandit
+        bandit -r hive/ -f json -o bandit-report.json || true
+        cat bandit-report.json
+      continue-on-error: true
+
+    - name: Check dead code with vulture
+      id: vulture
+      run: |
+        pip install vulture
+        vulture hive/ --exclude=*_test.py,*/tests/* || true
+      continue-on-error: true
+
+    - name: Summary
+      run: |
+        echo "=== Code Quality Summary ==="
+        echo ""
+        echo "Black (formatting):  ${{ steps.black.outcome }}"
+        echo "isort (imports):     ${{ steps.isort.outcome }}"
+        echo "Ruff (linting):      ${{ steps.ruff.outcome }}"
+        echo "mypy (type check):   ${{ steps.mypy.outcome }}"
+        echo "Bandit (security):   ${{ steps.bandit.outcome }}"
+        echo "Vulture (dead code): ${{ steps.vulture.outcome }}"
+        echo ""
+        
+        # 只有关键检查失败才阻止合并
+        if [ "${{ steps.black.outcome }}" = "failure" ] || [ "${{ steps.ruff.outcome }}" = "failure" ]; then
+          echo "❌ Critical checks failed - blocking merge"
+          exit 1
+        else
+          echo "✅ All critical checks passed"
+          exit 0
+        fi
+
+  complexity:
+    name: Complexity Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install complexity tools
+      run: |
+        pip install radon xenon
+    
+    - name: Cyclomatic complexity
+      run: |
+        echo "=== Cyclomatic Complexity ==="
+        radon cc hive/ -a -s
+        echo ""
+        echo "=== Maintainability Index ==="
+        radon mi hive/ -s
+    
+    - name: Check complexity thresholds
+      run: |
+        # 检查复杂度是否超过阈值
+        # A = 1-5, B = 6-10, C = 11-20, D = 21-30, E = 31-40, F = 41+
+        HIGH_COMPLEXITY=$(radon cc hive/ -s | grep -E '^\s+[C-F] ' | wc -l)
+        
+        echo "Functions with high complexity (C-F): $HIGH_COMPLEXITY"
+        
+        if [ "$HIGH_COMPLEXITY" -gt 10 ]; then
+          echo "⚠️  Warning: Many functions with high complexity"
+          exit 0  # 警告但不阻止
+        fi
