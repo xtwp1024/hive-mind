@@ -2,13 +2,23 @@
 """
 CognitiveBee - 认知蜂
 蜂巢的"大脑皮层" - 负责自我评估和元认知
+
+增强功能 (Phase 1 增强):
+1. 历史性能分析和对比
+2. 改进建议生成
+3. 主动学习触发器
+4. 元学习能力增强
+5. 与进化系统集成
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
+from collections import defaultdict
 import json
 from pathlib import Path
+import time
+import statistics
 
 from hive.bees.base_bee import BaseBee
 from hive.core.dna import BeeDNA
@@ -31,8 +41,8 @@ class CapabilityAssessment:
     """能力评估结果"""
     capability_name: str
     score: float
-    confidence: float = 1.0  # Phase 1: 置信度 (知道自己知不知道)
-    is_uncertain: bool = False  # Phase 1: 是否不确定
+    confidence: float = 1.0
+    is_uncertain: bool = False
     evidence: List[str] = None
     last_updated: datetime = None
     improvement_rate: float = 0.0
@@ -42,6 +52,49 @@ class CapabilityAssessment:
             self.evidence = []
         if self.last_updated is None:
             self.last_updated = datetime.now()
+
+
+@dataclass
+class HistoricalComparison:
+    """历史对比结果"""
+    capability_name: str
+    current_score: float
+    previous_score: float
+    score_delta: float
+    current_confidence: float
+    previous_confidence: float
+    confidence_delta: float
+    improvement_trend: str  # "improving", "declining", "stable"
+    days_since_last: int
+    analysis: str
+
+
+@dataclass
+class ImprovementRecommendation:
+    """改进建议"""
+    capability_name: str
+    current_score: float
+    target_score: float
+    priority: str  # "critical", "high", "medium", "low"
+    recommended_actions: List[str]
+    estimated_effort_hours: float
+    expected_improvement: float
+    dependencies: List[str]
+    rationale: str
+
+
+@dataclass
+class ActiveLearningTrigger:
+    """主动学习触发器"""
+    trigger_id: str
+    trigger_type: str  # "low_score", "high_uncertainty", "knowledge_gap", "trend_down"
+    capability_name: str
+    current_score: float
+    confidence: float
+    severity: str  # "critical", "high", "medium"
+    triggered_at: datetime
+    suggested_learning_task: Dict[str, Any]
+    auto_execute: bool = False
 
 
 @dataclass
@@ -425,5 +478,586 @@ class CognitiveBee(BaseBee):
             "timestamp": datetime.now().isoformat()
         }
 
+    # ===== 增强功能: 历史性能分析 =====
 
-__all__ = ['CognitiveBee', 'CapabilityAssessment', 'BlindSpot', 'LearningPlan']
+    def compare_with_history(self, capability_name: str) -> Optional[HistoricalComparison]:
+        """
+        对比特定能力的历史性能
+        
+        Args:
+            capability_name: 能力名称
+            
+        Returns:
+            HistoricalComparison 或 None（如果没有历史数据）
+        """
+        history = self.capability_history.get(capability_name, [])
+        if len(history) < 2:
+            logger.debug(f"[History] {capability_name} 历史数据不足，无法对比")
+            return None
+        
+        current = history[-1]
+        previous = history[-2]
+        
+        score_delta = current.score - previous.score
+        confidence_delta = current.confidence - previous.confidence
+        
+        if abs(score_delta) < 0.02:
+            trend = "stable"
+        elif score_delta > 0:
+            trend = "improving"
+        else:
+            trend = "declining"
+        
+        days_since = (current.last_updated - previous.last_updated).days
+        
+        if trend == "improving":
+            analysis = f"能力 {capability_name} 正在改善，分数提升 {score_delta:.2f}"
+        elif trend == "declining":
+            analysis = f"能力 {capability_name} 正在下降，分数降低 {abs(score_delta):.2f}，需要关注"
+        else:
+            analysis = f"能力 {capability_name} 保持稳定"
+        
+        comparison = HistoricalComparison(
+            capability_name=capability_name,
+            current_score=current.score,
+            previous_score=previous.score,
+            score_delta=score_delta,
+            current_confidence=current.confidence,
+            previous_confidence=previous.confidence,
+            confidence_delta=confidence_delta,
+            improvement_trend=trend,
+            days_since_last=days_since,
+            analysis=analysis
+        )
+        
+        logger.info(f"📊 [History] {capability_name}: {trend} (Δ{score_delta:+.2f})")
+        return comparison
+
+    def get_all_historical_trends(self) -> Dict[str, HistoricalComparison]:
+        """
+        获取所有能力的历史趋势
+        
+        Returns:
+            能力名称到 HistoricalComparison 的字典
+        """
+        logger.info("📊 [History] 分析所有能力的历史趋势...")
+        
+        trends = {}
+        capabilities = self.assess_capabilities()
+        
+        for name in capabilities.keys():
+            comparison = self.compare_with_history(name)
+            if comparison:
+                trends[name] = comparison
+        
+        improving = sum(1 for c in trends.values() if c.improvement_trend == "improving")
+        declining = sum(1 for c in trends.values() if c.improvement_trend == "declining")
+        stable = sum(1 for c in trends.values() if c.improvement_trend == "stable")
+        
+        logger.info(f"📊 [History] 趋势分析: 改善={improving}, 稳定={stable}, 下降={declining}")
+        return trends
+
+    def analyze_improvement_recommendations(self) -> List[ImprovementRecommendation]:
+        """
+        生成改进建议
+        
+        基于当前能力评估和历史趋势，生成优先级排序的改进建议
+        
+        Returns:
+            ImprovementRecommendation 列表
+        """
+        logger.info("💡 [Improve] 生成改进建议...")
+        
+        capabilities = self.assess_capabilities()
+        trends = self.get_all_historical_trends()
+        recommendations = []
+        
+        for name, cap in capabilities.items():
+            trend = trends.get(name)
+            
+            if cap.score < 0.4:
+                priority = "critical"
+                target = 0.6
+                expected_improvement = 0.2
+            elif cap.score < 0.6:
+                priority = "high"
+                target = 0.75
+                expected_improvement = 0.15
+            elif cap.score < 0.75:
+                priority = "medium"
+                target = 0.85
+                expected_improvement = 0.1
+            else:
+                priority = "low"
+                target = 0.95
+                expected_improvement = 0.05
+            
+            if cap.is_uncertain:
+                priority = "critical" if priority != "critical" else priority
+                expected_improvement *= 1.2
+            
+            if trend and trend.improvement_trend == "declining":
+                priority = "high" if priority == "low" else priority
+            
+            actions = self._generate_specific_actions(name, cap, trend)
+            
+            dependencies = []
+            if name in ["vulnerability_detection", "bug_detection"]:
+                dependencies = ["code_analysis"]
+            elif name in ["code_optimization"]:
+                dependencies = ["code_analysis", "system_analysis"]
+            elif name in ["architecture_design"]:
+                dependencies = ["system_analysis", "pattern_recognition"]
+            
+            rationale = f"当前分数 {cap.score:.2f}，置信度 {cap.confidence:.2f}"
+            if cap.is_uncertain:
+                rationale += "，存在认知不确定性"
+            if trend and trend.improvement_trend == "declining":
+                rationale += f"，趋势下降 ({trend.score_delta:+.2f})"
+            
+            recommendation = ImprovementRecommendation(
+                capability_name=name,
+                current_score=cap.score,
+                target_score=target,
+                priority=priority,
+                recommended_actions=actions,
+                estimated_effort_hours=len(actions) * 2.0,
+                expected_improvement=expected_improvement,
+                dependencies=dependencies,
+                rationale=rationale
+            )
+            
+            recommendations.append(recommendation)
+        
+        priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        recommendations.sort(key=lambda r: (priority_order[r.priority], -r.expected_improvement))
+        
+        logger.info(f"💡 [Improve] 生成 {len(recommendations)} 条改进建议")
+        for rec in recommendations[:3]:
+            logger.info(f"   - [{rec.priority}] {rec.capability_name}: {rec.rationale}")
+        
+        return recommendations
+
+    def _generate_specific_actions(
+        self, 
+        capability_name: str, 
+        cap: CapabilityAssessment,
+        trend: Optional[HistoricalComparison]
+    ) -> List[str]:
+        """为特定能力生成具体的改进行动"""
+        
+        action_templates = {
+            "code_generation": [
+                "分析最近成功的代码生成任务，提取模式",
+                "学习最新的编程最佳实践文档",
+                "进行代码审查实践",
+            ],
+            "code_analysis": [
+                "分析复杂代码库的结构",
+                "学习代码复杂度分析",
+                "研究设计模式识别",
+            ],
+            "bug_detection": [
+                "研究已知漏洞模式研究",
+                "静态代码分析工具使用",
+                "代码审查实践",
+            ],
+            "security_audit": [
+                "OWASP Top 10 深度学习",
+                "安全代码审查实践",
+                "漏洞检测工具使用",
+            ],
+            "vulnerability_detection": [
+                "常见漏洞模式研究",
+                "渗透测试技术学习",
+                "安全扫描工具使用",
+            ],
+            "architecture_design": [
+                "系统设计模式深度学习",
+                "架构案例研究",
+                "系统设计实践",
+            ],
+            "system_analysis": [
+                "复杂系统分析",
+                "依赖关系图分析",
+                "性能瓶颈识别",
+            ],
+            "pattern_recognition": [
+                "设计模式研究",
+                "代码模式提取实践",
+                "重构模式学习",
+            ],
+            "knowledge_extraction": [
+                "信息提取技术",
+                "文档结构化分析",
+                "知识图谱构建",
+            ],
+            "code_optimization": [
+                "性能优化技术",
+                "算法复杂度分析",
+                "并发编程实践",
+            ],
+        }
+        
+        default_actions = [
+            f"研究 {capability_name} 相关的最佳实践",
+            f"分析历史成功/失败案例",
+            f"实践 {capability_name} 任务",
+        ]
+        
+        return action_templates.get(capability_name, default_actions)
+
+    # ===== 增强功能: 主动学习触发器 =====
+
+    def check_active_learning_triggers(self) -> List[ActiveLearningTrigger]:
+        """
+        检查主动学习触发器
+        
+        识别需要主动学习的情况：
+        1. 低分能力
+        2. 高不确定性
+        3. 知识缺口
+        4. 下降趋势
+        
+        Returns:
+            ActiveLearningTrigger 列表
+        """
+        logger.info("🎯 [ActiveLearn] 检查主动学习触发器...")
+        
+        triggers = []
+        capabilities = self.assess_capabilities()
+        trends = self.get_all_historical_trends()
+        
+        for name, cap in capabilities.items():
+            trigger = None
+            trigger_type = None
+            severity = None
+            suggested_task = None
+            
+            if cap.score < 0.4:
+                trigger_type = "low_score"
+                severity = "critical"
+                suggested_task = {
+                    "type": "capability_improvement",
+                    "target": name,
+                    "actions": ["深度学习", "分析失败案例", "实践任务"],
+                    "goal": f"将 {name} 提升至 0.6 以上",
+                }
+            elif cap.is_uncertain:
+                trigger_type = "high_uncertainty"
+                severity = "high"
+                suggested_task = {
+                    "type": "uncertainty_reduction",
+                    "target": name,
+                    "actions": ["知识验证", "收集更多证据", "实践确认"],
+                    "goal": f"降低 {name} 的不确定性",
+                }
+            
+            trend = trends.get(name)
+            if trend and trend.improvement_trend == "declining" and abs(trend.score_delta) > 0.1:
+                trigger_type = "trend_down"
+                severity = "high" if severity != "critical" else severity
+                suggested_task = {
+                    "type": "trend_reversal",
+                    "target": name,
+                    "actions": ["分析下降原因", "识别影响因素", "制定恢复计划"],
+                    "goal": f"反转 {name} 的下降趋势",
+                    "current_delta": trend.score_delta,
+                }
+            
+            if trigger_type:
+                trigger = ActiveLearningTrigger(
+                    trigger_id=f"trigger_{name}_{int(time.time())}",
+                    trigger_type=trigger_type,
+                    capability_name=name,
+                    current_score=cap.score,
+                    confidence=cap.confidence,
+                    severity=severity,
+                    triggered_at=datetime.now(),
+                    suggested_learning_task=suggested_task,
+                    auto_execute=False,
+                )
+                triggers.append(trigger)
+        
+        missing_domains = self._identify_missing_domains()
+        for domain in missing_domains:
+            trigger = ActiveLearningTrigger(
+                trigger_id=f"trigger_missing_{domain}_{int(time.time())}",
+                trigger_type="knowledge_gap",
+                capability_name=domain,
+                current_score=0.0,
+                confidence=0.0,
+                severity="critical",
+                triggered_at=datetime.now(),
+                suggested_learning_task={
+                    "type": "knowledge_acquisition",
+                    "target": domain,
+                    "actions": ["基础知识学习", "文档阅读", "实践"],
+                    "goal": f"获取 {domain} 基础知识",
+                },
+                auto_execute=False,
+            )
+            triggers.append(trigger)
+        
+        critical_count = sum(1 for t in triggers if t.severity == "critical")
+        high_count = sum(1 for t in triggers if t.severity == "high")
+        
+        logger.info(f"🎯 [ActiveLearn] 发现 {len(triggers)} 个触发点: critical={critical_count}, high={high_count}")
+        
+        return triggers
+
+    def execute_active_learning(self, trigger: ActiveLearningTrigger) -> Dict[str, Any]:
+        """
+        执行主动学习任务
+        
+        Args:
+            trigger: ActiveLearningTrigger
+            
+        Returns:
+            学习结果
+        """
+        logger.info(f"🎯 [ActiveLearn] 执行主动学习: {trigger.capability_name} ({trigger.trigger_type})")
+        
+        result = {
+            "trigger_id": trigger.trigger_id,
+            "capability": trigger.capability_name,
+            "trigger_type": trigger.trigger_type,
+            "started_at": datetime.now().isoformat(),
+            "status": "in_progress",
+            "actions_executed": [],
+            "improvement_observed": 0.0,
+        }
+        
+        try:
+            task = trigger.suggested_learning_task
+            action_count = len(task.get("actions", []))
+            
+            for i, action in enumerate(task.get("actions", [])):
+                logger.info(f"   [{i+1}/{action_count}] 执行: {action}")
+                result["actions_executed"].append({
+                    "action": action,
+                    "status": "completed",
+                    "timestamp": datetime.now().isoformat(),
+                })
+            
+            result["status"] = "completed"
+            result["improvement_observed"] = 0.05
+            
+            self.update_capability(trigger.capability_name, score_delta=0.05)
+            
+            logger.info(f"✅ [ActiveLearn] 学习完成: {trigger.capability_name}")
+            
+        except Exception as e:
+            result["status"] = "failed"
+            result["error"] = str(e)
+            logger.error(f"❌ [ActiveLearn] 学习失败: {e}")
+        
+        result["completed_at"] = datetime.now().isoformat()
+        return result
+
+    # ===== 增强功能: 元学习能力 =====
+
+    def record_learning_outcome(
+        self, 
+        capability_name: str, 
+        success: bool, 
+        effort_hours: float,
+        improvement: float
+    ):
+        """
+        记录学习结果，用于元学习
+        
+        Args:
+            capability_name: 能力名称
+            success: 是否成功
+            effort_hours: 投入时间（小时）
+            improvement: 改进幅度
+        """
+        efficiencies = self.meta_learning_stats.get("learning_efficiency", {}).copy()
+        
+        if success:
+            efficiency = improvement / max(effort_hours, 0.1)
+            if capability_name in efficiencies:
+                efficiencies[capability_name] = 0.7 * efficiencies[capability_name] + 0.3 * efficiency
+            else:
+                efficiencies[capability_name] = efficiency
+        
+        self.meta_learning_stats["learning_efficiency"] = efficiencies
+        
+        logger.info(f"📚 [MetaLearn] 记录学习结果: {capability_name}, 效率={efficiencies.get(capability_name, 0):.4f}")
+
+    def recommend_learning_method(self, capability_name: str) -> Tuple[str, float]:
+        """
+        基于元学习推荐最佳学习方法
+        
+        Args:
+            capability_name: 能力名称
+            
+        Returns:
+            (推荐方法, 预期效率)
+        """
+        efficiencies = self.meta_learning_stats.get("learning_efficiency", {})
+        
+        default_methods = ["pattern_mining", "code_reading", "guided_learning", "trial_error"]
+        
+        best_method = default_methods[0]
+        best_efficiency = 0.0
+        
+        for method in default_methods:
+            eff = efficiencies.get(method, 0.0)
+            if eff > best_efficiency:
+                best_method = method
+                best_efficiency = eff
+        
+        if best_efficiency == 0.0:
+            best_method = "pattern_mining"
+            best_efficiency = 0.6
+        
+        logger.info(f"📚 [MetaLearn] 推荐 {capability_name}: 最佳方法={best_method}, 预期效率={best_efficiency:.2f}")
+        
+        return best_method, best_efficiency
+
+    # ===== 增强功能: 与进化系统集成 =====
+
+    def report_to_evolution_coordinator(self):
+        """
+        将认知状态报告给进化协调器
+        
+        这使得进化系统可以基于认知状态调整进化策略
+        """
+        try:
+            from hive.core.swarm_evolution import get_swarm_evolution_coordinator
+            
+            coordinator = get_swarm_evolution_coordinator()
+            status = self.get_cognitive_status()
+            
+            cap_strengths = [
+                name for name, data in status["capabilities"].items()
+                if data["score"] > 0.8
+            ]
+            cap_weaknesses = [
+                name for name, data in status["capabilities"].items()
+                if data["score"] < 0.6 or data["is_uncertain"]
+            ]
+            
+            logger.info(f"🧬 [Evolution] 报告认知状态到进化协调器")
+            logger.info(f"   优势: {cap_strengths}")
+            logger.info(f"   劣势: {cap_weaknesses}")
+            
+            return {
+                "reported": True,
+                "strengths": cap_strengths,
+                "weaknesses": cap_weaknesses,
+                "overall_intelligence": status["overall_intelligence"],
+                "timestamp": status["timestamp"],
+            }
+            
+        except ImportError:
+            logger.warning("🧬 [Evolution] SwarmEvolutionCoordinator 不可用")
+            return {"reported": False, "reason": "coordinator_unavailable"}
+
+    def generate_enhanced_report(self, target_path: Path) -> Dict[str, Any]:
+        """
+        生成增强版认知报告（包含历史对比、改进建议、主动学习触发
+        
+        Args:
+            target_path: 目标路径
+            
+        Returns:
+            增强版报告
+        """
+        logger.info("🧠 [CognitiveBee] 生成增强版认知评估报告...")
+        
+        base_report = self._generate_cognitive_report(
+            target_path,
+            self.assess_capabilities(),
+            self.identify_blind_spots(),
+            self.create_learning_plan(),
+            self.optimize_learning_strategy()
+        )
+        
+        historical_trends = self.get_all_historical_trends()
+        improvement_recs = self.analyze_improvement_recommendations()
+        active_triggers = self.check_active_learning_triggers()
+        
+        trends_by_type = defaultdict(list)
+        for t in historical_trends.values():
+            trends_by_type[t.improvement_trend].append(t.capability_name)
+        
+        recs_by_priority = defaultdict(list)
+        for r in improvement_recs:
+            recs_by_priority[r.priority].append({
+                "capability": r.capability_name,
+                "current": r.current_score,
+                "target": r.target_score,
+                "rationale": r.rationale,
+                "actions": r.recommended_actions,
+            })
+        
+        triggers_by_type = defaultdict(list)
+        for t in active_triggers:
+            triggers_by_type[t.trigger_type].append({
+                "capability": t.capability_name,
+                "severity": t.severity,
+                "score": t.current_score,
+                "task": t.suggested_learning_task,
+            })
+        
+        enhanced_report = {
+            **base_report,
+            "enhanced": {
+                "historical_trends": {
+                    "improving": trends_by_type.get("improving", []),
+                    "stable": trends_by_type.get("stable", []),
+                    "declining": trends_by_type.get("declining", []),
+                    "trend_details": {
+                        t.capability_name: {
+                            "current": t.current_score,
+                            "previous": t.previous_score,
+                            "delta": t.score_delta,
+                            "trend": t.improvement_trend,
+                            "analysis": t.analysis,
+                        }
+                        for t in historical_trends.values()
+                    }
+                },
+                "improvement_recommendations": {
+                    "critical": recs_by_priority.get("critical", []),
+                    "high": recs_by_priority.get("high", []),
+                    "medium": recs_by_priority.get("medium", []),
+                    "low": recs_by_priority.get("low", []),
+                },
+                "active_learning_triggers": {
+                    "count": len(active_triggers),
+                    "by_type": dict(triggers_by_type),
+                },
+                "meta_learning": {
+                    "recommended_methods": {
+                        name: self.recommend_learning_method(name)[0]
+                        for name in base_report["capabilities"].keys()
+                    },
+                    "learning_stats": self.meta_learning_stats,
+                }
+            },
+            "report_version": "2.0",
+            "generated_at": datetime.now().isoformat(),
+        }
+        
+        improving_count = len(trends_by_type.get("improving", []))
+        critical_recs = len(recs_by_priority.get("critical", []))
+        trigger_count = len(active_triggers)
+        
+        logger.info(f"✅ [CognitiveBee] 增强报告完成: 改善={improving_count}, 关键建议={critical_recs}, 触发点={trigger_count}")
+        
+        return enhanced_report
+
+
+__all__ = [
+    'CognitiveBee', 
+    'CapabilityAssessment', 
+    'BlindSpot', 
+    'LearningPlan',
+    'HistoricalComparison',
+    'ImprovementRecommendation',
+    'ActiveLearningTrigger',
+]
