@@ -73,6 +73,13 @@ out3.txt
 error_dump.txt
 log_bug.ps1
 40
+progress.txt
+
+# 第三方二进制与运行报告
+vendor/*.whl
+reports/
+shared-brain/events/
+obsidian_notes/
 
 # Testing
 .pytest_cache/
