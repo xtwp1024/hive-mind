@@ -1,0 +1,20 @@
+(define (domain image_generation)
+	(:requirements :typing :strips)
+	(:types text image)
+	(:predicates
+		(IsText ?input_text - text)
+        (IsImage ?input_image - image)
+        (GenerateImageFromText ?input_text - text)
+        (RefineImage ?input_image - image ?input_text - text)
+	)
+	(:action text_to_image ; given a piece of text, generates an image
+		:parameters (?input_text - text)
+		:precondition (IsText ?input_text)
+		:effect (GenerateImageFromText ?input_text)
+	)
+    (:action image_refinement ; given an image, we try to refine it. Image-to-image
+        :parameters (?input_image - image ?input_text - text)
+        :precondition (and (IsImage ?input_image)(IsText ?input_text))
+        :effect (RefineImage ?input_image ?input_text)
+    )
+)

@@ -1,0 +1,27 @@
+(define (domain machine_translation)
+	(:requirements :strips :typing)
+	(:types text language)
+	(:predicates
+		(BackTranslation ?input_text - text ?source_language - language ?target_language - language)
+		(ValidLanguage ?language - language)
+		(IsEvaluationMetric ?metric - text)
+		(Translate ?input_text - text ?language - language ?language - language)
+		(IsText ?input_text - text)
+		(MakeEvaluation ?metric - text ?input_ref_text - text ?input_src_text - text)
+	)
+	(:action get_translation ; translate language of a text from xx to yy
+		:parameters (?source_language - language ?target_language - language ?input_text - text)
+		:precondition (and (ValidLanguage ?target_language) (IsText ?input_text))
+		:effect (Translate ?input_text ?source_language ?target_language)
+	)
+	(:action back_translation ; translate language of a text from xx to yy and then yy back to xx
+		:parameters (?input_text - text ?source_language - language ?target_language - language)
+		:precondition (and (IsText ?input_text) (ValidLanguage ?source_language) (ValidLanguage ?target_language))
+		:effect (BackTranslation ?input_text ?source_language ?target_language)
+	)
+	(:action translation_evaluation ; evaluate the translation quality
+		:parameters (?metric - text ?translated_text - text ?input_text - text)
+		:precondition (and (IsText ?translated_text) (IsText ?input_text) (IsEvaluationMetric ?metric))
+		:effect (MakeEvaluation ?metric ?translated_text ?input_text)
+	)
+)

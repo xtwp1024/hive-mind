@@ -1,0 +1,26 @@
+(define (domain audio)
+	(:requirements :strips :typing)
+	(:types text audio)
+	(:predicates
+		(ConvertAudioToAudio ?input_audio - audio)
+		(IsAudio ?input_audio - audio)
+		(GenerateAudioFromText ?input_text - text)
+		(IsText ?input_text - text)
+		(SpeechRecognition ?input_audio - audio)
+	)
+	(:action text_to_audio ; given a piece of text, convert it to audio
+		:parameters (?input_text - text)
+		:precondition (IsText ?input_text)
+		:effect (GenerateAudioFromText ?input_text)
+	)
+	(:action audio_to_audio ; convert a given audio to another audio
+		:parameters (?input_audio - audio)
+		:precondition (IsAudio ?input_audio)
+		:effect (ConvertAudioToAudio ?input_audio)
+	)
+	(:action audio_to_text ; given an audio, transcribe it to text
+		:parameters (?input_audio - audio)
+		:precondition (IsAudio ?input_audio)
+		:effect (SpeechRecognition ?input_audio)
+	)
+)

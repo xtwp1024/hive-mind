@@ -16,7 +16,11 @@ Phase 2 P2: LLM Reasoning 加持
 
 import logging
 from collections import Counter
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Callable
+from enum import Enum
+from dataclasses import dataclass, field
+import time
+import asyncio
 
 logger = logging.getLogger("Hive.Consensus")
 
@@ -37,6 +41,76 @@ def _get_brain():
             except Exception:
                 return None
     return _brain
+
+
+# ===== Phase 2: 集体决策新增枚举和数据类 =====
+
+class DecisionType(Enum):
+    """决策类型 (Phase 2 新增)"""
+    UNANIMOUS = "unanimous"          # 全票通过
+    MAJORITY = "majority"            # 多数通过 (>50%)
+    SUPER_MAJORITY = "super_majority"  # 超多数 (>=2/3)
+    PLURALITY = "plurality"          # 相对多数
+    WEIGHTED = "weighted"            # 加权投票
+
+
+class VoteOption(Enum):
+    """投票选项 (Phase 2 新增)"""
+    APPROVE = "approve"      # 批准/同意
+    REJECT = "reject"        # 拒绝
+    ABSTAIN = "abstain"      # 弃权
+    DEFER = "defer"          # 延期决策
+
+
+@dataclass
+class Vote:
+    """投票记录 (Phase 2 新增)"""
+    voter_id: str
+    option: VoteOption
+    weight: float = 1.0  # 权重 (基于适应度)
+    justification: Optional[str] = None
+    timestamp: float = field(default_factory=time.time)
+
+
+@dataclass
+class DecisionProposal:
+    """决策提案 (Phase 2 新增)"""
+    proposal_id: str
+    proposer_id: str
+    
+    # 提案内容
+    title: str
+    description: str
+    proposal_type: str  # e.g., "evolve_species", "allocate_resources", "change_strategy"
+    
+    # 决策规则
+    decision_type: DecisionType = DecisionType.MAJORITY
+    quorum: float = 0.5  # 法定人数比例
+    time_limit: float = 300.0  # 决策时限 (秒)
+    
+    # 元数据
+    created_at: float = field(default_factory=time.time)
+    expires_at: Optional[float] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def is_expired(self) -> bool:
+        if self.expires_at is None:
+            return time.time() - self.created_at > self.time_limit
+        return time.time() > self.expires_at
+
+
+@dataclass
+class DecisionResult:
+    """决策结果 (Phase 2 新增)"""
+    proposal_id: str
+    approved: bool
+    vote_summary: Dict[str, int]  # VoteOption.value -> count
+    weighted_summary: Dict[str, float]  # VoteOption.value -> weight sum
+    final_option: Optional[VoteOption]
+    participating_voters: List[str]
+    quorum_reached: bool
+    elapsed_time: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class ConsensusEngine:
@@ -260,3 +334,434 @@ Return ONLY the answer text, no explanation."""
             "consensus_id": job_id,
             "nodes_participated": len(payloads)
         }
+    
+    # ===== Phase 2: 完整投票系统实例方法 =====
+    
+    def __init__(self, communication_bus: Any = None):
+        """初始化共识引擎
+        
+        Args:
+            communication_bus: 通信总线 (SwarmCommunication 实例)
+        """
+        self.active_proposals: Dict[str, DecisionProposal] = {}
+        self.votes: Dict[str, Dict[str, Vote]] = {}  # proposal_id -> {voter_id: Vote}
+        self.decision_history: List[DecisionResult] = []
+        self.communication_bus = communication_bus
+        
+        # 权重计算函数 - 基于蜜蜂适应度
+        self.weight_calculator: Callable[[str], float] = self._default_weight_calculator
+    
+    def _default_weight_calculator(self, voter_id: str) -> float:
+        """默认权重计算 - 所有投票者权重相同
+        
+        实际实现应该查询蜜蜂的适应度分数
+        """
+        return 1.0
+    
+    def cast_vote(
+        self,
+        proposal_id: str,
+        voter_id: str,
+        option: VoteOption,
+        justification: Optional[str] = None,
+    ) -> bool:
+        """提交投票
+        
+        Args:
+            proposal_id: 提案ID
+            voter_id: 投票者ID
+            option: 投票选项
+            justification: 投票理由（可选）
+            
+        Returns:
+            是否成功提交
+        """
+        if proposal_id not in self.active_proposals:
+            logger.warning(f"⚖️ [Consensus] 提案不存在: {proposal_id}")
+            return False
+        
+        if proposal_id not in self.votes:
+            self.votes[proposal_id] = {}
+        
+        weight = self.weight_calculator(voter_id)
+        
+        self.votes[proposal_id][voter_id] = Vote(
+            voter_id=voter_id,
+            option=option,
+            weight=weight,
+            justification=justification,
+        )
+        
+        logger.info(f"⚖️ [Consensus] {voter_id} 投了 {option.value} (提案: {proposal_id})")
+        return True
+    
+    def get_vote_status(self, proposal_id: str) -> Dict:
+        """获取提案的投票状态
+        
+        Args:
+            proposal_id: 提案ID
+            
+        Returns:
+            投票状态字典
+        """
+        if proposal_id not in self.active_proposals:
+            return {"error": "proposal_not_found"}
+        
+        proposal = self.active_proposals[proposal_id]
+        votes = self.votes.get(proposal_id, {})
+        
+        # 统计投票
+        vote_counts: Dict[VoteOption, int] = {
+            VoteOption.APPROVE: 0,
+            VoteOption.REJECT: 0,
+            VoteOption.ABSTAIN: 0,
+            VoteOption.DEFER: 0,
+        }
+        weighted_counts: Dict[VoteOption, float] = {
+            VoteOption.APPROVE: 0.0,
+            VoteOption.REJECT: 0.0,
+            VoteOption.ABSTAIN: 0.0,
+            VoteOption.DEFER: 0.0,
+        }
+        
+        for vote in votes.values():
+            vote_counts[vote.option] += 1
+            weighted_counts[vote.option] += vote.weight
+        
+        total_votes = len(votes)
+        eligible_voters = len(votes)  # 暂时假设所有投票者都是合格的
+        
+        quorum_reached = total_votes >= eligible_voters * proposal.quorum if eligible_voters > 0 else False
+        
+        return {
+            "proposal_id": proposal_id,
+            "proposal": {
+                "title": proposal.title,
+                "type": proposal.proposal_type,
+                "decision_type": proposal.decision_type.value,
+            },
+            "vote_counts": {k.value: v for k, v in vote_counts.items()},
+            "weighted_counts": {k.value: v for k, v in weighted_counts.items()},
+            "total_votes": total_votes,
+            "eligible_voters": eligible_voters,
+            "quorum_reached": quorum_reached,
+            "quorum_required": proposal.quorum,
+            "time_remaining": max(0, proposal.time_limit - (time.time() - proposal.created_at)),
+            "is_expired": proposal.is_expired(),
+        }
+    
+    def _try_early_decision(
+        self,
+        proposal: DecisionProposal,
+        votes: Dict[str, Vote],
+        total_eligible: int,
+    ) -> Optional[DecisionResult]:
+        """尝试提前决策
+        
+        根据决策类型判断是否可以提前结束投票
+        """
+        if not votes:
+            return None
+        
+        # 统计投票
+        vote_counts: Dict[VoteOption, int] = {
+            VoteOption.APPROVE: 0,
+            VoteOption.REJECT: 0,
+            VoteOption.ABSTAIN: 0,
+            VoteOption.DEFER: 0,
+        }
+        weighted_counts: Dict[VoteOption, float] = {
+            VoteOption.APPROVE: 0.0,
+            VoteOption.REJECT: 0.0,
+            VoteOption.ABSTAIN: 0.0,
+            VoteOption.DEFER: 0.0,
+        }
+        
+        for vote in votes.values():
+            vote_counts[vote.option] += 1
+            weighted_counts[vote.option] += vote.weight
+        
+        # 检查法定人数
+        total_votes = len(votes)
+        quorum_reached = total_votes >= total_eligible * proposal.quorum if total_eligible > 0 else False
+        
+        if not quorum_reached:
+            return None
+        
+        # 根据决策类型判断
+        approved = False
+        final_option = None
+        
+        if proposal.decision_type == DecisionType.UNANIMOUS:
+            # 全票通过 - 所有投票者都必须 APPROVE
+            all_approve = all(
+                v.option == VoteOption.APPROVE for v in votes.values()
+            )
+            if all_approve and total_votes == total_eligible:
+                approved = True
+                final_option = VoteOption.APPROVE
+        
+        elif proposal.decision_type == DecisionType.MAJORITY:
+            # 简单多数 (>50%)
+            approve_weight = weighted_counts[VoteOption.APPROVE]
+            reject_weight = weighted_counts[VoteOption.REJECT]
+            total_valid = approve_weight + reject_weight
+            
+            if total_valid > 0:
+                if approve_weight > total_valid / 2:
+                    approved = True
+                    final_option = VoteOption.APPROVE
+                elif reject_weight > total_valid / 2:
+                    approved = False
+                    final_option = VoteOption.REJECT
+        
+        elif proposal.decision_type == DecisionType.SUPER_MAJORITY:
+            # 超多数 (>= 2/3)
+            approve_weight = weighted_counts[VoteOption.APPROVE]
+            total_valid = approve_weight + weighted_counts[VoteOption.REJECT]
+            
+            if total_valid > 0 and approve_weight >= total_valid * (2 / 3):
+                approved = True
+                final_option = VoteOption.APPROVE
+        
+        elif proposal.decision_type == DecisionType.PLURALITY:
+            # 相对多数 - 得票最多的选项获胜
+            max_weight = max(weighted_counts.values())
+            leading_options = [k for k, v in weighted_counts.items() if v == max_weight]
+            
+            if len(leading_options) == 1 and max_weight > 0:
+                final_option = leading_options[0]
+                approved = final_option == VoteOption.APPROVE
+        
+        elif proposal.decision_type == DecisionType.WEIGHTED:
+            # 加权投票 - 简单多数但考虑权重
+            approve_weight = weighted_counts[VoteOption.APPROVE]
+            reject_weight = weighted_counts[VoteOption.REJECT]
+            
+            if approve_weight > reject_weight and approve_weight > 0:
+                approved = True
+                final_option = VoteOption.APPROVE
+            elif reject_weight > approve_weight:
+                approved = False
+                final_option = VoteOption.REJECT
+        
+        # 构建结果
+        if final_option is not None:
+            return self._build_result(
+                proposal=proposal,
+                votes=votes,
+                vote_counts=vote_counts,
+                weighted_counts=weighted_counts,
+                final_option=final_option,
+                approved=approved,
+                quorum_reached=quorum_reached,
+            )
+        
+        return None
+    
+    def _build_result(
+        self,
+        proposal: DecisionProposal,
+        votes: Dict[str, Vote],
+        vote_counts: Dict[VoteOption, int],
+        weighted_counts: Dict[VoteOption, float],
+        final_option: Optional[VoteOption],
+        approved: bool,
+        quorum_reached: bool,
+    ) -> DecisionResult:
+        """构建决策结果"""
+        return DecisionResult(
+            proposal_id=proposal.proposal_id,
+            approved=approved,
+            vote_summary={k.value: v for k, v in vote_counts.items()},
+            weighted_summary={k.value: v for k, v in weighted_counts.items()},
+            final_option=final_option,
+            participating_voters=list(votes.keys()),
+            quorum_reached=quorum_reached,
+            elapsed_time=time.time() - proposal.created_at,
+            metadata={
+                "proposal_type": proposal.proposal_type,
+                "decision_type": proposal.decision_type.value,
+                "proposer_id": proposal.proposer_id,
+            },
+        )
+    
+    def _finalize_decision(
+        self,
+        proposal: DecisionProposal,
+        timeout: bool = False,
+    ) -> DecisionResult:
+        """最终决策 - 超时或投票结束时调用"""
+        votes = self.votes.get(proposal.proposal_id, {})
+        
+        # 统计投票
+        vote_counts: Dict[VoteOption, int] = {
+            VoteOption.APPROVE: 0,
+            VoteOption.REJECT: 0,
+            VoteOption.ABSTAIN: 0,
+            VoteOption.DEFER: 0,
+        }
+        weighted_counts: Dict[VoteOption, float] = {
+            VoteOption.APPROVE: 0.0,
+            VoteOption.REJECT: 0.0,
+            VoteOption.ABSTAIN: 0.0,
+            VoteOption.DEFER: 0.0,
+        }
+        
+        for vote in votes.values():
+            vote_counts[vote.option] += 1
+            weighted_counts[vote.option] += vote.weight
+        
+        total_votes = len(votes)
+        quorum_reached = total_votes > 0
+        
+        # 找出得票最多的选项
+        max_weight = max(weighted_counts.values())
+        leading_options = [k for k, v in weighted_counts.items() if v == max_weight]
+        
+        final_option = leading_options[0] if len(leading_options) == 1 and max_weight > 0 else None
+        approved = final_option == VoteOption.APPROVE if final_option else False
+        
+        if timeout:
+            logger.warning(f"⚖️ [Consensus] 提案 {proposal.proposal_id} 超时，最终投票: {vote_counts}")
+        
+        result = self._build_result(
+            proposal=proposal,
+            votes=votes,
+            vote_counts=vote_counts,
+            weighted_counts=weighted_counts,
+            final_option=final_option,
+            approved=approved,
+            quorum_reached=quorum_reached,
+        )
+        
+        # 记录历史
+        self.decision_history.append(result)
+        
+        # 清理活跃提案
+        self.active_proposals.pop(proposal.proposal_id, None)
+        
+        return result
+    
+    async def propose_decision(
+        self,
+        proposal: DecisionProposal,
+        voter_ids: List[str],
+    ) -> DecisionResult:
+        """提出决策提案并等待结果
+        
+        Args:
+            proposal: 决策提案
+            voter_ids: 投票者ID列表
+            
+        Returns:
+            决策结果
+        """
+        self.active_proposals[proposal.proposal_id] = proposal
+        self.votes[proposal.proposal_id] = {}
+        
+        logger.info(f"⚖️ [Consensus] 提出新提案: {proposal.title} ({proposal.proposal_id})")
+        
+        # 如果有通信总线，广播提案
+        if self.communication_bus:
+            # 广播给所有投票者
+            pass
+        
+        # 等待投票结果
+        start_time = time.time()
+        total_voters = len(voter_ids)
+        
+        while True:
+            elapsed = time.time() - start_time
+            
+            # 检查是否超时
+            if elapsed > proposal.time_limit:
+                return self._finalize_decision(proposal, timeout=True)
+            
+            # 检查当前投票状态
+            current_votes = self.votes.get(proposal.proposal_id, {})
+            votes_received = len(current_votes)
+            
+            # 尝试提前决策
+            result = self._try_early_decision(
+                proposal=proposal,
+                votes=current_votes,
+                total_eligible=total_voters,
+            )
+            
+            if result:
+                # 记录历史
+                self.decision_history.append(result)
+                self.active_proposals.pop(proposal.proposal_id, None)
+                
+                logger.info(f"⚖️ [Consensus] 提案 {proposal.proposal_id} 决策结果: {'通过' if result.approved else '拒绝'}")
+                return result
+            
+            # 等待一下再检查
+            await asyncio.sleep(1.0)
+    
+    def get_decision_history(self) -> List[DecisionResult]:
+        """获取决策历史"""
+        return self.decision_history.copy()
+    
+    def get_active_proposals(self) -> List[DecisionProposal]:
+        """获取活跃提案列表"""
+        return list(self.active_proposals.values())
+    
+    def cancel_proposal(self, proposal_id: str) -> bool:
+        """取消提案
+        
+        Args:
+            proposal_id: 提案ID
+            
+        Returns:
+            是否成功取消
+        """
+        if proposal_id not in self.active_proposals:
+            return False
+        
+        logger.warning(f"⚖️ [Consensus] 取消提案: {proposal_id}")
+        
+        # 创建取消结果
+        proposal = self.active_proposals[proposal_id]
+        result = DecisionResult(
+            proposal_id=proposal_id,
+            approved=False,
+            vote_summary={},
+            weighted_summary={},
+            final_option=None,
+            participating_voters=[],
+            quorum_reached=False,
+            elapsed_time=time.time() - proposal.created_at,
+            metadata={"cancelled": True},
+        )
+        
+        self.decision_history.append(result)
+        self.active_proposals.pop(proposal_id, None)
+        self.votes.pop(proposal_id, None)
+        
+        return True
+
+
+# ===== 便捷函数 =====
+
+_consensus_engine_instance: Optional[ConsensusEngine] = None
+
+
+def get_consensus_engine(communication_bus: Any = None) -> ConsensusEngine:
+    """获取共识引擎单例
+    
+    Args:
+        communication_bus: 通信总线实例（可选）
+        
+    Returns:
+        ConsensusEngine 实例
+    """
+    global _consensus_engine_instance
+    
+    if _consensus_engine_instance is None:
+        _consensus_engine_instance = ConsensusEngine(communication_bus=communication_bus)
+    elif communication_bus is not None:
+        _consensus_engine_instance.communication_bus = communication_bus
+    
+    return _consensus_engine_instance

@@ -1,0 +1,26 @@
+(define (domain text_classification)
+	(:requirements :typing :strips)
+	(:types list text)
+	(:predicates
+		(ClassifyText ?input_text - text ?classes - list)
+		(ClassifySentiment ?input_text - text)
+		(ClassifySpam ?input_text - text)
+		(IsList ?list - list)
+		(IsText ?input_text - text)
+	)
+	(:action classify_text ; Classify the text into given classes
+		:parameters (?input_text - text ?classes - list)
+		:precondition ( and (IsText ?input_text) (IsList ?classes))
+		:effect (ClassifyText ?input_text ?classes)
+	)
+	(:action find_sentiment ; find the sentiment of the text
+		:parameters (?input_text - text)
+		:precondition ( and (IsText ?input_text))
+		:effect (ClassifySentiment ?input_text)
+	)
+	(:action classify_spam ; Check if the text is a spam or not
+		:parameters (?input_text - text)
+		:precondition ( and (IsText ?input_text))
+		:effect (ClassifySpam ?input_text)
+	)
+)

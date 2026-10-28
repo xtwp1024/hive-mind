@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "Hive Evolution Capsules - 存储成功的进化方案组合",
+    "created_at": 1740487200
+  },
+  "evomap_22edc947": {
+    "id": "evomap_22edc947",
+    "source": "evomap",
+    "original_id": null,
+    "title": "",
+    "summary": "",
+    "gdi": 0,
+    "tags": "",
+    "imported_at": 1772021087.511242,
+    "updated_at": 1772021087.511242
+  },
+  "evomap_94cc6abd": {
+    "id": "evomap_94cc6abd",
+    "source": "evomap",
+    "original_id": null,
+    "title": "",
+    "summary": "",
+    "gdi": 0,
+    "tags": "",
+    "imported_at": 1772021087.5132337,
+    "updated_at": 1772021087.5132337
+  },
+  "evomap_3fd89a8f": {
+    "id": "evomap_3fd89a8f",
+    "source": "evomap",
+    "original_id": null,
+    "title": "",
+    "summary": "",
+    "gdi": 0,
+    "tags": "",
+    "imported_at": 1772021087.514234,
+    "updated_at": 1772021087.514234
+  },
+  "evomap_5ef6792a": {
+    "id": "evomap_5ef6792a",
+    "source": "evomap",
+    "original_id": null,
+    "title": "",
+    "summary": "",
+    "gdi": 0,
+    "tags": "",
+    "imported_at": 1772021087.5152347,
+    "updated_at": 1772021087.5152347
+  },
+  "evomap_9d8d3fdf": {
+    "id": "evomap_9d8d3fdf",
+    "source": "evomap",
+    "original_id": null,
+    "title": "",
+    "summary": "",
+    "gdi": 0,
+    "tags": "",
+    "imported_at": 1772021087.5162466,
+    "updated_at": 1772021087.5162466
+  }
+}

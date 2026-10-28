@@ -1,0 +1,25 @@
+(define (domain question_answering)
+	(:requirements :strips :typing)
+	(:types text)
+	(:predicates
+		(ExtracteAnswerFromTable ?question -text ?data - text)
+		(ExtractAnswerFromContext ?question - text ?context - text)
+		(IsText ?input_text - text)
+		(GenerateAnswer ?question - text)
+	)
+	(:action get_answer_when_context_is_given ; answer a question based on some previous context/paragraph
+		:parameters (?question - text ?context - text)
+		:precondition (and (IsText ?question) (IsText ?context))
+		:effect (ExtractAnswerFromContext ?question ?context)
+	)
+	(:action generate_answer_without_context ; open question answering, answering a question when no context is given
+		:parameters (?question - text)
+		:precondition (IsText ?question)
+		:effect (GenerateAnswer ?question)
+	)
+	(:action get_answer_when_data_or_table_is_given ; table question answering, answer a question given a table/dict
+		:parameters (?question - text ?data - text)
+		:precondition (and (IsText ?question) (IsText ?data))
+		:effect (ExtracteAnswerFromTable ?question ?data)
+	)
+)

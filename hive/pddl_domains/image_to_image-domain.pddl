@@ -1,0 +1,20 @@
+(define (domain image_to_image)
+	(:requirements :typing :strips)
+	(:types text image)
+	(:predicates
+		(IsText ?input_text - text)
+        (IsImage ?input_image - image)
+        (SegmentImage ?input_image - image)
+        (DepthEstimation ?input_image - image)  
+	)
+    (:action image_segmentation
+        :parameters (?input_image - image)
+        :precondition (IsImage ?input_image)
+        :effect (SegmentImage ?input_image)
+    )
+    (:action estimate_depth_of_image
+        :parameters (?input_image - image)
+        :precondition (IsImage ?input_image)
+        :effect (DepthEstimation ?input_image)
+    )
+)

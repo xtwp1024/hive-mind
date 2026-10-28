@@ -1,0 +1,32 @@
+(define (domain image_to_text)
+	(:requirements :strips :typing)
+	(:types text image)
+	(:predicates
+		(ObjectDetection ?input_image - image)
+		(ClassifiyImage ?input_image - image)
+		(IsImage ?input_image - image)
+		(VisualQuestionAnswering ?input_image - image ?question - text)
+		(ImageCaptioning ?input_image - image)
+		(IsText ?input_text - text)
+	)
+	(:action classify_image ; classify a given image into the vanilla classes
+		:parameters (?input_image - image)
+		:precondition (IsImage ?input_image)
+		:effect (ClassifiyImage ?input_image)
+	)
+	(:action detect_objects_in_image ; detect/identify the objects present in the iamge
+		:parameters (?input_image - image)
+		:precondition (IsImage ?input_image)
+		:effect (ObjectDetection ?input_image)
+	)
+	(:action caption_image; give a caption to an image or convert the image to text
+		:parameters (?input_image - image)
+		:precondition (IsImage ?input_image)
+		:effect (ImageCaptioning ?input_image)
+	)
+	(:action answer_question_based_on_image; Understanding images and text to answer questions
+		:parameters (?input_image - image ?question - text)
+		:precondition (and (IsImage ?input_image) (IsText ?question))
+		:effect (VisualQuestionAnswering ?input_image ?question)
+	)
+)

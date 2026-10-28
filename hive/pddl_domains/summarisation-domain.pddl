@@ -1,0 +1,33 @@
+(define (domain summarisation)
+	(:requirements :typing :strips)
+	(:types text)
+	(:predicates
+		(IsText ?input_text - text)
+		(InstructionBasedSummary ?instruction - text ?input_text - text)
+		(ExtractedQueriedSummary ?input_query - text ?input_text - text)
+		(MakeEvaluation ?metric - text ?input_ref_text - text ?input_src_text - text)
+		(AbstractSummary ?input_text - text)
+		(ExtractSummary ?input_text - text)
+		(IsEvaluationMetric ?metric - text)
+	)
+	(:action get_extractive_summarization ; Generate a summary by selecting and combining the most important sentences or phrases from the original text.
+		:parameters (?input_text - text)
+		:precondition (IsText ?input_text)
+		:effect (ExtractSummary ?input_text)
+	)
+	(:action get_abstractive_summarization ; Create a summary by understanding the meaning of the text and generating new sentences that capture the main ideas.
+		:parameters (?input_text - text)
+		:precondition (IsText ?input_text)
+		:effect (AbstractSummary ?input_text)
+	)
+	(:action get_instruction_based_summary ; instruction based summarisation
+		:parameters (?input_text - text ?instruction - text)
+		:precondition (and (IsText ?input_text) (IsText ?instruction))
+		:effect (InstructionBasedSummary ?instruction ?input_text)
+	)
+	(:action summarization_evaluation ; Assess the quality of a summary by comparing it to a reference text or gold standard and calculating metrics such as ROUGE or BLEU scores.
+		:parameters (?metric - text ?input_ref_text - text ?input_src_text - text)
+		:precondition (and (IsText ?input_ref_text) (IsText ?input_src_text) (IsEvaluationMetric ?metric))
+		:effect (MakeEvaluation ?metric ?input_ref_text ?input_src_text)
+	)
+)
