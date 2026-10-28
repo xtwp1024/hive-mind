@@ -46,6 +46,34 @@ hive/morgue/
 hive/incubation/graveyard/
 sandbox/
 
+# 运行期产物与本地状态（不入库）
+maplestorycw/
+.temp_aden_hive/
+.agent/
+.claude/
+.temp*/
+hive/incubation/larvae/
+hive/memory/benchmarks/
+hive/evolution/gep/events.jsonl
+hive/memory/events/
+
+# 运行期账本（由程序生成，非源码）
+hive/mining_ledger.json
+hive/discovery_history.json
+hive/science_journal.json
+discovery_history.json
+intel_strategy.json
+test_report.json
+.shared-brain.json
+
+# 临时输出
+out.txt
+out2.txt
+out3.txt
+error_dump.txt
+log_bug.ps1
+40
+
 # Testing
 .pytest_cache/
 .coverage
