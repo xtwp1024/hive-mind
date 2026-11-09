@@ -25,7 +25,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install pwp-qa (本地 vendor wheel, 私有部署)
-        run: pip install ./vendor/pwp_qa-0.1.4-py3-none-any.whl tree-sitter tree-sitter-python
+        run: pip install ./vendor/pwp_qa-0.2.3-py3-none-any.whl tree-sitter tree-sitter-python
 
       - name: PWP-QA baseline (mock)
         run: pwp-qa baseline establish --backend mock -n 3
@@ -53,7 +53,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install pwp-qa + openai (本地 vendor wheel, 私有部署)
-        run: pip install ./vendor/pwp_qa-0.1.4-py3-none-any.whl openai tree-sitter tree-sitter-python
+        run: pip install ./vendor/pwp_qa-0.2.3-py3-none-any.whl openai tree-sitter tree-sitter-python
 
       - name: PWP-QA baseline (real LLM)
         run: pwp-qa baseline establish --backend openai -n 3
