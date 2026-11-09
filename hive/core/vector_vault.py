@@ -8,6 +8,7 @@ Hive 2.0 的统一语义记忆系统，基于 ChromaDB。
 import os
 import logging
 import hashlib
+import struct
 import time
 import json
 from pathlib import Path
@@ -18,6 +19,65 @@ from chromadb.config import Settings
 from hive.config.settings import get_settings
 
 logger = logging.getLogger("Hive.VectorVault")
+
+
+# ============================================================================
+# 轻量 Embedding Function —— 零模型下载依赖
+# 用 SHA256 哈希直接生成固定维度的确定性向量
+# 替代 Chroma DefaultEmbeddingFunction (ONNXMiniLM_L6_V2)，避免首次启动时
+# 从 S3 下载 79MB onnx.tar.gz（速度 ~10KB/s，会卡死 Evolution 阶段）
+# ============================================================================
+class _HashEmbeddingFunction:
+    """确定性哈希向量嵌入 —— 无外部依赖"""
+
+    DIMENSIONS = 256  # 256 floats = 1KB/条，Chroma 默认 384 我们给 256 足够
+
+    def __init__(self, dims: int = 256):
+        self.dims = dims
+
+    def __call__(self, input) -> List[List[float]]:
+        """Chroma 要求的主接口：接收文档列表，返回向量列表"""
+        if isinstance(input, str):
+            input = [input]
+        return [self._hash_vector(doc) for doc in input]
+
+    def embed_query(self, input) -> List[List[float]]:
+        if isinstance(input, str):
+            input = [input]
+        return [self._hash_vector(doc) for doc in input]
+
+    def _hash_vector(self, text: str) -> List[float]:
+        """SHA256 → 足够多字节 → 归一化到 [-1,1]"""
+        # 把文本扩充到 dims * 4 字节（每个 float 占 4 字节）
+        target_bytes = self.dims * 4
+        buf = bytearray()
+        counter = 0
+        # 多次 SHA256 拼接，保证足够长且确定性
+        while len(buf) < target_bytes:
+            h = hashlib.sha256(f"{text}::{counter}".encode("utf-8", errors="ignore")).digest()
+            buf.extend(h)
+            counter += 1
+        # 转 float32 并归一化
+        vec = []
+        for i in range(self.dims):
+            raw = struct.unpack_from('<f', buf, i * 4)[0]
+            # inf/nan 保护 → 剪到 [-1,1]
+            vec.append(max(-1.0, min(1.0, raw if raw == raw and abs(raw) < 1000 else (i % 20 - 10) / 10.0)))
+        # L2 归一化
+        norm = sum(v * v for v in vec) ** 0.5 or 1.0
+        return [v / norm for v in vec]
+
+    # ── Chroma 可选接口（新版本会警告缺失，补上更健壮）──
+    @staticmethod
+    def name() -> str:
+        return "hash_embedding_v256"
+
+    def get_config(self) -> Dict[str, Any]:
+        return {"type": "hash_embedding", "dims": self.dims}
+
+    @staticmethod
+    def build_from_config(config: Dict[str, Any]) -> "_HashEmbeddingFunction":
+        return _HashEmbeddingFunction(dims=config.get("dims", 256))
 
 class VectorVault:
     """向量金库 - 基于 ChromaDB 的统一语义存储"""
@@ -38,8 +98,14 @@ class VectorVault:
         try:
             logger.info(f"💾 初始化 VectorVault @ {self.persist_dir}")
             self.client = chromadb.PersistentClient(path=str(self.persist_dir))
-            self.collection = self.client.get_or_create_collection(name="hive_knowledge")
-            logger.info(f"📚 ChromaDB 连接成功. 当前条目: {self.collection.count()}")
+            # ⚠ 关键：显式指定 embedding_function，跳过 Chroma 默认的
+            # ONNXMiniLM_L6_V2（首次启动从 S3 下载 79MB，速度 ~10KB/s 卡死）
+            self._emb_fn = _HashEmbeddingFunction(dims=256)
+            self.collection = self.client.get_or_create_collection(
+                name="hive_knowledge",
+                embedding_function=self._emb_fn,
+            )
+            logger.info(f"📚 ChromaDB 连接成功. 当前条目: {self.collection.count()} (embed={self._emb_fn.name()})")
         except Exception as e:
             logger.error(f"❌ ChromaDB 初始化失败: {e}")
             raise e

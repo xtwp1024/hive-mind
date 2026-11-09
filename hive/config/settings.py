@@ -24,8 +24,17 @@ class HiveSettings(BaseSettings):
     """
     
     # ========== 路径配置 ==========
-    # 优先使用环境变量 HIVE_HOME, 否则默认为当前工作目录下的 Data 文件夹
-    BASE_DIR: Path = Field(default_factory=lambda: Path(os.getenv("HIVE_HOME", Path.cwd() / "Data")))
+    # 优先使用环境变量 HIVE_HOME, Windows 默认落 D 盘, 其他回退 cwd/Data
+    def _default_base_dir() -> Path:
+        env_home = os.getenv("HIVE_HOME")
+        if env_home:
+            return Path(env_home) / "Data" / "Inbound"
+        if os.name == "nt":
+            # Windows 无 HIVE_HOME 时默认 D 盘
+            return Path("D:/HIVE/Data/Inbound")
+        return Path.cwd() / "Data" / "Inbound"
+
+    BASE_DIR: Path = Field(default_factory=_default_base_dir)
     
     # 子目录默认相对于 BASE_DIR, 除非单独设置了环境变量
     @property

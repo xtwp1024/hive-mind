@@ -85,7 +85,7 @@ class EngineerBee(BaseMinister):
         
         from hive.utils.github_hunter import GithubHunter
         hunter = GithubHunter()
-        prey_list = hunter.hunt(topics, count=limit * 2)
+        prey_list = hunter.hunt_sync(topics, count=limit * 2)
         
         unique_prey = self._filter_unique_prey(prey_list, limit)
         if not unique_prey: return

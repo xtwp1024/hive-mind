@@ -19,11 +19,13 @@ except ImportError:
     BrainInterface = None
     get_brain = None
 
-# 默认知识库路径
-KB_PATH = Path("c:/Users/Administrator/.gemini/antigravity/scratch/AGENT_DEVELOPMENT_KNOWLEDGE_BASE.md")
+# 默认知识库路径（优先环境变量 → 落 D 盘 → 回退项目 docs 目录）
+import os as _os
+_PROJECT_ROOT = Path(_os.getenv("HIVE_HOME", _os.getcwd()))
+KB_PATH = Path(_os.getenv("HIVE_KB_PATH", str(_PROJECT_ROOT / "docs" / "AGENT_DEVELOPMENT_KNOWLEDGE_BASE.md")))
 
-# 本地代码库路径（用于检索真实代码片段）
-CODE_REPOS_PATH = Path("c:/Users/Administrator/Documents/Repos")
+# 本地代码库路径（用于检索真实代码片段，默认落 D 盘）
+CODE_REPOS_PATH = Path(_os.getenv("HIVE_CODE_REPOS_PATH", str(_PROJECT_ROOT / "Data" / "Repos")))
 
 
 class LibrarianBee(BaseBee):

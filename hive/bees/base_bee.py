@@ -88,11 +88,20 @@ class BaseBee(BeeInterface, multiprocessing.Process):
         bee_type = self.__class__.__name__
         logger.info(f"[{bee_type}-{self.pid_str}] 启动中，目标: {self.dna.id}")
         try:
-            self.devour()
-        except Exception as e:
-            self._handle_process_crash(e)
-            self.return_payload({"source": self.id, "status": "CRITICAL_FAILURE", "error": str(e)})
-        logger.info(f"[{bee_type}-{self.pid_str}] 进程结束")
+            try:
+                self.devour()
+            except Exception as e:
+                self._handle_process_crash(e)
+                self.return_payload({"source": self.id, "status": "CRITICAL_FAILURE", "error": str(e)})
+        finally:
+            # 强制关闭 MemoryBox（Windows multiprocessing 子进程里 __del__ 不可靠）
+            if self.memory is not None:
+                try:
+                    self.memory.close()
+                except Exception:
+                    pass
+                self.memory = None
+            logger.info(f"[{bee_type}-{self.pid_str}] 进程结束")
 
     def _handle_process_crash(self, e: Exception):
         bee_type = self.__class__.__name__

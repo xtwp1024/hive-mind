@@ -55,6 +55,10 @@ class QueenBee(QueenInterface):
 
         self.dna_queue = multiprocessing.Queue()
 
+        # 运行时统计 —— 让 get_colony_status 返回真实数字
+        self._honey_collected: int = 0   # 累计被 consume_honey 收割的 payload 数
+        self._cycle: int = 0
+
         # 将她核心依赖挂入解耦池，由于 WorkerManager 是紧耦合在队列上的，我们这里将它暂作核心件注册
         from hive.core.worker_manager import WorkerManager
         wm = WorkerManager(result_queue)
@@ -124,7 +128,10 @@ class QueenBee(QueenInterface):
         if not payloads:
             return
 
-        logger.info(f"==== 👑 女王蜂开始收割战果 (共有 {len(payloads)} 滴花蜜) ====")
+        # ⬇⬇⬇ 关键：把收割数量计入累计花蜜 ⬇⬇⬇
+        self._honey_collected += len(payloads)
+
+        logger.info(f"==== 👑 女王蜂开始收割战果 (共有 {len(payloads)} 滴花蜜, 累计 {self._honey_collected}) ====")
         offspring = honey_processor.process_batch(payloads)
 
         # 路由逻辑：遍历原始 payloads，处理特殊信号（SPAWNED / MapReduce）
@@ -240,9 +247,14 @@ class QueenBee(QueenInterface):
     def get_colony_status(self) -> dict[str, Any]:
         """获取蜂群状态"""
         wm = BeeServiceLocator.get_service("WorkerManager")
+        base = {}
         if wm:
-            return wm.get_status()
-        return {"active_workers": 0, "honey_collected": 0}
+            base = wm.get_status()
+        else:
+            base = {"active_workers": 0}
+        # ⬇⬇⬇ 把 Queen 自己的统计合并进去 ⬇⬇⬇
+        base["honey_collected"] = self._honey_collected
+        return base
 
     def shutdown(self, wait: bool = True, timeout: float = 30) -> None:
         """优雅关闭"""

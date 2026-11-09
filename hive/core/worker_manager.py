@@ -149,45 +149,82 @@ class WorkerManager:
         total_workers = len(self.active_workers) + len(self.active_async_workers)
         return max(0, self.MAX_ACTIVE_WORKERS - total_workers)
 
-    def cleanup_dead_workers(self) -> int:
-        """清理死亡进程（并行 join，避免串行阻塞 n 秒）"""
-        import threading
-        # 快照进程引用，避免迭代过程中字典被修改导致 KeyError
-        dead_items = [(wid, proc) for wid, proc in self.active_workers.items() if not proc.is_alive()]
+    def cleanup_dead_workers(self, force_timeout: float = 30.0) -> int:
+        """清理死亡 + 僵死 Worker 进程
 
-        if not dead_items:
+        两路策略：
+        1. 正常死亡进程：is_alive()=False → join 收尸（原有逻辑）
+        2. 僵死进程：is_alive()=True 但 start_time 已超过 force_timeout → terminate→kill 强收
+
+        Args:
+            force_timeout: worker 存活超过这个秒数就判定为僵死（启动到现在的总时长）
+        """
+        import threading
+
+        now = time.time()
+
+        # ── 第 1 路：正常死亡 ──
+        dead_items = [
+            (wid, proc) for wid, proc in self.active_workers.items()
+            if not proc.is_alive()
+        ]
+
+        # ── 第 2 路：僵死检测 ──
+        zombie_items = []
+        for wid, proc in list(self.active_workers.items()):
+            if proc.is_alive():
+                ft = self.worker_futures.get(wid, {})
+                start_time = ft.get("start_time", now)
+                age = now - start_time
+                if age > force_timeout:
+                    logger.warning(
+                        f"[WorkerManager] 发现僵死 Worker {wid} "
+                        f"(age={age:.1f}s > {force_timeout}s)，强制终止"
+                    )
+                    zombie_items.append((wid, proc))
+
+        if not dead_items and not zombie_items:
             return 0
 
         results = {}
 
-        def _join_one(wid, proc, results_dict):
-            """在独立线程中 join 单个进程"""
-            proc.join(timeout=1)
-            exit_code = proc.exitcode
-            if exit_code is None:
-                logger.warning(f"[WorkerManager] 强制终止 {wid}")
+        def _join_or_kill(wid, proc, results_dict, timeout_for_join=1.5):
+            """统一的收尸：先 join 等一下，还活就 terminate，再 kill"""
+            proc.join(timeout=timeout_for_join)
+            if proc.is_alive():
                 try:
                     proc.terminate()
+                    proc.join(timeout=2)
+                except (OSError, PermissionError):
+                    pass
+            if proc.is_alive():
+                logger.warning(f"[WorkerManager] {wid} 未响应 terminate，直接 kill")
+                try:
+                    proc.kill()
                     proc.join(timeout=1)
                 except (OSError, PermissionError):
                     pass
-                exit_code = proc.exitcode
-            results_dict[wid] = exit_code
+            results_dict[wid] = proc.exitcode
 
         threads = []
         for wid, proc in dead_items:
-            t = threading.Thread(target=_join_one, args=(wid, proc, results))
-            threads.append(t)
-            t.start()
+            t = threading.Thread(target=_join_or_kill, args=(wid, proc, results, 1))
+            threads.append(t); t.start()
+        for wid, proc in zombie_items:
+            t = threading.Thread(target=_join_or_kill, args=(wid, proc, results, 1.5))
+            threads.append(t); t.start()
         for t in threads:
-            t.join()
+            t.join(timeout=5)
 
-        # 在主线程中安全地更新状态和删除（持有 GIL，串行执行安全）
-        for wid, _ in dead_items:
+        # 主线程安全删除
+        total = len(dead_items) + len(zombie_items)
+        for wid, _ in dead_items + zombie_items:
             self._update_worker_end_status(wid)
             self.active_workers.pop(wid, None)
 
-        return len(dead_items)
+        if zombie_items:
+            logger.warning(f"[WorkerManager] 本轮清理含 {len(zombie_items)} 个僵死 Worker 被强杀")
+        return total
 
     def _update_worker_end_status(self, worker_id: str) -> None:
         """更新 Worker 结束状态，并清理过期记录（保留最近1000条）"""

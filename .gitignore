@@ -81,6 +81,9 @@ reports/
 shared-brain/events/
 obsidian_notes/
 
+# Chroma / ONNX 模型缓存（vector_vault 已改用哈希嵌入，此处为历史残留）
+cache/
+
 # Testing
 .pytest_cache/
 .coverage

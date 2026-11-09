@@ -101,8 +101,14 @@ class ResourceMonitor:
             memory_used_gb = memory.used / (1024**3)
             memory_total_gb = memory.total / (1024**3)
 
-            # 磁盘使用（Windows 用 C:\，其他用 /）
-            disk_path = "C:\\" if platform.system() == "Windows" else "/"
+            # 磁盘使用（优先 HIVE_HOME 所在盘 → Windows 用 D:\，其他用 /）
+            hive_home = os.environ.get("HIVE_HOME", "")
+            if hive_home and hive_home[0].isalpha():
+                disk_path = hive_home[:2] + "\\"  # 例如 D:\
+            elif platform.system() == "Windows":
+                disk_path = "D:\\"
+            else:
+                disk_path = "/"
             disk = psutil.disk_usage(disk_path)
             disk_percent = disk.percent
             disk_used_gb = disk.used / (1024**3)
