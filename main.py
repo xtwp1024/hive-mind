@@ -34,6 +34,7 @@ from hive.core.queen import QueenBee
 from hive.ministers.engineer import get_engineer
 from hive.core.dna import BeeDNA
 from hive.core.warmup import get_warmup
+from hive.utils.event_stream import emit, init_events_file
 
 logger = get_logger(__name__)
 
@@ -75,29 +76,44 @@ async def initialize_system():
 
 
 def _handle_warmup_phase(cycle_count: int, engineer: Any) -> List[BeeDNA]:
-    """处理预热阶段任务分配"""
-    if cycle_count != 1:
-        logger.info("Assigning tasks...")
+    """处理预热阶段任务分配
+
+    策略：
+    - Cycle 1：用 Warmup 预热 40 种蜂种（保证所有蜂种登场）
+    - Cycle 2+：先用 engineer.assign_tasks 找真实任务；如果没活，
+                 回退到 warmup 模式生成随机 idle 任务，保证蜂群持续运转
+    """
+    if cycle_count == 1:
+        logger.info("Warming up - Ensuring all bee species are present...")
         try:
-            dna_batch = engineer.assign_tasks(capacity=30)
-            logger.info(f"Assigned {len(dna_batch)} tasks")
+            warmup = get_warmup()
+            dna_batch = warmup.create_active_swarm(capacity=30)
+            species_status = warmup.get_species_status()
+            logger.info(f"Warmup complete: {species_status['total_species']} species")
             return dna_batch
         except Exception as e:
-            logger.error(f"Failed to assign tasks: {e}")
-            return []
+            logger.error(f"Warmup failed: {e}")
 
-    # 周期 1：预热
-    logger.info("Warming up - Ensuring all bee species are present...")
+    # Cycle 2+：先试真实任务，没活就回退到 warmup idle
+    logger.info("Assigning tasks...")
+    try:
+        dna_batch = engineer.assign_tasks(capacity=30)
+        if dna_batch:
+            logger.info(f"Assigned {len(dna_batch)} real tasks")
+            return dna_batch
+        logger.info("Engineer 暂无真实任务，回退 warmup idle 模式")
+    except Exception as e:
+        logger.error(f"Failed to assign tasks: {e}")
+
+    # 回退 warmup
     try:
         warmup = get_warmup()
         dna_batch = warmup.create_active_swarm(capacity=30)
-        species_status = warmup.get_species_status()
-        logger.info(f"Warmup complete: {species_status['total_species']} species")
+        logger.info(f"Warmup fallback: {len(dna_batch)} idle tasks")
         return dna_batch
     except Exception as e:
-        logger.error(f"Warmup failed: {e}")
-        dna_batch = engineer.assign_tasks(capacity=30)
-        return dna_batch
+        logger.error(f"Warmup fallback failed: {e}")
+        return []
 
 
 async def _handle_deployment_phase(queen: QueenBee, dna_batch: List[BeeDNA]) -> None:
@@ -107,20 +123,64 @@ async def _handle_deployment_phase(queen: QueenBee, dna_batch: List[BeeDNA]) -> 
         return
 
     logger.info(f"Deploying {len(dna_batch)} bees...")
-    
-    # V2 Execution
+
+    # 优先尝试 V2 异步调度器（需要预注册 Actor）
     results = await queen.deploy_swarm_v2(dna_batch)
-    logger.info(f"Processed {len(results)} tasks")
-    
-    # 进化处理
+
+    if results:
+        # V2 成功：直接走 V2 进化路径
+        logger.info(f"[V2 Dispatcher] Processed {len(results)} tasks")
+        offspring_dna = queen.process_results_v2(results)
+        if offspring_dna:
+            logger.info(f"Executing {len(offspring_dna)} offspring tasks...")
+            queen.process_results_v2(await queen.deploy_swarm_v2(offspring_dna))
+        return
+
+    # V2 无 Actor 或空转 → 回退 V1 WorkerManager 多进程路径
+    logger.info("[V2 Dispatcher] No registered actors, falling back to V1 WorkerManager...")
+    queen.deploy_swarm(dna_batch)
+
+    # 等待工蜂进程完成
+    await _wait_for_v1_workers(queen)
+
+    # 回收队列结果 + 进化繁育
     logger.info("Evolution & Digestion...")
-    offspring_dna = queen.process_results_v2(results)
-    
-    # 执行子代任务
-    if offspring_dna:
-        logger.info(f"Executing {len(offspring_dna)} offspring tasks...")
-        offspring_results = await queen.deploy_swarm_v2(offspring_dna)
-        queen.process_results_v2(offspring_results)
+    queen.consume_honey()
+
+
+async def _wait_for_v1_workers(queen: QueenBee, poll_interval: float = 0.3, max_wait: float = 45) -> None:
+    """等待 V1 WorkerManager 中所有活跃工蜂完成
+
+    配合 WorkerManager.cleanup_dead_workers 的僵死检测：
+    - 正常 worker 秒返回 → 下一轮 poll 就被清理
+    - 僵死 worker 超过 ZOMBIE_THRESHOLD (20s) → 被 force_timeout 强杀
+    - max_wait 只是最终兜底（需要大于 force_timeout 才有意义）
+    """
+    from hive.core.service_locator import BeeServiceLocator
+    worker_manager = BeeServiceLocator.get_service("WorkerManager")
+    if not worker_manager:
+        await asyncio.sleep(2)
+        return
+
+    ZOMBIE_THRESHOLD = 20.0  # 工蜂存活超过 20s 就判定为僵死
+
+    elapsed = 0.0
+    while elapsed < max_wait:
+        removed = worker_manager.cleanup_dead_workers(force_timeout=ZOMBIE_THRESHOLD)
+        active = worker_manager.active_workers
+        if not active:
+            if removed > 0:
+                logger.info(f"[_wait] 本轮清理 {removed} 只 Worker，蜂巢空了 ✓ (花了 {elapsed:.1f}s)")
+            break
+        await asyncio.sleep(poll_interval)
+        elapsed += poll_interval
+
+    # 最终清场
+    worker_manager.cleanup_dead_workers(force_timeout=5.0)  # 最后给 5s 阈值收漏网之鱼
+    active_count = len(worker_manager.active_workers)
+    if active_count > 0:
+        logger.warning(f"[{max_wait}s 兜底超时] 仍有 {active_count} 只工蜂活跃，强制 shutdown")
+        worker_manager.shutdown(timeout=5)
 
 
 def _update_metrics_and_health(queen: QueenBee, monitor: Any, metrics: Any) -> None:
@@ -143,16 +203,37 @@ async def _execute_single_cycle(cycle_count: int, max_cycles: int, queen: QueenB
     logger.info(f"Cycle {cycle_count}/{max_cycles}")
     logger.info("=" * 60)
 
+    # ── 每轮 cycle 开始前，先清理 WorkerManager 残留 ──
+    # （Evolution 阶段 Queen 可能 spawn 子代 worker 但没人等它们，残留占满 MAX_WORKERS 容量）
+    from hive.core.service_locator import BeeServiceLocator
+    wm = BeeServiceLocator.get_service("WorkerManager")
+    if wm and wm.active_workers:
+        pre_clean = len(wm.active_workers)
+        wm.cleanup_dead_workers(force_timeout=3.0)
+        if wm.active_workers:
+            # 还活的一律清场（这是新 cycle，旧 worker 不应留）
+            logger.info(f"[Cycle 预热] 强制清场 {len(wm.active_workers)} 只残留 worker")
+            wm.shutdown(timeout=2)
+        if pre_clean:
+            logger.info(f"[Cycle {cycle_count}] WorkerManager 清场: {pre_clean} → {len(wm.active_workers)}")
+
+    emit("cycle_start", cycle=cycle_count, total=max_cycles)
+
     # 1. 任务分配
     dna_batch = _handle_warmup_phase(cycle_count, engineer)
 
     # 2. 部署蜂群
+    emit("bees_deploying", count=len(dna_batch), cycle=cycle_count)
     await _handle_deployment_phase(queen, dna_batch)
 
     # 3. 更新指标
     _update_metrics_and_health(queen, monitor, metrics)
 
-    # 4. 等待下一轮
+    # 4. 事件收尾
+    status = queen.get_colony_status()
+    emit("cycle_end", cycle=cycle_count, honey=status.get("honey_collected", 0), active=status.get("active_workers", 0))
+
+    # 5. 等待下一轮
     await asyncio.sleep(1)
 
 
@@ -179,6 +260,10 @@ async def run_hive():
     """运行蜂巢主循环"""
     logger.info("\nStarting Hive Mind Swarm")
     
+    # 初始化事件流（前端动画数据源）
+    init_events_file()
+    emit("system_init", message="Hive Mind Swarm online")
+    
     metrics = get_metrics()
     monitor = get_monitor()
     engineer = get_engineer()
@@ -187,6 +272,7 @@ async def run_hive():
     result_queue = multiprocessing.Queue()
     queen = QueenBee(result_queue)
     logger.info("QueenBee initialized")
+    emit("queen_born")
 
     # 主循环
     max_cycles = 10
@@ -202,6 +288,7 @@ async def run_hive():
         raise
     finally:
         _cleanup_hive(queen)
+        emit("system_shutdown")
 
     _log_final_metrics(metrics)
 

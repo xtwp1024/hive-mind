@@ -11,7 +11,7 @@ import time
 import json
 import psutil
 from functools import wraps
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, jsonify, render_template_string, request, send_from_directory, Response
 from flask_cors import CORS
 from pathlib import Path
 
@@ -19,6 +19,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 app = Flask(__name__)
 CORS(app)
+
+# ====== 目录常量 ======
+BASE_DIR = Path(__file__).parent                           # d:\Hive
+WEB_DIR = BASE_DIR / "web"                                 # d:\Hive\web
+HIVE_HOME = Path(os.getenv("HIVE_HOME", str(BASE_DIR)))   # D:/HIVE 或 d:/Hive
+EVENTS_FILE = HIVE_HOME / "Data" / "events.jsonl"          # D:\HIVE\Data\events.jsonl
 
 DEBUG_MODE = os.environ.get("HIVE_DASHBOARD_DEBUG", "false").lower() == "true"
 BASIC_AUTH_ENABLED = os.environ.get("HIVE_DASHBOARD_AUTH", "true").lower() == "true"
@@ -44,7 +50,6 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-BASE_DIR = Path(__file__).parent
 MORGUE_DIR = BASE_DIR / "hive" / "morgue"
 LEDGER_PATH = BASE_DIR / "hive" / "mining_ledger.json"
 
@@ -239,6 +244,33 @@ def get_ratelimiter_status():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
+
+
+# ====================== 蜂群动画端点（免鉴权） ======================
+
+@app.route('/swarm')
+def swarm_page():
+    """蜂群可视化动画主页 —— 直接把 web/swarm.html 喂给浏览器"""
+    return send_from_directory(str(WEB_DIR), "swarm.html")
+
+
+@app.route('/events.jsonl')
+def events_jsonl():
+    """前端轮询的事件流 —— 返回纯文本 JSONL"""
+    if EVENTS_FILE.exists():
+        try:
+            text = EVENTS_FILE.read_text(encoding="utf-8")
+        except Exception:
+            text = ""
+    else:
+        text = ""
+    return Response(text, mimetype="text/plain; charset=utf-8")
+
+
+@app.route('/web/<path:filename>')
+def web_static(filename):
+    """web/ 目录下的通用静态文件（CSS/JS/assets 等）"""
+    return send_from_directory(str(WEB_DIR), filename)
 
 
 if __name__ == "__main__":

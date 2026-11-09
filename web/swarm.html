@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>🐝 Hive Mind — 蜂群运行可视化</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; background:#0a0a12; color:#e8d58a; font-family:'Segoe UI',system-ui,sans-serif; overflow:hidden; }
+
+/* 顶部状态栏 */
+.hud {
+  position:fixed; top:0; left:0; right:0;
+  display:flex; gap:24px; padding:14px 24px;
+  background:linear-gradient(180deg,rgba(10,10,18,0.95),rgba(10,10,18,0));
+  z-index:10; font-size:14px; letter-spacing:0.5px;
+}
+.hud .title { font-weight:700; color:#f4b740; font-size:18px; text-shadow:0 0 12px rgba(244,183,64,0.5); }
+.hud .stat { color:#c9b97a; }
+.hud .stat b { color:#f4b740; }
+.hud .mode { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.hud button {
+  background:transparent; border:1px solid #f4b740; color:#f4b740;
+  padding:4px 14px; border-radius:20px; cursor:pointer; font-size:12px;
+}
+.hud button.active { background:#f4b740; color:#0a0a12; }
+.hud button:hover { box-shadow:0 0 10px rgba(244,183,64,0.4); }
+
+/* 花蜜罐 */
+.honey-jar {
+  position:fixed; bottom:24px; right:24px; width:120px; height:160px; z-index:10;
+  display:flex; flex-direction:column; align-items:center;
+}
+.jar-label { color:#c9b97a; font-size:12px; margin-bottom:6px; }
+.jar-body {
+  width:80px; height:130px; border:3px solid #f4b740; border-radius:10px 10px 40px 40px;
+  position:relative; overflow:hidden; background:rgba(0,0,0,0.4);
+  box-shadow:0 0 20px rgba(244,183,64,0.3), inset 0 0 20px rgba(244,183,64,0.1);
+}
+.honey-level {
+  position:absolute; bottom:0; left:0; right:0;
+  background:linear-gradient(0deg,#e8920a,#f4b740,#ffd66b);
+  height:0%; transition:height 0.6s cubic-bezier(.2,.8,.3,1);
+  box-shadow:0 0 18px rgba(244,183,64,0.7);
+}
+.honey-count { color:#f4b740; font-weight:700; font-size:18px; margin-top:6px; }
+
+/* 周期进度 */
+.cycle-bar {
+  position:fixed; bottom:24px; left:24px; z-index:10; font-size:12px;
+}
+.cycle-bar .pbar {
+  width:200px; height:8px; background:rgba(244,183,64,0.15); border-radius:4px; overflow:hidden; margin-top:6px;
+}
+.cycle-bar .pfill {
+  height:100%; width:0%; background:linear-gradient(90deg,#f4b740,#ffd66b);
+  box-shadow:0 0 8px #f4b740; transition:width 0.4s;
+}
+
+canvas { display:block; }
+
+/* 底部日志 */
+.log-panel {
+  position:fixed; bottom:12px; left:50%; transform:translateX(-50%);
+  font-size:11px; color:rgba(232,213,138,0.55); font-family:'Consolas',monospace;
+  pointer-events:none; z-index:9; height:18px; overflow:hidden;
+}
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <div class="title">🐝 Hive Mind Swarm</div>
+  <div class="stat">周期: <b id="hud-cycle">0/10</b></div>
+  <div class="stat">活跃工蜂: <b id="hud-active">0</b></div>
+  <div class="stat">花蜜: <b id="hud-honey">0</b></div>
+  <div class="stat">状态: <b id="hud-status" style="color:#7dff9a">● 在线</b></div>
+  <div class="mode">
+    <button id="btn-demo" class="active" onclick="setMode('demo')">🎬 演示模式</button>
+    <button id="btn-live" onclick="setMode('live')">📡 实时</button>
+  </div>
+</div>
+
+<div class="honey-jar">
+  <div class="jar-label">🍯 花蜜罐</div>
+  <div class="jar-body"><div class="honey-level" id="honey-lv"></div></div>
+  <div class="honey-count" id="honey-num">0</div>
+</div>
+
+<div class="cycle-bar">
+  <div>Cycles</div>
+  <div class="pbar"><div class="pfill" id="cycle-fill"></div></div>
+</div>
+
+<div class="log-panel" id="log"></div>
+
+<canvas id="c"></canvas>
+
+<script>
+// ====== 画布 ======
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy;
+function resize(){
+  W = canvas.width = innerWidth * devicePixelRatio;
+  H = canvas.height = innerHeight * devicePixelRatio;
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = innerHeight + 'px';
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  cx = innerWidth / 2;
+  cy = innerHeight / 2;
+}
+window.addEventListener('resize', resize); resize();
+
+// ====== 状态 ======
+const state = {
+  cycle: 0, total: 10,
+  activeBees: 0, honey: 0,
+  bees: [],         // 活跃工蜂
+  trails: [],       // 飞行轨迹
+  particles: [],    // 花蜜粒子
+  queenPulse: 0,
+  mode: 'demo',     // demo | live
+  lastEvents: [],
+};
+
+// ====== 蜂类 ======
+const SPECIES = [
+  {name:'Miner',     color:'#f4b740',  orbit:1.0},
+  {name:'Architect', color:'#9ad8ff',  orbit:1.1},
+  {name:'Librarian', color:'#a6e8a1',  orbit:0.9},
+  {name:'Darwin',    color:'#ff9dd6',  orbit:1.05},
+  {name:'Sentinel',  color:'#ff7777',  orbit:1.2},
+  {name:'Standard',  color:'#f4b740',  orbit:1.0},
+  {name:'Gatherer',  color:'#c9b97a',  orbit:0.95},
+  {name:'Seeker',    color:'#b4a0ff',  orbit:1.15},
+  {name:'Antibody',  color:'#ff6b6b',  orbit:1.25},
+  {name:'Warden',    color:'#8bc34a',  orbit:1.1},
+];
+
+function spawnBee(autoForage=true){
+  const sp = SPECIES[Math.floor(Math.random()*SPECIES.length)];
+  const angle = Math.random() * Math.PI * 2;
+  const bee = {
+    id: Math.random().toString(36).slice(2,8),
+    species: sp.name,
+    color: sp.color,
+    state: 'idle',    // idle | outbound | working | returning
+    angle,
+    orbitRadius: 60 + sp.orbit * 25 + Math.random()*20,
+    orbitSpeed: 0.008 + Math.random()*0.012,
+    targetX: 0, targetY: 0,
+    workTimer: 0,
+    phase: 'leaving',  // leaving | working | returning
+    x: cx + Math.cos(angle)*80,
+    y: cy + Math.sin(angle)*80,
+    wingPhase: Math.random()*Math.PI*2,
+    autoForage,       // true=演示模式自主外勤, false=实时模式仅轨道飞行
+  };
+  // 只有 autoForage 的工蜂才分配外勤任务
+  if(autoForage && Math.random() < 0.45){
+    bee.state = 'outbound';
+    const r = Math.min(innerWidth,innerHeight)*0.38;
+    bee.targetX = cx + (Math.random()-0.5)*r*1.6;
+    bee.targetY = cy + (Math.random()-0.5)*r*1.6;
+    bee.phase = 'leaving';
+  }
+  state.bees.push(bee);
+  state.activeBees = state.bees.length;
+  document.getElementById('hud-active').textContent = state.activeBees;
+  log(`🐝 ${sp.name} 起飞了`);
+}
+
+function updateBees(dt){
+  for(let i=state.bees.length-1; i>=0; i--){
+    const b = state.bees[i];
+    b.wingPhase += dt * 30;
+
+    if(b.state === 'idle'){
+      // 绕蜂后轨道飞行
+      b.angle += b.orbitSpeed * dt * 60;
+      b.x = cx + Math.cos(b.angle) * b.orbitRadius;
+      b.y = cy + Math.sin(b.angle) * b.orbitRadius;
+    }
+    else if(b.state === 'outbound'){
+      if(b.phase === 'leaving'){
+        b.x += (b.targetX - b.x) * 0.03;
+        b.y += (b.targetY - b.y) * 0.03;
+        if(Math.hypot(b.targetX-b.x, b.targetY-b.y) < 10){
+          b.phase = 'working';
+          b.workTimer = 30 + Math.random()*60;  // 0.5-1.5s
+          log(`🔨 ${b.species} 在执行任务`);
+        }
+      } else if(b.phase === 'working'){
+        b.workTimer -= dt*60;
+        b.x = b.targetX + Math.sin(b.workTimer*0.3)*20;
+        b.y = b.targetY + Math.cos(b.workTimer*0.3)*15;
+        if(b.workTimer <= 0){
+          b.phase = 'returning';
+          b.state = 'returning';
+        }
+      }
+    }
+    else if(b.state === 'returning'){
+      b.x += (cx - b.x) * 0.04;
+      b.y += (cy - b.y) * 0.04;
+      if(Math.hypot(cx-b.x, cy-b.y) < 50){
+        // 只有 autoForage 的工蜂才加蜜（实时模式下 honey 完全由事件驱动）
+        if(b.autoForage){
+          state.honey++;
+          honeyJarFill();
+          spawnHoneyDrop(b.x, b.y);
+        }
+        // 80% 留下继续待命，20% 退休
+        if(Math.random() < 0.8){
+          b.state = 'idle';
+          b.angle = Math.atan2(b.y-cy, b.x-cx);
+        } else {
+          state.bees.splice(i,1);
+        }
+        state.activeBees = state.bees.length;
+        document.getElementById('hud-active').textContent = state.activeBees;
+      }
+    }
+  }
+}
+
+function honeyJarFill(){
+  const max = 50;
+  const pct = Math.min(state.honey, max) / max * 100;
+  document.getElementById('honey-lv').style.height = pct + '%';
+  document.getElementById('honey-num').textContent = state.honey;
+  document.getElementById('hud-honey').textContent = state.honey;
+  document.getElementById('hud-active').textContent = state.activeBees;
+}
+
+function spawnHoneyDrop(x, y){
+  for(let i=0; i<5; i++){
+    state.particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*3,
+      vy: -Math.random()*3 - 1,
+      life: 40 + Math.random()*20,
+      size: 2 + Math.random()*3,
+    });
+  }
+}
+
+function updateParticles(dt){
+  for(let i=state.particles.length-1; i>=0; i--){
+    const p = state.particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15;
+    p.life -= dt*60;
+    if(p.life <= 0) state.particles.splice(i,1);
+  }
+}
+
+// ====== 绘制 ======
+function drawQueen(){
+  state.queenPulse += 0.03;
+  const pulse = Math.sin(state.queenPulse) * 0.15 + 1;
+
+  // 光环
+  const grd = ctx.createRadialGradient(cx,cy,0, cx,cy,90*pulse);
+  grd.addColorStop(0,'rgba(244,183,64,0.35)');
+  grd.addColorStop(0.5,'rgba(244,183,64,0.08)');
+  grd.addColorStop(1,'rgba(244,183,64,0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(cx,cy,90*pulse,0,Math.PI*2); ctx.fill();
+
+  // 蜂后主体
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(state.queenPulse*0.3);
+
+  // 身体（椭圆）
+  ctx.fillStyle = '#f4b740';
+  ctx.beginPath(); ctx.ellipse(0,0,22,14,0,0,Math.PI*2); ctx.fill();
+  // 条纹
+  ctx.fillStyle = '#2a1a0a';
+  for(let i=-8; i<=8; i+=4){
+    ctx.fillRect(i-1.5,-13,3,26);
+  }
+  // 王冠
+  ctx.fillStyle = '#ffd66b';
+  ctx.beginPath();
+  ctx.moveTo(-12,-16); ctx.lineTo(-8,-22); ctx.lineTo(-4,-16);
+  ctx.lineTo(0,-24); ctx.lineTo(4,-16); ctx.lineTo(8,-22); ctx.lineTo(12,-16);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#c9902a'; ctx.lineWidth = 1; ctx.stroke();
+
+  ctx.restore();
+
+  // 标签
+  ctx.fillStyle = '#f4b740';
+  ctx.font = 'bold 13px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('👑 QUEEN BEE', cx, cy + 50);
+}
+
+function drawBee(b){
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(Math.atan2(b.y-(state.mode==='demo'?cy:cy), b.x-(state.mode==='demo'?cx:cx)) + Math.PI/2);
+
+  // 翅膀（扇动）
+  const wingY = Math.sin(b.wingPhase) * 6;
+  ctx.fillStyle = 'rgba(200,220,255,0.55)';
+  ctx.beginPath(); ctx.ellipse(-7, -4+wingY, 9, 5, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 7, -4-wingY, 9, 5,  0.3, 0, Math.PI*2); ctx.fill();
+
+  // 身体
+  ctx.fillStyle = b.color;
+  ctx.beginPath(); ctx.ellipse(0,0,8,11,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#1a0f05';
+  ctx.fillRect(-2,-9,4,3); ctx.fillRect(-2,-3,4,3); ctx.fillRect(-2,3,4,3);
+
+  // 采蜜时发光
+  if(b.state === 'working'){
+    ctx.shadowColor = '#f4b740'; ctx.shadowBlur = 15;
+  }
+
+  ctx.restore();
+}
+
+function drawParticles(){
+  for(const p of state.particles){
+    ctx.fillStyle = `rgba(244,183,64,${Math.max(0,p.life/50)})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+function drawBackground(){
+  // 深色星点
+  if(!this._stars){
+    this._stars = Array.from({length:80}, () => ({
+      x: Math.random()*innerWidth,
+      y: Math.random()*innerHeight,
+      r: Math.random()*1.2,
+      a: Math.random()*0.5+0.1,
+    }));
+  }
+  ctx.fillStyle = '#0a0a12'; ctx.fillRect(0,0,innerWidth,innerHeight);
+  ctx.fillStyle = 'rgba(200,180,100,0.05)';
+  for(const s of this._stars){
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  }
+
+  // 蜂巢纹理（六边形网格，淡）
+  ctx.strokeStyle = 'rgba(244,183,64,0.04)';
+  ctx.lineWidth = 1;
+  const size = 32;
+  const w = size*Math.sqrt(3), h = size*1.5;
+  for(let row=-1; row<innerHeight/h+2; row++){
+    for(let col=-1; col<innerWidth/w+2; col++){
+      const x = col*w + (row%2===0?0:w/2);
+      const y = row*h;
+      ctx.beginPath();
+      for(let i=0;i<6;i++){
+        const a = Math.PI/3*i;
+        const px = x + Math.cos(a)*size*0.9;
+        const py = y + Math.sin(a)*size*0.9;
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.stroke();
+    }
+  }
+}
+
+// ====== 主循环 ======
+let lastTime = performance.now();
+function frame(now){
+  const dt = Math.min((now - lastTime)/1000, 0.1);
+  lastTime = now;
+
+  drawBackground();
+  updateBees(dt);
+  updateParticles(dt);
+  drawQueen();
+  for(const b of state.bees) drawBee(b);
+  drawParticles();
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ====== 演示模式 ======
+let demoIntervalId = null;   // 保存引用以便切换模式时清除
+
+function runDemo(){
+  // 初始一群蜂
+  for(let i=0; i<10; i++) spawnBee();
+
+  let cycleTick = 0;
+  demoIntervalId = setInterval(() => {
+    cycleTick++;
+    if(cycleTick % 15 === 0){
+      state.cycle++;
+      document.getElementById('hud-cycle').textContent = state.cycle + '/' + state.total;
+      document.getElementById('cycle-fill').style.width = (state.cycle/state.total*100) + '%';
+      log(`📊 Cycle ${state.cycle}/${state.total}`);
+      // 每个 cycle 加 2-4 只新蜂
+      const add = 2 + Math.floor(Math.random()*3);
+      for(let i=0;i<add;i++) spawnBee();
+    }
+    // 随机补充一只（如果掉了）
+    if(state.bees.length < 6 && Math.random() < 0.3) spawnBee();
+  }, 500);
+}
+
+function stopDemo(){
+  if(demoIntervalId !== null){
+    clearInterval(demoIntervalId);
+    demoIntervalId = null;
+  }
+}
+
+// ====== 实时模式（读 events.jsonl）======
+let eventTail = 0;
+function pollEvents(){
+  if(state.mode !== 'live') return;
+  fetch('/events.jsonl')
+    .then(r => r.text())
+    .then(txt => {
+      const lines = txt.split('\n');
+      if(lines.length > eventTail){
+        for(let i=eventTail; i<lines.length; i++){
+          const line = lines[i].trim();
+          if(!line) continue;
+          try { handleEvent(JSON.parse(line)); } catch(e){}
+        }
+        eventTail = lines.length;
+      }
+    })
+    .catch(()=>{});
+  setTimeout(pollEvents, 500);
+}
+
+function handleEvent(ev){
+  const d = ev.data || {};
+  // 实时模式下用 autoForage=false：工蜂只做轨道飞行，不自主采蜜
+  const LF = false;
+  switch(ev.type){
+    case 'system_init':
+      log('🟢 Hive Online');
+      break;
+    case 'queen_born':
+      log('👑 Queen Born');
+      break;
+    case 'cycle_start':
+      state.cycle = d.cycle; state.total = d.total;
+      document.getElementById('hud-cycle').textContent = d.cycle + '/' + d.total;
+      document.getElementById('cycle-fill').style.width = (d.cycle/d.total*100) + '%';
+      log(`📊 Cycle ${d.cycle}/${d.total}`);
+      break;
+    case 'cycle_end':
+      state.honey = d.honey;
+      state.activeBees = d.active;
+      document.getElementById('hud-active').textContent = d.active;
+      honeyJarFill();
+      break;
+    case 'bees_deploying':
+      for(let i=0;i<Math.min(d.count, 15);i++) spawnBee(LF);
+      break;
+    case 'system_shutdown':
+      log('🔴 Hive Offline');
+      document.getElementById('hud-status').innerHTML = '<span style="color:#ff7777">● 离线</span>';
+      break;
+  }
+}
+
+// ====== 模式切换 ======
+function setMode(mode){
+  state.mode = mode;
+  document.getElementById('btn-demo').classList.toggle('active', mode==='demo');
+  document.getElementById('btn-live').classList.toggle('active', mode==='live');
+  // 停掉另一模式的定时器
+  stopDemo();
+
+  if(mode === 'demo'){
+    state.bees = []; state.honey = 0; state.cycle = 0;
+    state.total = 10;
+    document.getElementById('hud-cycle').textContent = '0/10';
+    document.getElementById('cycle-fill').style.width = '0%';
+    document.getElementById('hud-status').innerHTML = '<span style="color:#7dff9a">● 演示</span>';
+    honeyJarFill();
+    eventTail = 0;  // 切回演示也清掉实时模式的文件指针
+    runDemo();
+  } else {
+    state.bees = []; state.honey = 0; state.cycle = 0;
+    state.activeBees = 0;
+    document.getElementById('hud-cycle').textContent = '0/0';
+    document.getElementById('hud-active').textContent = '0';
+    document.getElementById('cycle-fill').style.width = '0%';
+    document.getElementById('hud-status').innerHTML = '<span style="color:#f4b740">● 实时</span>';
+    honeyJarFill();
+    eventTail = 0;
+    log('📡 连接事件流...');
+    pollEvents();
+  }
+}
+
+function log(msg){
+  const el = document.getElementById('log');
+  el.textContent = msg;
+}
+
+// 默认演示模式
+setMode('demo');
+</script>
+</body>
+</html>
