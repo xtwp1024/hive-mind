@@ -4,6 +4,7 @@
 使用psutil监控系统资源使用情况（CPU、内存、磁盘、网络）。
 """
 
+import os
 import platform
 from dataclasses import dataclass
 from typing import Optional
@@ -214,6 +215,8 @@ class ResourceMonitor:
         Returns:
             系统信息字典
         """
+        # 运行时冒烟验证（main.initialize_system）会读取这两个 key；
+        # 以前缺失导致日志恒显 "CPU/Memory: unknown"，补齐真实值。
         return {
             "platform": platform.system(),
             "platform_release": platform.release(),
@@ -222,6 +225,8 @@ class ResourceMonitor:
             "processor": platform.processor(),
             "hostname": platform.node(),
             "python_version": platform.python_version(),
+            "cpu_count": psutil.cpu_count(logical=True) or 0,
+            "memory_total_gb": round(psutil.virtual_memory().total / (1024**3), 2),
         }
 
     def log_snapshot(self, snapshot: Optional[ResourceSnapshot] = None) -> None:

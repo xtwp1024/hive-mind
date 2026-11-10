@@ -10,6 +10,7 @@
 """
 
 import asyncio
+import os
 import sys
 import multiprocessing
 from pathlib import Path
@@ -275,8 +276,14 @@ async def run_hive():
     emit("queen_born")
 
     # 主循环
-    max_cycles = 10
-    
+    # HIVE_SMOKE_CYCLES: 有界运行时验证用（tools/smoke_runtime.py），
+    # 未设置时保持默认 10 周期，不改变正常启动行为。
+    try:
+        max_cycles = max(1, int(os.environ.get("HIVE_SMOKE_CYCLES", "10")))
+    except ValueError:
+        logger.warning("HIVE_SMOKE_CYCLES 非整数，回退默认 10")
+        max_cycles = 10
+
     try:
         for i in range(max_cycles):
             await _execute_single_cycle(i + 1, max_cycles, queen, engineer, monitor, metrics)

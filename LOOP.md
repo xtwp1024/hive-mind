@@ -27,23 +27,28 @@ python tools/loop_check.py                  # 静态体检：见下
 
 1. **语法**：所有入库 `.py` 通过 `py_compile`
 2. **模块闭合**：所有 `from hive.* / import hive.*` 目标在检出树中可解析
-3. **镜像一致**：`D:/repos/hive-mind` 的 HEAD 与远端 `origin/master` 一致（不一致先同步，不算推进）
+3. **镜像一致**（R1 修订）：`D:/repos/hive-mind` HEAD 必须 == `origin/master`；主工作区 HEAD 允许**领先**（待推送的正常推进态），但落后/分叉仍 FAIL。旧口径要求三方严格相等，会在每轮 commit 后、push 前误报基线已坏。
 
-静态体检只保证「能解析、能编译」，**不等于服务能跑**。运行时验证见 P0-2，未跑通前不得把项目状态写成「可用」。
+**第 4 层（可选，R1 新增）**：`python tools/smoke_runtime.py --cycles 1`（须用装了依赖的托管 venv）。依赖缺失时退出码 2 显式 SKIP，**不算通过**；2 周期以上会暴露 P0-3，目前预期 FAIL。
 
-## 三、当前快照（2026-11-10）
+静态体检只保证「能解析、能编译」，**不等于服务能跑**。R1 实证：静态三项全 PASS 时仍存在 3 处只在运行时暴露的缺陷。未跑通前不得把项目状态写成「可用」。
+
+## 三、当前快照（2026-11-10 R1 刷新）
+
+> 以 git 实测为准，不照抄上一轮台账（R0 快照曾漏记 `12b41ef` 回填提交）。
 
 | 项 | 值 |
 | --- | --- |
-| HEAD | `3478df9`（远端与镜像已对齐） |
-| 提交数 | 31 |
-| 跟踪文件 | 396（322 个 .py） |
-| 工作区 | 干净 |
-| 静态体检 | `PASS`（语法 0 失败 / 116 个 hive.* 目标 0 缺失 / 镜像 0 问题） |
-| 验证层级 | 静态通过；**运行时未验证** |
+| HEAD | `12b41ef`（R1 开工基线；R1 提交后以 `git rev-parse HEAD` 为准） |
+| 提交数 | 32（R1 开工基线） |
+| 跟踪文件 | 396（322 个 .py）；R1 新增 3 个入库文件 |
+| 工作区 | R1 开工时干净 |
+| 静态体检 | `PASS`（语法 0 失败 / 116 个 hive.* 目标 0 缺失 / 镜像对齐） |
+| 运行时 | **已首次跑通且有界冒烟 PASS**：`smoke_runtime.py --cycles 1` EXIT=0、10 个 SUCCESS 载荷、正常收尾；`--cycles 2` 仍 FAIL（P0-3） |
+| 验证层级 | 静态 PASS + 1 周期冒烟 PASS；**完整运行时/服务仍不可用**（依赖未装齐、P0-1/P0-3 未清） |
 | 资料库档案 | `https://www.workbuddy.cn/space/d/URL2Tg73gmbxGrjut4nPoj` |
 
-2026-11-10 R0 入库 4 个提交：`d14135d` 运行时健壮性（僵死 Worker 回收、缓存落 D 盘、哈希嵌入）、`db74a7a` 可视化（事件流 + swarm.html + warmup 回退）、`ee24c6f` CI 版本 bump、`3478df9` 本台账与体检脚本。清理的是 10/31–11/01 遗留的 15 项未提交改动。
+2026-11-10 R0 入库 4 个提交：`d14135d` 运行时健壮性（僵死 Worker 回收、缓存落 D 盘、哈希嵌入）、`db74a7a` 可视化（事件流 + swarm.html + warmup 回退）、`ee24c6f` CI 版本 bump、`3478df9` 本台账与体检脚本，外加 `12b41ef` 回填快照。清理的是 10/31–11/01 遗留的 15 项未提交改动。
 
 ## 四、待办队列
 
@@ -56,10 +61,22 @@ python tools/loop_check.py                  # 静态体检：见下
 - B. workflow 改为从内部源安装，缺源时显式跳过并标注 skip 原因
 - C. 把 QA 步骤改成不依赖 pwp-qa 的等价静态检查
 
-**P0-2　运行时从未跑通**
-依赖 `chromadb / openai / ollama / psycopg2 / flask` 未安装，`main.py` 没起过。
-验收：在托管 venv `~/.workbuddy/binaries/python/envs/default` 装依赖 → 跑一次最小 smoke（起服务或一个主循环周期）→ 把真实报错写进本节。装不上的依赖写清原因，不要假报成功。
-注意：base 解释器（`~/.workbuddy/binaries/python/versions/.../python.exe`）没有任何第三方包，别在它上面装。
+**P0-2　运行时首次跑通（R1 已达成「有界冒烟」，但项目仍非可用）**
+
+R1 实测结论（`2026-11-10`）：
+- **通路**：`pypi.org` 直连、代理 7897、清华源全部 `SSLEOFError`/无匹配；**阿里源 `https://mirrors.aliyun.com/pypi/simple/` 可用**。装齐启动链轻量依赖 `pydantic-settings 2.16.2 / structlog 26.1.0 / psutil 7.2.2 / typing-inspection 0.4.5`（`httpx/pydantic/requests/numpy/python-dotenv` 本就在 venv）。
+- **最小 smoke 真实跑通**：托管 venv 下 `HIVE_SMOKE_CYCLES=1 python main.py` → EXIT=0、209 行输出、10 个 `返回载荷: SUCCESS`、`Hive cleanup complete`、`Final Metrics Summary` 正常收尾。`smoke_runtime.py --cycles 1` = PASS。
+- **装不上的依赖（如实登记，不假报）**：`chromadb / openai / ollama / psycopg2 / flask / scikit-learn` 本轮**未装**——启动链扫描（55 个 hive 模块）显示 `main.py` 可达路径只需 `chromadb httpx psutil pydantic pydantic_settings requests structlog`，其中 `chromadb` 仅在 `vector_vault.py` 顶层 import、未被 1 周期 warmup 路径实例化，故冒烟能过；**但完整功能（语义记忆/Web 服务/DB）依然未验证**。
+- **静态 PASS 漏掉的 3 处真实运行时缺陷**（本轮实证，非推测）：
+  1. `hive/utils/monitor.py` 缺 `import os` → `get_snapshot()` 抛 `name 'os' is not defined`，被 `except` 吞成全 0 默认值（日志 `CPU/Memory: unknown` 即此）。**已修**。
+  2. `ResourceMonitor.get_system_info()` 不返回 `cpu_count`/`memory_total_gb`，而 `main.initialize_system` 读这两个 key → 日志恒显 unknown。**已修**（现为 `CPU: 16 cores`）。
+  3. `engineer.assign_tasks` → `_perform_active_hunting` → `GithubHunter.hunt_sync` → `asyncio.run(self.hunt())`，在主循环 `asyncio.run(main())` 内嵌套调用 → 每周期 `RuntimeError: asyncio.run() cannot be called from a running event loop`，静默回退 warmup。**未修，拆为 P0-3**。
+- 验收证据：`tools/smoke_runtime.py`（1 周期 PASS / 2 周期 FAIL 精确捕获第 3 条）、`tests/utils/test_r1_runtime_regressions.py` 5 项 + `test_loop_check_mirror.py` 4 项 = 9 passed、旧实现注入反证（删掉 `monitor.os` 后精确复现 `name 'os' is not defined` 与全 0 默认值）。
+- 注意：base 解释器（`~/.workbuddy/binaries/python/versions/.../python.exe`）没有任何第三方包，别在它上面装。
+
+**P0-3　主动狩猎在主循环内必然失败（R1 新增，未修）**
+`hunt_sync` 用 `asyncio.run()`，而 `engineer.assign_tasks()` 是同步函数、从 `asyncio.run(main())` 的事件循环里调用 ⇒ 第 2 周期起每周期抛 `RuntimeError` 并回退 warmup，`smoke_runtime.py --cycles 2` 因此 FAIL。
+修法涉及行为决策，**不擅自改**：① 把 `hunt_sync` 改为检测 running loop 并用 `loop.run_until_complete`/独立线程；② 让 `assign_tasks` 走 async 链路；③ 主循环内显式跳过狩猎（会改变「主动狩猎」语义）。另注：狩猎默认 5 关键词 × 6s 间隔、限流冷却 120s，冒烟若真触发会拖慢，需一并定超时口径。
 
 ### P1 · 质量与债务
 
@@ -108,8 +125,22 @@ python tools/loop_check.py                  # 静态体检：见下
 开工前先扫 `D:/编程复利系统/rules/RULES.md`；命中既有规则时直接复用，并在对应条目上 `hits+1`（附 commit sha 或路径作证据）。没命中不硬凑。
 本项目已产出的一条经验：「提交时只 add 当阶段文件 → 远端仓库变成残缺快照且不报错」，值得回写候选池。
 
+**R1 命中 2 条（已回链、已回读校验）**：
+- `R-20261015-05`「通路配方不跨对象保证，换源/换客户端必须重新探测」：pypi 直连 + 代理 7897 + 清华源全败、阿里源成功。hits `11 → 12`，证据追加至 `CANDIDATES.md` C-20261015-05、`RULES.md` 复用行。
+- `R-20261010-19`「不要信状态文档，先 git log + 实测」：本台账快照 `3478df9`/31 与实测 `12b41ef`/32 漂移；另用 `gh api` 独立复核远端。hits `14 → 15`，证据追加至 C-20261010-19、`RULES.md` 复用行。
+- 同时复用了 `R-20261010-11`「旧实现注入反证」与 `R-20261010-08`「修完必做运行时真实调用」的方法（未重复计数，避免硬凑）。
+
+**本轮新增候选（值得回写候选池，hits=0）**：静态验收口径「全绿」与运行时行为之间存在断层——`py_compile` + import 闭合都过，仍可能有 `NameError` 藏在 `except` 兜底分支里被吞成默认值。**推论：任何带宽泛 `except Exception` 返回兜底值的路径，静态检查天然不可见，必须靠运行时真实调用 + 反证覆盖**（本轮 `get_snapshot()` 的 `name 'os' is not defined` 即此形态）。
+
 ## 八、推进日志
 
 | 时间 | 轮次 | 做了什么 | 证据 | 下一步 |
 | --- | --- | --- | --- | --- |
-| 2026-11-10 | R0 建档 | 清理 10/31–11/01 遗留 15 项未提交改动，分 3 提交入库；排除 `cache/`；建立本台账、体检脚本与长效自动化 | `d14135d` `db74a7a` `ee24c6f` `3478df9`；12 文件 py_compile 全过；末次体检 `PASS` | 推进 P0-2（运行时验证），P0-1 待用户决策 |
+| 2026-11-10 | R0 建档 | 清理 10/31–11/01 遗留 15 项未提交改动，分 3 提交入库；排除 `cache/`；建立本台账、体检脚本与长效自动化 | `d14135d` `db74a7a` `ee24c6f` `3478df9` `12b41ef`；12 文件 py_compile 全过；末次体检 `PASS` | 推进 P0-2（运行时验证），P0-1 待用户决策 |
+| 2026-11-10 10:25–10:58 | R1（推进 + 即时口径修订） | 打通 P0-2：实测阿里源装齐启动链依赖、`main.py` **首次真实跑通**并正常收尾；修静态 PASS 漏掉的 2 处运行时缺陷（缺 `import os`、`get_system_info` 少 key）；新增有界周期开关、第 4 层 `smoke_runtime.py`、9 项回归测试；就地把镜像验收口径改为「允许本地领先」并令体检自证范围。遗留 `hunt_sync` 缺陷拆为 P0-3（需行为决策，未擅改） | 体检 `PASS`（322 .py / 116 import / 镜像对齐）；`smoke_runtime.py --cycles 1` = `PASS`（EXIT=0、10 SUCCESS、CPU: 16 cores），`--cycles 2` = `FAIL`（精确捕获 `asyncio.run() cannot be called from a running event loop`）；pytest 9 passed；旧实现注入反证复现 `name 'os' is not defined` 与全 0 默认值；`gh api` 复核远端 `12b41ef` = 本地 HEAD、ahead 0 | P0-3 修法需决策；补装 `chromadb` 等依赖验证完整功能；P0-1 仍待用户决策 |
+
+**R1 元审视（提前触发，理由：本轮实证「验收口径覆盖不住新风险」，属立即触发条款）**
+- 问1 验收口径是否漏新风险：**是，且是本轮最大发现**。静态三项全 PASS 仍漏 3 处运行时缺陷 ⇒ 新增第 4 层 `tools/smoke_runtime.py`（依赖缺失显式 SKIP、error 级别日志纳入判定，不恒绿）；`loop_check.py` 增加 `SCOPE` 自证行，明确「PASS ≠ 服务能跑」。
+- 问2 待办是否过期/重复：P0-2 描述「从未跑通」已过期，改为「首次有界冒烟达成 + 项目仍非可用」；新暴露缺陷立为 P0-3，未与既有项重复。
+- 问3 路径/假设是否漂移：**是**。① 台账快照写 `3478df9`/31，实测 `12b41ef`/32（R0 回填提交未计入）；②「三方 HEAD 严格相等」假设与「每轮先 commit 再 push」流程冲突，已改；③「依赖装不上」的假设被推翻——不是装不上，是默认 pypi 源不通，阿里源可用。
+- 轮次计数：R0 建档 + R1 = **2 轮**，距 R6 元审视还差 4 轮。
