@@ -40,10 +40,11 @@ python tools/loop_check.py                  # 静态体检：见下
 | 项 | 值 |
 | --- | --- |
 | HEAD | `12b41ef`（R1 开工基线；R1 提交后以 `git rev-parse HEAD` 为准） |
-| 提交数 | 32（R1 开工基线） |
-| 跟踪文件 | 396（322 个 .py）；R1 新增 3 个入库文件 |
-| 工作区 | R1 开工时干净 |
-| 静态体检 | `PASS`（语法 0 失败 / 116 个 hive.* 目标 0 缺失 / 镜像对齐） |
+| 提交数 | 33（R1 主提交 `ec0930c` 后；回填提交后以 `git rev-list --count HEAD` 为准） |
+| 跟踪文件 | 399（325 个 .py）；R1 新增 3 个入库文件 |
+| 工作区 | 干净（R1 提交后） |
+| 推送状态 | **本地领先待补推**：直连 `Recv failure: Connection was reset`、代理 7897 `schannel: failed to receive handshake`；按约定各试一次即止，未反复重试。`gh api` 复核远端仍 `12b41ef`，未分叉 |
+| 静态体检 | `PASS`（325 个 .py 语法 0 失败 / 116 个 hive.* 目标 0 缺失 / 镜像与远端一致、本地领先 1 待推送） |
 | 运行时 | **已首次跑通且有界冒烟 PASS**：`smoke_runtime.py --cycles 1` EXIT=0、10 个 SUCCESS 载荷、正常收尾；`--cycles 2` 仍 FAIL（P0-3） |
 | 验证层级 | 静态 PASS + 1 周期冒烟 PASS；**完整运行时/服务仍不可用**（依赖未装齐、P0-1/P0-3 未清） |
 | 资料库档案 | `https://www.workbuddy.cn/space/d/URL2Tg73gmbxGrjut4nPoj` |
@@ -137,7 +138,7 @@ R1 实测结论（`2026-11-10`）：
 | 时间 | 轮次 | 做了什么 | 证据 | 下一步 |
 | --- | --- | --- | --- | --- |
 | 2026-11-10 | R0 建档 | 清理 10/31–11/01 遗留 15 项未提交改动，分 3 提交入库；排除 `cache/`；建立本台账、体检脚本与长效自动化 | `d14135d` `db74a7a` `ee24c6f` `3478df9` `12b41ef`；12 文件 py_compile 全过；末次体检 `PASS` | 推进 P0-2（运行时验证），P0-1 待用户决策 |
-| 2026-11-10 10:25–10:58 | R1（推进 + 即时口径修订） | 打通 P0-2：实测阿里源装齐启动链依赖、`main.py` **首次真实跑通**并正常收尾；修静态 PASS 漏掉的 2 处运行时缺陷（缺 `import os`、`get_system_info` 少 key）；新增有界周期开关、第 4 层 `smoke_runtime.py`、9 项回归测试；就地把镜像验收口径改为「允许本地领先」并令体检自证范围。遗留 `hunt_sync` 缺陷拆为 P0-3（需行为决策，未擅改） | 体检 `PASS`（322 .py / 116 import / 镜像对齐）；`smoke_runtime.py --cycles 1` = `PASS`（EXIT=0、10 SUCCESS、CPU: 16 cores），`--cycles 2` = `FAIL`（精确捕获 `asyncio.run() cannot be called from a running event loop`）；pytest 9 passed；旧实现注入反证复现 `name 'os' is not defined` 与全 0 默认值；`gh api` 复核远端 `12b41ef` = 本地 HEAD、ahead 0 | P0-3 修法需决策；补装 `chromadb` 等依赖验证完整功能；P0-1 仍待用户决策 |
+| 2026-11-10 10:25–10:58 | R1（推进 + 即时口径修订） | 打通 P0-2：实测阿里源装齐启动链依赖、`main.py` **首次真实跑通**并正常收尾；修静态 PASS 漏掉的 2 处运行时缺陷（缺 `import os`、`get_system_info` 少 key）；新增有界周期开关、第 4 层 `smoke_runtime.py`、9 项回归测试；就地把镜像验收口径改为「允许本地领先」并令体检自证范围。遗留 `hunt_sync` 缺陷拆为 P0-3（需行为决策，未擅改） | 体检 `PASS`（322 .py / 116 import / 镜像对齐）；`smoke_runtime.py --cycles 1` = `PASS`（EXIT=0、10 SUCCESS、CPU: 16 cores），`--cycles 2` = `FAIL`（精确捕获 `asyncio.run() cannot be called from a running event loop`）；pytest 9 passed；旧实现注入反证复现 `name 'os' is not defined` 与全 0 默认值；`gh api` 复核远端 `12b41ef`、开工 ahead 0；R1 主提交 `ec0930c`（7 文件 +358/-33）；旧口径反证：此时三方 distinct=2，旧规则会误报 FAIL | **下一轮先补推**（直连/代理各试一次）；再推进 P0-3 修法决策、补装 `chromadb` 等依赖验证完整功能；P0-1 仍待用户决策 |
 
 **R1 元审视（提前触发，理由：本轮实证「验收口径覆盖不住新风险」，属立即触发条款）**
 - 问1 验收口径是否漏新风险：**是，且是本轮最大发现**。静态三项全 PASS 仍漏 3 处运行时缺陷 ⇒ 新增第 4 层 `tools/smoke_runtime.py`（依赖缺失显式 SKIP、error 级别日志纳入判定，不恒绿）；`loop_check.py` 增加 `SCOPE` 自证行，明确「PASS ≠ 服务能跑」。
