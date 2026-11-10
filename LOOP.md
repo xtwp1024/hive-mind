@@ -33,13 +33,13 @@ python tools/loop_check.py                  # 静态体检：见下
 
 静态体检只保证「能解析、能编译」，**不等于服务能跑**。R1 实证：静态三项全 PASS 时仍存在 3 处只在运行时暴露的缺陷。未跑通前不得把项目状态写成「可用」。
 
-## 三、当前快照（2026-11-10 R2 刷新）
+## 三、当前快照（2026-11-11 R4 刷新）
 
 > **易变值不写死**（R1 修订，源自 R-20261010-19「HEAD 是会移动的状态」）：
 > HEAD / 提交数 / 领先数一律以 git 实测为准，本表只记**不可变的开工基线**与**验收结论**。
 > 开工前跑：`git rev-parse HEAD` / `git rev-list --count HEAD` / `git ls-files | wc -l`。
 > R0 快照曾漏记 `12b41ef` 回填提交；R1 回填时又让「33 / 领先 1」立刻过期，故改为指针式。
-> 不可变历史：**R1 功能主提交 `ec0930c`**（7 文件 +358/-33）、**R2 功能主提交 `fb757cd`**（2 文件 +153/-3）、**R3 功能主提交 `696b76e`**（7 文件 +392/-42）；
+> 不可变历史：**R1 功能主提交 `ec0930c`**（7 文件 +358/-33）、**R2 功能主提交 `fb757cd`**（2 文件 +153/-3）、**R3 功能主提交 `696b76e`**（7 文件 +392/-42）、**R4 功能主提交 `d92ef5f`**（4 文件 +554/-6）；
 > 完整列表用 `git log --oneline 12b41ef..HEAD` 查，不在本表逐个枚举（枚举本身会过期）。
 
 | 项 | 值 |
@@ -47,12 +47,12 @@ python tools/loop_check.py                  # 静态体检：见下
 | 开工基线 HEAD | `12b41ef`（R1 轮首实测，远端 `origin/master` 同值；R2 开工时本地领先 4 个待补推提交） |
 | 当前 HEAD | **以 `git rev-parse HEAD` 为准，不写死**：R2 功能主提交是 `fb757cd`，但本表自身的回填提交会让 HEAD 再前移一位（R1 正是漏记这类回填导致快照漂移）。查完整链用 `git log --oneline 12b41ef..HEAD` |
 | 提交数 | 以 `git rev-list --count HEAD` 为准（**回填提交会 +1，不写死具体值**） |
-| 跟踪文件 | 以 `git ls-files \| wc -l` 为准（R3 新增 2 个入库文件 `hive/paths.py`、`tests/utils/test_hive_paths_single_source.py`；其中 .py 数由 326 → **328**，R3 验收实测 402 个跟踪文件） |
-| 工作区 | 干净（R3 功能提交 `696b76e` 后、台账回填前实测） |
+| 跟踪文件 | 以 `git ls-files \| wc -l` 为准（R4 新增 3 个入库文件 `tests/core/test_species_blueprint_crossover.py`、`tools/triage_check.py`、`docs/reports/LEGACY_TEST_TRIAGE_R4.md`；其中 .py 数 328 → **330**，跟踪文件 402 → **405**。⚠️ `docs/reports/` 被 `.gitignore` 的 `reports/` 忽略，报告须 `git add -f`） |
+| 工作区 | 干净（R4 功能提交 `d92ef5f` 后、台账回填前实测；`hive/memory/cognitive_state.json` 每轮跑 pytest 会被改写，已 `git checkout --` 复原，R 轮复核忽略策略） |
 | 推送状态 | **以 `git rev-list --count origin/master..HEAD` 实测为准，不写死**：本行曾被 R2 回填提交自己顶成过期值 ⇒ 改为纯指针式（R1 同款坑的第二次出现）。**口径**：本地领先是「已 commit、待推送」的正常推进态，体检按 R1 修订允许落后以外的领先；每轮**先补推**再同步镜像。R3 轮首先补推 R2 积压 2 提交：直连 / 代理各一次均失败（详见 R3 行），远端未分叉；功能提交后本地领先以实测为准 |
-| 静态体检 | `PASS`（328 个 .py 语法 0 失败 / 118 个 hive.* 目标 0 缺失；镜像与 `origin/master` 一致，主工作区允许领先） |
-| 运行时 | **已首次跑通且有界冒烟 PASS**：`smoke_runtime.py --cycles 1` EXIT=0、10 个 SUCCESS 载荷、正常收尾（R3 复跑确认未回归）；`--cycles 2` 仍 FAIL（P0-3） |
-| 验证层级 | 静态 PASS + 1 周期冒烟 PASS + **tests/ 子集 133 passed**（101 原有 + 32 新增，退出码 0）；**完整运行时/服务仍不可用**（依赖未装齐、P0-1/P0-3 未清）。⚠️ **R3 实测口径修正**：R2 台账写的「全量 pytest 101 passed」实为 `tests/` 子集口径；全仓库 `pytest -q` 为 **455 passed / 20 failed**，那 20 个是 `hive/tests/` 下的历史失败（`brain_config.json` 缺失、旧断言失效等），与本轮改动无关。今后台账写 pytest 数字必须带子集范围 |
+| 静态体检 | `PASS`（R4 功能提交前实测 328 个 .py / 118 个 hive.* 目标 0 缺失；提交后以 `python tools/loop_check.py` 实测为准，新入库 2 个 .py 会让计数 +2） |
+| 运行时 | **已首次跑通且有界冒烟 PASS**：`smoke_runtime.py --cycles 1` EXIT=0、209 行、CPU 16 cores、正常收尾（R4 复跑确认未回归）；`--cycles 2` 仍 FAIL（P0-3） |
+| 验证层级 | 静态 PASS + 1 周期冒烟 PASS + **`tests/` 子集 139 passed**（133 原有 + 6 新增，退出码 0）+ **`hive/tests/` 全量 19 failed/456 passed**（R4 修复前 20/455，恰少 1 条）+ `triage_check.py` 静态/对账双 PASS；**完整运行时/服务仍不可用**（依赖未装齐、P0-1/P0-3 未清）。⚠️ **R4 口径再修正**：R3 写的「全仓库 `pytest -q`」其实因 `testpaths=["hive/tests"]` 只收 475 项 `hive/tests/`，**不是全仓库**；CI 也只跑 `hive/tests/`，反而漏掉 `tests/` 子集。两集合因 `test_dna.py` 同名无法一起 collect。见 **P1-10**，台账写 pytest 数字必须带集合范围 |
 | 资料库档案 | `https://www.workbuddy.cn/space/d/URL2Tg73gmbxGrjut4nPoj` |
 
 2026-11-10 R0 入库 4 个提交：`d14135d` 运行时健壮性（僵死 Worker 回收、缓存落 D 盘、哈希嵌入）、`db74a7a` 可视化（事件流 + swarm.html + warmup 回退）、`ee24c6f` CI 版本 bump、`3478df9` 本台账与体检脚本，外加 `12b41ef` 回填快照。清理的是 10/31–11/01 遗留的 15 项未提交改动。
@@ -95,7 +95,13 @@ R1 实测结论（`2026-11-10`）：
 - **P1-6** `web/swarm.html` 默认深色底 + emoji 标题，与既定「白主 / 黑 / 蓝辅、不用 emoji 改用开源图标、每个元素有出现-过渡-消失动画」规范不一致；按规范改版。
 - **P1-7　✅ R3 已完成（`696b76e`）** 散落 4 处的 `HIVE_HOME` 根锚点收敛成单一真源 `hive/paths.py`（`PROJECT_ROOT` / `resolve_hive_home` / `resolve_events_file`）；`hive/__init__.py`、`settings.py`、`librarian_bee.py`、`web_dashboard.py` 四处改为调用真源，`event_stream.py` 退化为转发薄壳并保留 P1-1 回归的可注入符号。新增 32 项回归（判据唯一性、消费点投影守卫、`__all__` 派生守卫、写读同路径、旧实现注入反证）。按 `R-20261024-01` 判定：`monitor.py` 取盘符、`.env` 的 `BASE_DIR`、3 处非根锚点 `cwd()` 语义不同，**不合并**并显式登记。详见「八、推进日志」R3 行。
 
-- **P1-8（R3 侦察新增，未修）** 全仓库 `pytest -q` 有 **20 个 `hive/tests/` 历史失败**（`brain_config.json` 缺失导致 BrainInterface 加载失败、旧断言如 `test_nonexistent_image` 期望 `success=False` 实为 True 等）。本轮只做口径登记、不扩面修复；需独立一轮逐个判定「真缺陷 / 断言过期 / 依赖缺失」并决定修或标记 xfail。注意：台账与 CI 若只跑 `tests/` 子集，这 20 个失败会被静默忽略。
+- **P1-8　✅ R4 已完成（`d92ef5f`）** 20 个历史失败逐条分诊 + 修唯一真缺陷。产出 `tools/triage_check.py`（**唯一真源** `LEDGER` 20 行 + 一条可复现校验命令：台账完整性 / AST 收集闭合 / 与 pytest FAILED 集合对账，自证 SCOPE）与 `docs/reports/LEGACY_TEST_TRIAGE_R4.md`（导读，不复制台账）。分类：真缺陷·已修 1 / 真缺陷·待行为决策 1 / 断言过期 10 / 测试自身缺陷 6 / 状态污染·顺序依赖 2 / **依赖缺失 0**。修了 `species_blueprint.py` 函数级 `import random` 遮蔽（静态三项全 PASS 仍漏，**第 4 次实证**），配 6 项回归 + 旧实现注入反证。全量 `hive/tests/` 从 20 failed 降为 **19 failed/456 passed**。**显式决定不批量 xfail**（会把可见失败变成静默噪声，且 `#18` 涉及对外行为决策）；19 条按去向立 P1-9。
+  - **口径更正（R4 实测，推翻 R3 举例）**：R3 写的「`brain_config.json` 缺失导致 BrainInterface 加载失败」在 20 条实测异常中 **0 条命中**，依赖缺失实测为 0；R3 写的「全仓库 `pytest -q` = 455 passed/20 failed」其实是 **`hive/tests/` 单集合**（475 = 455+20），因 `testpaths=["hive/tests"]`。详见 P1-10。
+  - **本轮不改** `tools/loop_check.py` 的固定验收口径：是否把分诊对账纳入固定口径属 R6 元审视既定问题②，不提前越权。
+
+- **P1-9（R4 分诊产出，未修）** P1-8 余下 19 条按分类批量处置：① 断言过期 10 条按当前契约改断言或标 xfail（多为 Ministers 委托语义迁移，改前需确认契约是「已变」还是「退化」）；② 测试自身缺陷 6 条统一修 `test_create_mock_dna` helper 命名（一处改动影响 6 个用例）；③ 状态污染 2 条分别加 fixture 隔离（`get_swarm_communication()` 单例、`gap_analyzer/report_*.json` 磁盘残留）；④ `#18` 单独判定 `ImageEncoder` 对不存在路径静默成功的修法（改变对外行为，需决策）。逐条证据见 `tools/triage_check.py LEDGER`，**不要另开散落 TODO**。
+
+- **P1-10（R4 侦察产出，未修 / R6 输入）** 验收口径三条实测事实：① `pyproject.toml:113` `testpaths=["hive/tests"]` ⇒ 裸 `pytest -q` 只收 475 项，不是「全仓库」；② CI（`.github/workflows/test.yml:45/80`）跑 `pytest hive/tests/`，**能看到这 20 个失败、却完全没跑维护中的 `tests/` 子集（139 项，含 R1~R4 全部回归）**；③ 两集合一起 collect 会因 `test_dna.py` 同名 + 无 `__init__.py` 报 `import file mismatch`（597 collected + 1 error，退出码 2），目前无法一条命令覆盖两套。改收集范围/CI/命名属验收口径变更，归 R6 定夺。附带：`docs/reports/` 被 `.gitignore:80` 的 `reports/` 忽略，但已有 12 份报告是入库的 ⇒ 新报告必须 `git add -f`，否则交付物静默丢失（R4 已用 `-f` 入库）。
 
 ### P2 · 清理与归档
 
@@ -133,13 +139,15 @@ R1 实测结论（`2026-11-10`）：
 触发条件变化时（换了主工作区、新增服务、依赖大改）立即触发，不等满 6 轮。
 **这条是长效推进不腐化的关键：机制本身要跟着项目改，不能只让项目跟着机制转。**
 
-> **当前轮次指针（唯一状态源，R3 收尾）**：R0 建档 + R1 + R2 + R3 = **4 轮**，距 R6 元审视还差 **2 轮**。
-> 下方「R1 元审视」段末尾写的「还差 4 轮」是**当时的历史结论**，不是当前值，勿据此判断。
-> R3 未触发即时元审视：主工作区未变更、无新增服务、无依赖大改（新增的是内部模块 `hive/paths.py`，不是服务）；本节与 `tools/loop_check.py` 本轮均不改。
-> **待 R 轮复核的问题（R3 补了两条新证据，不提前改机制）**：
-> ① 静态体检对路径/配置类缺陷完全无感——R3 第三次实证：把 `D:/HIVE` 注回真实源码时，`7 failed` 而同期 `loop_check.py` 仍 `PASS`。是否该补一条**跨写读两端的路径契约检查**？R3 的答复倾向是「已在运行时层用 32 项回归覆盖」，但仍留 R 轮定夺。
-> ② **验收口径漂移**（R3 新发现）：台账写「全量 pytest 101 passed」实为 `tests/` 子集，全仓库另有 20 个历史失败。R 轮须判断：静态体检之外，是否把「带范围的 pytest 子集」正式纳入固定验收口径，并明确全仓库失败的处理策略。
-> ③ 复利规则 `R-20261010-19` 第 16 次命中即此：连自己项目的台账数字也会漂，写数字必须带口径范围。
+> **当前轮次指针（唯一状态源，R4 收尾）**：R0 建档 + R1 + R2 + R3 + R4 = **5 轮**，距 R6 元审视还差 **1 轮**（下一轮 R5 之后即触发 R6）。
+> 下方「R1 元审视」段末尾写的「还差 4 轮」、R3 段写的「还差 2 轮」都是**当时的历史结论**，不是当前值，勿据此判断。
+> R4 未触发即时元审视：主工作区未变更、无新增服务、无依赖大改（新增的是内部工具 `tools/triage_check.py` 与回归测试，不是服务）；本节与 `tools/loop_check.py` 本轮均不改。
+> **待 R 轮复核的问题（R4 补了决定性的新证据，仍不提前改机制）**：
+> ① 静态体检对运行时缺陷完全无感——**R4 第四次实证**：`species_blueprint.py` 函数级 `import random` 遮蔽让 `crossover()` 在互斥能力分支抛 `UnboundLocalError`，而同期 `loop_check.py` 三项仍 `PASS`。R1 缺 import os / R2 路径默认值 / R3 根锚点 / R4 import 遮蔽，四种不同形态 ⇒ 候选 `C-20261110-01` 的「断层不止一种形态」已被反复坐实。R 轮须定夺静态层是否补契约检查，还是维持「静态只证明能解析，运行时靠回归+冒烟覆盖」的分层。
+> ② **验收口径（R4 把 R3 的粗结论彻底查清，这是 R6 的主输入）**：`testpaths=["hive/tests"]` ⇒ 裸 `pytest -q` 只收 475 项，CI 也只跑 `hive/tests/`；维护中的 `tests/` 子集（139 项）从未进 CI；两集合因 `test_dna.py` 同名无法一起 collect。R6 须决定：是否把「**带范围的两套 pytest + `triage_check.py` 对账**」正式纳入固定验收口径、是否调整 `testpaths`/CI/测试命名以让两套可合并。R4 已把 20 个失败变成可校验台账（P1-8），但不擅自改收集范围。
+> ③ **产物入库静默失败**：`docs/reports/` 被忽略却已有 12 份报告入库，新报告必须 `git add -f`；R4 差点把分诊报告丢在库外。R 轮复核 `.gitignore` 覆盖是否精确（复利规则 `R-20261014-01`）。
+> ④ 运行时账本 `hive/memory/cognitive_state.json` 每轮跑 pytest 都被改写并需手工复原（R3 已提），R 轮复核忽略或只读策略。
+> ⑤ 复利规则 `R-20261010-19` 第 17 次命中即此：连自己项目的台账**举例**也会错（R3 的 `brain_config.json` 举例实测 0 条命中），不只数字会漂。
 
 ## 七、复利回链
 
@@ -169,6 +177,16 @@ R1 实测结论（`2026-11-10`）：
 - `R-20261010-19`「不要信状态文档，先实测」：hits `15 → 16`。实测推翻台账「全量 101 passed」（实为 `tests/` 子集，全仓库 455 passed / 20 failed）；实测出 `.env` 的 `HIVE_HOME=D:/HIVE` 才是本机「碰巧能用」的真源，而非代码默认值。
 - 回读校验：`RULES.md` 含 `696b76e` **12 处**（6 条 × 形态行与 commit 行）、`CANDIDATES.md` **6 处**；6 条 hits 逐条回读正确，候选池各行竖线数不变（沿用 `C-20261109-06`）。回链脚本跑完即删，未留临时文件。
 
+**R4 命中 7 条（已回链、已回读校验，证据均带 `d92ef5f`）**：
+- `R-20261010-19`「不要信状态文档，先实测」：hits `16 → 17`。R3 台账称 20 个失败源于 `brain_config.json` 缺失/`BrainInterface` 加载失败，逐条实测 **0 条命中**；另实测裸 `pytest -q` 只收 475 项 `hive/tests/`，并非「全仓库」。
+- `R-20261015-03`「交叉核对要核分母的来源」：hits `11 → 12`。台账「455 passed/20 failed」的分母 475 只来自 `hive/tests/` 单集合；CI 跑 `hive/tests/` 反而漏掉 `tests/` 子集（139 项）。
+- `R-20261010-11`「旧实现注入反证」：hits `7 → 8`。把 `import random` 注回真实源码 → `5 failed, 2 passed` 并精确复现 `UnboundLocalError`，`finally` 字节级复原 `sha256 f6115dac45e01e55 SAME` → `7 passed`；另发现 **CRLF 行尾让 LF 注入锚点静默失效**，已在测试中做 LF 归一化并留注释（反证自身也会腐坏的新形态）。
+- `R-20261010-08`「修完必做运行时真实调用」：hits `6 → 7`。真实 `crossover()` 覆盖互斥/共有能力、亲和度分支，真实 `mutate()`、1 周期 `main.py` 冒烟、全量 pytest 前后对比。
+- `R-20261010-15`「审计发现 ≠ 本轮修复，三种去向」：hits `9 → 10`。P1-8 分诊 20 条 → 修 1（`#10`）/ 立下一轮 19（P1-9）/ 登记备查 1 组（P1-10）/ 待人工 0，并显式决定不批量 xfail。
+- `R-20261104-02`「散装检查收敛成一条可复现命令且自证范围」：hits `3 → 4`。新增 `tools/triage_check.py`（逐项打印、任一失败非零退出、SCOPE 行写明不做什么），post-fix 报告对账 `FAILED 19 == open 19` PASS。
+- `R-20261024-12`「判据收成唯一实现，每个投影派生或守卫」：hits `7 → 8`。`import random` 4 份收成模块级单一真源 + AST 守卫；分诊台账以 `LEDGER` 为唯一真源，报告只做指针不复制表格，AST 检查 20 个 nodeid 收集闭合。
+- 回读校验：`RULES.md` 含 `d92ef5f` **7 处**、`CANDIDATES.md` 7 条 hits 主表/晋升表**两处同步 +1 且数值一致**，竖线数不变。⚠️ 回链脚本一度把两个 ledger 的 CRLF 写成 LF（1219/580 行全量行尾漂移），grep 回读时检出并已逐字节复原为 100% CRLF；`RULES.md` 行数 +7 恰为 7 条证据行，`CANDIDATES.md` 行数不变。
+
 ## 八、推进日志
 
 | 时间 | 轮次 | 做了什么 | 证据 | 下一步 |
@@ -177,6 +195,10 @@ R1 实测结论（`2026-11-10`）：
 | 2026-11-10 10:25–10:58 | R1（推进 + 即时口径修订） | 打通 P0-2：实测阿里源装齐启动链依赖、`main.py` **首次真实跑通**并正常收尾；修静态 PASS 漏掉的 2 处运行时缺陷（缺 `import os`、`get_system_info` 少 key）；新增有界周期开关、第 4 层 `smoke_runtime.py`、9 项回归测试；就地把镜像验收口径改为「允许本地领先」并令体检自证范围。遗留 `hunt_sync` 缺陷拆为 P0-3（需行为决策，未擅改） | 体检 `PASS`（322 .py / 116 import / 镜像对齐）；`smoke_runtime.py --cycles 1` = `PASS`（EXIT=0、10 SUCCESS、CPU: 16 cores），`--cycles 2` = `FAIL`（精确捕获 `asyncio.run() cannot be called from a running event loop`）；pytest 9 passed；旧实现注入反证复现 `name 'os' is not defined` 与全 0 默认值；`gh api` 复核远端 `12b41ef`、开工 ahead 0；R1 主提交 `ec0930c`（7 文件 +358/-33）；旧口径反证：此时三方 distinct=2，旧规则会误报 FAIL | **下一轮先补推**（直连/代理各试一次）；再推进 P0-3 修法决策、补装 `chromadb` 等依赖验证完整功能；P0-1 仍待用户决策 |
 | 2026-11-10 17:10–17:40 | R2（推进 + 补推清零） | 取 P1-1「事件流根目录跨平台歧义」：改为 `PROJECT_ROOT` + 单一 `HIVE_HOME` 读取，与读取方 `web_dashboard.py` 锚点对齐；新增 11 项回归（含跨平台语义断言、写读同路径契约、真实 emit 落盘解析、AST 契约、旧实现注入反证）。**并补推 R1 积压的 4 个提交 + 本轮 1 个**，同步只读镜像，三方首次对齐。侦察发现同源硬编码散落 3 处，登记 P1-7 不扩面；顺手修正「五、每轮流程」章节号笔误（七→八） | 开工基线体检 `PASS`（325 .py / 116 import / 本地领先 4）；pathlib 实测 `PureWindowsPath('D:/Hive')/'D:/HIVE'` → `D:\HIVE`、`PurePosixPath('/srv/hive')/'D:/HIVE'` → `/srv/hive/D:/HIVE`（同期证明本机「碰巧能用」）；pytest 新增 11 passed / 全量 **101 passed**；旧实现注入反证 `6 failed, 5 passed` 且**静态体检同时仍 PASS** → 字节级复原 `sha256 6510078806374266 SAME` → `11 passed`；`smoke_runtime.py --cycles 1` `PASS`（EXIT=0、209 行、CPU: 16 cores）；真实运行后 `Data/events.jsonl` 593B/3 条落项目根、无畸形目录；`gh api` 复核远端未分叉 → 裸直连 `git push` 一次成功 `12b41ef..fb757cd`（60s 超时防挂起）→ 镜像 `pull --ff-only` → 复跑体检 `PASS`（326 .py / 116 import / **三方对齐 fb757cde**）、工作区干净、ahead 0。主提交 `fb757cd`（2 文件 +153/-3）；R2 台账回填另计 | 下一步：P0-3 修法仍需用户决策（不擅改）；可推进 P1-2 tag 口径确认 / P1-7 单一根锚点收敛；补装 `chromadb/openai/ollama/psycopg2/flask` 验证完整功能；P0-1 仍待用户决策。轮次 R0+R1+R2 = **3**，距 R6 元审视还差 **3** 轮 |
 | 2026-11-10 23:47–00:12 | R3（推进 + 轮首补推失败） | 取 P1-7「根锚点收敛」：新增 `hive/paths.py` 作单一真源，4 处硬编码（`hive/__init__.py` / `settings.py` / `librarian_bee.py` / `web_dashboard.py`）改为调用真源，`event_stream.py` 退化为转发薄壳并保留 P1-1 回归可注入符号；新增 32 项回归覆盖判据唯一性 / 消费点投影守卫 / `__all__` 派生守卫 / 写读同路径 / 旧实现注入反证。轮首按交接先补推 R2 积压 2 提交，直连与代理各试一次均失败、只记一行不反复重试。侦察发现两处口径漂移并登记：①「全量 101 passed」实为 `tests/` 子集，全仓库另有 20 个历史失败（立为 P1-8）；② `.env` 的 `HIVE_HOME=D:/HIVE` 才是本机「碰巧能用」真源 | 开工基线体检 `PASS`（326 .py / 116 import / 本地领先 2）；补推：直连 `Recv failure: Connection was reset`、代理 7897 `TLS unexpected eof`，各一次即止；`gh api` 复核远端仍 `fb757cd` 未分叉。功能主提交 **`696b76e`**（7 文件 +392/-42）。验收：静态体检 `PASS`（**328 .py / 118 hive.\* 目标 / 镜像=origin/master、本地允许领先**）；`tests/` 子集 **133 passed**（101 原有 + 32 新增，退出码 0）；P1-1 既有 11 项回归原样通过；**旧实现注入反证**：把 `Path.cwd() / "D:/HIVE"` 注回真实源码 → `7 failed, 36 passed`，而同期 `loop_check.py` 仍 `PASS`（静态层无感第三次实证）→ 字节级复原 `sha256 79d81f59d7e4a91dc0bc81291c40d493c452e770b72512d4d486770a3a80f116 SAME` → 复原后 `43 passed`；`smoke_runtime.py --cycles 1` **PASS**（EXIT=0 / 209 行 / CPU: 16 cores / 正常收尾）；真实落盘 `D:/Hive/Data/events.jsonl` 6 条事件逐字段解析、无畸形 `D:` 目录。运行时副产物 `hive/memory/cognitive_state.json` 已 `git checkout --` 复原，工作区干净。复利回链 **6 条** hits+1，回读校验 `696b76e` 在 RULES.md 12 处 / CANDIDATES.md 6 处 | 下一步：**先补推**本地领先提交（含 `d36ed04` / `148c6f5` / `696b76e` 及本轮回填，直连 / 代理各一次，仍失败只记一行）；推送成功后镜像 `pull --ff-only` 并复跑体检。P0-3 需用户决策、P0-1 决策权归用户，均跳过；可推进 P1-2 tag 口径 / P1-8 历史失败分诊 / 补装 `chromadb` 等依赖。轮次 R0+R1+R2+R3 = **4**，距 R6 元审视还差 **2** 轮 |
+
+| 2026-11-11 06:15–07:05 | R4（推进 + 分诊台账） | 取 **P1-8**「20 个历史失败分诊」：全仓库逐条实测分类（真缺陷·已修 1 / 待行为决策 1 / 断言过期 10 / 测试自身缺陷 6 / 状态污染 2 / **依赖缺失 0**），落地 `tools/triage_check.py` 为**唯一真源** + 一条可复现自证校验命令，报告只做指针不复制台账，**显式决定不批量 xfail**。修唯一产品真缺陷：`species_blueprint.py` 3 处函数级 `import random` 遮蔽模块级导入，双亲能力互斥时 `crossover()` 抛 `UnboundLocalError`（静态三项全 PASS 仍漏，**第 4 次实证**），配 6 项回归 + 旧实现注入反证。侦察推翻 R3 两处口径：①「`brain_config.json`/`BrainInterface` 缺依赖」举例在 20 条实测异常中 **0 条命中**；② 裸 `pytest -q` 因 `testpaths=["hive/tests"]` 只收 475 项、CI 也只跑 `hive/tests/` 而**漏掉 `tests/` 子集 139 项**，两集合因 `test_dna.py` 同名无法一起 collect ⇒ 立 P1-10。余 19 条按去向立 P1-9 | 开工基线：工作区干净、HEAD `118c2798`、42 提交、402 跟踪文件、ahead 0、`git fetch` 直连成功 + `gh api` 复核远端同值、三方对齐；静态体检 `PASS`（328 .py / 118 hive.\* 目标 / 镜像一致）。**修复前**全仓库 `pytest -q --tb=line`：**20 failed/455 passed**（251.40s）；**修复后**：**19 failed/456 passed**（255.24s），恰少 `#10` 一条、无新增失败。功能主提交 **`d92ef5f`**（4 文件 +554/-6）。验收：`tests/` 子集 **139 passed**（133+6，退出码 0）；`tests/core/test_species_blueprint_crossover.py` **6 passed**；原失败用例 `TestSpeciesBlueprint::test_crossover` FAIL→**PASS**；**旧实现注入反证**：注回 `import random` → `5 failed, 2 passed` 且精确复现 `UnboundLocalError`，`finally` 字节级复原 `sha256 f6115dac45e01e55 SAME` → `7 passed`（另发现 CRLF 行尾会让 LF 注入锚点静默失效，已修正并留注释）；`triage_check.py` 静态 `PASS`、对账 post-fix 报告 `FAILED 19 == open 19` `PASS`（对 pre-fix 报告则正确判 FAIL，证明有区分力）；`loop_check.py` `PASS`；`smoke_runtime.py --cycles 1` `PASS`（EXIT=0/209 行/CPU 16 cores/正常收尾）。运行时副产物 `hive/memory/cognitive_state.json` 已 `git checkout --` 复原。复利回链 **7 条** hits+1，`d92ef5f` 在 RULES.md 7 处、CANDIDATES.md 7 条主表/晋升表两处同步；回链脚本 CRLF→LF 全量行尾漂移已 grep 检出并逐字节复原 | 下一步：**先推送 + 同步镜像**（轮首 fetch + `gh api` 复核未分叉；直连不通试代理 7897 一次）；之后 P1-9 按分类批量处置 19 条、P1-10 交 R6。P0-3 需用户决策、P0-1 决策权归用户，均跳过。**轮次 R0+R1+R2+R3+R4 = 5，距 R6 元审视还差 1 轮**（R5 后触发，R6 须定夺两套 pytest + 分诊对账是否纳入固定验收口径） |
+
+**R4 里程碑判定：不算**。① P0 未清零（P0-1 待用户决策、P0-3 需行为决策）；② 运行时非「首次跑通」（R1 已达成有界冒烟，本轮只是复跑）；③ 未打版本 tag；④ 完整运行时/服务仍不可用（依赖未装齐、`--cycles 2` 仍 FAIL、19 个历史失败仍在）。故**未更新**资料库档案 `URL2Tg73gmbxGrjut4nPoj`。分诊台账与推送/三方对齐属流程状态，不是项目能力里程碑。
 
 **R3 里程碑判定：不算**。① P0 未清零（P0-1 待用户决策、P0-3 需行为决策）；② 运行时非「首次跑通」（R1 已达成有界冒烟，本轮只是复跑确认未回归）；③ 未打版本 tag；④ 完整运行时/服务仍不可用（依赖未装齐、`--cycles 2` 仍 FAIL）。故**未更新**资料库档案 `URL2Tg73gmbxGrjut4nPoj`。
 
