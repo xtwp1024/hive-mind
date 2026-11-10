@@ -13,26 +13,24 @@ from typing import Optional
 import os
 import threading
 
+from hive.paths import resolve_hive_home
+
 logger = logging.getLogger("Hive.Settings")
 
 
 class HiveSettings(BaseSettings):
     """
     蜂巢系统配置
-    
+
     所有配置项都通过环境变量或.env文件加载
     """
-    
+
     # ========== 路径配置 ==========
-    # 优先使用环境变量 HIVE_HOME, Windows 默认落 D 盘, 其他回退 cwd/Data
+    # BASE_DIR 是「hive 根/Data/Inbound」的派生投影；根锚点只由
+    # hive.paths.resolve_hive_home 解析（P1-7 单一真源），此处不再
+    # 硬编码盘符 / 拼 cwd / 自己读 HIVE_HOME。
     def _default_base_dir() -> Path:
-        env_home = os.getenv("HIVE_HOME")
-        if env_home:
-            return Path(env_home) / "Data" / "Inbound"
-        if os.name == "nt":
-            # Windows 无 HIVE_HOME 时默认 D 盘
-            return Path("D:/HIVE/Data/Inbound")
-        return Path.cwd() / "Data" / "Inbound"
+        return resolve_hive_home() / "Data" / "Inbound"
 
     BASE_DIR: Path = Field(default_factory=_default_base_dir)
     

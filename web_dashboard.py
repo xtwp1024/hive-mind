@@ -17,14 +17,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+from hive.paths import resolve_hive_home
+
 app = Flask(__name__)
 CORS(app)
 
 # ====== 目录常量 ======
+# BASE_DIR 是代码资源锚点（web/、morgue、ledger），始终跟随本文件所在目录。
+# HIVE_HOME 是数据锚点，由 hive.paths 单一真源解析（P1-7）：空串/空白按
+# 未设置回退项目根，不再出现 Path("") == cwd 或硬编码盘符。
 BASE_DIR = Path(__file__).parent                           # d:\Hive
 WEB_DIR = BASE_DIR / "web"                                 # d:\Hive\web
-HIVE_HOME = Path(os.getenv("HIVE_HOME", str(BASE_DIR)))   # D:/HIVE 或 d:/Hive
-EVENTS_FILE = HIVE_HOME / "Data" / "events.jsonl"          # D:\HIVE\Data\events.jsonl
+HIVE_HOME = resolve_hive_home()
+EVENTS_FILE = HIVE_HOME / "Data" / "events.jsonl"          # <hive 根>\Data\events.jsonl
 
 DEBUG_MODE = os.environ.get("HIVE_DASHBOARD_DEBUG", "false").lower() == "true"
 BASIC_AUTH_ENABLED = os.environ.get("HIVE_DASHBOARD_AUTH", "true").lower() == "true"

@@ -19,12 +19,15 @@ except ImportError:
     BrainInterface = None
     get_brain = None
 
-# 默认知识库路径（优先环境变量 → 落 D 盘 → 回退项目 docs 目录）
+# 默认知识库路径：根锚点由 hive.paths 单一真源解析（P1-7），
+# 不再回退 cwd（从别处启动进程时知识库会找不到）。
 import os as _os
-_PROJECT_ROOT = Path(_os.getenv("HIVE_HOME", _os.getcwd()))
+from hive.paths import resolve_hive_home
+
+_PROJECT_ROOT = resolve_hive_home()
 KB_PATH = Path(_os.getenv("HIVE_KB_PATH", str(_PROJECT_ROOT / "docs" / "AGENT_DEVELOPMENT_KNOWLEDGE_BASE.md")))
 
-# 本地代码库路径（用于检索真实代码片段，默认落 D 盘）
+# 本地代码库路径（用于检索真实代码片段）
 CODE_REPOS_PATH = Path(_os.getenv("HIVE_CODE_REPOS_PATH", str(_PROJECT_ROOT / "Data" / "Repos")))
 
 

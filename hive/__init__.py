@@ -13,11 +13,13 @@ Antigravity 蜂巢系统的重构版本
 import os as _os
 from pathlib import Path as _Path
 
+from .paths import resolve_hive_home as _resolve_hive_home
+
 def _force_cache_to_drive() -> None:
-    """将所有 AI 相关缓存目录重定向到 D 盘"""
-    # 根锚点：HIVE_HOME 环境变量 → 回退 settings 默认 → 回退 cwd
-    hive_home = _os.environ.get("HIVE_HOME")
-    if not hive_home:
+    """将 AI 相关缓存目录重定向到 hive 根（不写死盘符、不拼 cwd）"""
+    # 根锚点统一由 hive.paths.resolve_hive_home 解析（P1-7 单一真源）。
+    # 这里只保留 .env 预加载：它把 HIVE_HOME 写进 os.environ，随后被唯一实现读到。
+    if not _os.environ.get("HIVE_HOME"):
         # 尝试从 .env 手动加载 HIVE_HOME / BASE_DIR
         _env_file = _Path(_os.getcwd()) / ".env"
         if _env_file.exists():
@@ -30,9 +32,8 @@ def _force_cache_to_drive() -> None:
                 _val = _val.strip()
                 if _key in ("HIVE_HOME", "BASE_DIR") and _val and _key not in _os.environ:
                     _os.environ[_key] = _val
-        hive_home = _os.environ.get("HIVE_HOME")
 
-    base = _Path(hive_home) if hive_home else _Path.cwd() / "D:/HIVE"
+    base = _resolve_hive_home()
     cache_root = base / "cache"
     cache_root.mkdir(parents=True, exist_ok=True)
 
