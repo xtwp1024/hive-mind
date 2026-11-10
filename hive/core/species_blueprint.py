@@ -21,7 +21,7 @@ import uuid
 import time
 import json
 import threading
-import random
+import random  # 单一真源：本模块所有 random.* 均解析到此；禁止在函数体内再次 import random
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -458,8 +458,8 @@ class SpeciesBlueprint:
         基于当前蓝图创建一个变异版本，
         用于进化探索。
         """
-        import random
-
+        # random 统一用模块级 import（本文件第 24 行）；函数内再 import 会把它
+        # 绑成局部变量，使未执行到 import 的分支抛 UnboundLocalError。
         mutated = deepcopy(self)
         mutated.blueprint_id = f"{self.blueprint_id}_mut_{uuid.uuid4().hex[:8]}"
         mutated.origin = BlueprintOrigin.MUTATED
@@ -525,8 +525,6 @@ class SpeciesBlueprint:
             spec2 = other.capabilities.get(cap_name)
 
             if spec1 and spec2:
-                import random
-
                 if random.random() < 0.5:
                     child1.capabilities[cap_name] = deepcopy(spec1)
                     child2.capabilities[cap_name] = deepcopy(spec2)
@@ -562,7 +560,6 @@ class SpeciesBlueprint:
                 all_affinities[key] = []
             all_affinities[key].append(aff)
 
-        import random
         for key, affs in all_affinities.items():
             if len(affs) >= 2:
                 avg_score = (affs[0].affinity_score + affs[1].affinity_score) / 2
