@@ -49,8 +49,8 @@ python tools/loop_check.py                  # 静态体检：见下
 | 提交数 | 以 `git rev-list --count HEAD` 为准（**回填提交会 +1，不写死具体值**） |
 | 跟踪文件 | 以 `git ls-files \| wc -l` 为准（R2 新增 1 个入库文件 `tests/utils/test_event_stream_home.py`；其中 .py 数由 325 → 326） |
 | 工作区 | 干净（R2 功能提交后、台账回填前实测） |
-| 推送状态 | **已清零，三方对齐 `fb757cd`**：R2 先 `git fetch origin master` + `gh api` 复核远端未分叉，裸直连 `git push origin master`（60s 超时防挂起）**一次成功** `12b41ef..fb757cd`；随后镜像 `pull --ff-only` 同步。R1 积压的 4 个 + R2 新增 1 个一并推上，`git rev-list --count origin/master..HEAD` = 0。**R1 的「直连/代理全败」结论不跨时刻**（见七、复利回链） |
-| 静态体检 | `PASS`（326 个 .py 语法 0 失败 / 116 个 hive.* 目标 0 缺失 / 主工作区=远端=镜像 三方对齐） |
+| 推送状态 | **以 `git rev-list --count origin/master..HEAD` 实测为准，不写死**：本行曾被 R2 回填提交自己顶成过期值 ⇒ 改为纯指针式（R1 同款坑的第二次出现）。**口径**：本地领先是「已 commit、待推送」的正常推进态，体检按 R1 修订允许落后以外的领先；每轮**先补推**再同步镜像。R2 实测事件见「八、推进日志」R2 行与下方收尾补记 |
+| 静态体检 | `PASS`（326 个 .py 语法 0 失败 / 116 个 hive.* 目标 0 缺失；镜像与 `origin/master` 一致，主工作区允许领先） |
 | 运行时 | **已首次跑通且有界冒烟 PASS**：`smoke_runtime.py --cycles 1` EXIT=0、10 个 SUCCESS 载荷、正常收尾；`--cycles 2` 仍 FAIL（P0-3） |
 | 验证层级 | 静态 PASS + 1 周期冒烟 PASS + pytest 101 passed；**完整运行时/服务仍不可用**（依赖未装齐、P0-1/P0-3 未清） |
 | 资料库档案 | `https://www.workbuddy.cn/space/d/URL2Tg73gmbxGrjut4nPoj` |
@@ -164,7 +164,12 @@ R1 实测结论（`2026-11-10`）：
 | 2026-11-10 10:25–10:58 | R1（推进 + 即时口径修订） | 打通 P0-2：实测阿里源装齐启动链依赖、`main.py` **首次真实跑通**并正常收尾；修静态 PASS 漏掉的 2 处运行时缺陷（缺 `import os`、`get_system_info` 少 key）；新增有界周期开关、第 4 层 `smoke_runtime.py`、9 项回归测试；就地把镜像验收口径改为「允许本地领先」并令体检自证范围。遗留 `hunt_sync` 缺陷拆为 P0-3（需行为决策，未擅改） | 体检 `PASS`（322 .py / 116 import / 镜像对齐）；`smoke_runtime.py --cycles 1` = `PASS`（EXIT=0、10 SUCCESS、CPU: 16 cores），`--cycles 2` = `FAIL`（精确捕获 `asyncio.run() cannot be called from a running event loop`）；pytest 9 passed；旧实现注入反证复现 `name 'os' is not defined` 与全 0 默认值；`gh api` 复核远端 `12b41ef`、开工 ahead 0；R1 主提交 `ec0930c`（7 文件 +358/-33）；旧口径反证：此时三方 distinct=2，旧规则会误报 FAIL | **下一轮先补推**（直连/代理各试一次）；再推进 P0-3 修法决策、补装 `chromadb` 等依赖验证完整功能；P0-1 仍待用户决策 |
 | 2026-11-10 17:10–17:40 | R2（推进 + 补推清零） | 取 P1-1「事件流根目录跨平台歧义」：改为 `PROJECT_ROOT` + 单一 `HIVE_HOME` 读取，与读取方 `web_dashboard.py` 锚点对齐；新增 11 项回归（含跨平台语义断言、写读同路径契约、真实 emit 落盘解析、AST 契约、旧实现注入反证）。**并补推 R1 积压的 4 个提交 + 本轮 1 个**，同步只读镜像，三方首次对齐。侦察发现同源硬编码散落 3 处，登记 P1-7 不扩面；顺手修正「五、每轮流程」章节号笔误（七→八） | 开工基线体检 `PASS`（325 .py / 116 import / 本地领先 4）；pathlib 实测 `PureWindowsPath('D:/Hive')/'D:/HIVE'` → `D:\HIVE`、`PurePosixPath('/srv/hive')/'D:/HIVE'` → `/srv/hive/D:/HIVE`（同期证明本机「碰巧能用」）；pytest 新增 11 passed / 全量 **101 passed**；旧实现注入反证 `6 failed, 5 passed` 且**静态体检同时仍 PASS** → 字节级复原 `sha256 6510078806374266 SAME` → `11 passed`；`smoke_runtime.py --cycles 1` `PASS`（EXIT=0、209 行、CPU: 16 cores）；真实运行后 `Data/events.jsonl` 593B/3 条落项目根、无畸形目录；`gh api` 复核远端未分叉 → 裸直连 `git push` 一次成功 `12b41ef..fb757cd`（60s 超时防挂起）→ 镜像 `pull --ff-only` → 复跑体检 `PASS`（326 .py / 116 import / **三方对齐 fb757cde**）、工作区干净、ahead 0。主提交 `fb757cd`（2 文件 +153/-3）；R2 台账回填另计 | 下一步：P0-3 修法仍需用户决策（不擅改）；可推进 P1-2 tag 口径确认 / P1-7 单一根锚点收敛；补装 `chromadb/openai/ollama/psycopg2/flask` 验证完整功能；P0-1 仍待用户决策。轮次 R0+R1+R2 = **3**，距 R6 元审视还差 **3** 轮 |
 
-**R2 里程碑判定：不算**。① P0 未清零（P0-1 待用户决策、P0-3 需行为决策）；② 运行时非「首次跑通」（R1 已达成有界冒烟，本轮只是复跑确认未回归）；③ 未打版本 tag；④ 完整运行时/服务仍不可用（依赖未装齐、`--cycles 2` 仍 FAIL）。故**未更新**资料库档案 `URL2Tg73gmbxGrjut4nPoj`。另注：本轮「推送成功 + 三方对齐」属流程状态清零，不是项目能力里程碑，不据此升格项目状态。
+**R2 里程碑判定：不算**。① P0 未清零（P0-1 待用户决策、P0-3 需行为决策）；② 运行时非「首次跑通」（R1 已达成有界冒烟，本轮只是复跑确认未回归）；③ 未打版本 tag；④ 完整运行时/服务仍不可用（依赖未装齐、`--cycles 2` 仍 FAIL）。故**未更新**资料库档案 `URL2Tg73gmbxGrjut4nPoj`。另注：推送与三方对齐属流程状态，不是项目能力里程碑，不据此升格项目状态。
+
+**R2 收尾补记（同轮内通路二次翻转，append-only）**：功能提交 `fb757cd` 及其之前的 R1 积压 4 个提交**已成功推上远端**，镜像已 `pull --ff-only` 同步（这是本轮实质补推成果）。但随后生成的**台账回填提交 `d36ed04`** 推送失败：`git fetch` 直连 `Recv failure: Connection was reset`、裸直连 push 同错；按约定改试代理 7897（HTTP/1.1 + TLS1.2 + openssl）一次 → `TLS connect error: unexpected eof while reading`，代理侧镜像 pull 同样失败。**各试一次即止，未反复重试**。`gh api repos/xtwp1024/hive-mind/commits/master` 独立复核远端仍 `fb757cd`、**未分叉**；末次静态体检 `PASS`（326 .py / 116 import / 镜像=origin/master、本地领先），工作区干净。⇒ **R2 行里的「三方对齐、ahead 0」是功能提交时点的阶段性真值，不是收尾状态**；收尾为「本地领先、待补推」，**领先数不写死**——本补记及后续台账修正各自的提交都会让它 +1，一律以 `git rev-list --count origin/master..HEAD` 实测为准。
+- **同一轮内裸直连先成功后失败**，是 `R-20261015-05`「通路不跨时刻」最紧的一次实证：间隔不到 10 分钟、同一客户端同一命令，结果反转。故不能把「直连已通」写进任何长期配方，也不能因一次成功就认定代理侧永久失效。
+- **本轮第二次出现「回填提交顶掉快照」**（R1 是漏记回填提交，R2 是回填提交自己造成领先）。已把快照「推送状态」行改为纯指针式，不再写死三方对齐/领先数；下次 R 轮应复核：这类易变字段是否还有残留写死值。
+- **下一轮第一件事：补推 `d36ed04` 及其后的台账修正提交**（直连 / 代理各试一次，仍失败只记一行）；推送成功后再 `git -C D:/repos/hive-mind pull --ff-only` 同步镜像并复跑体检。之后才推进 P0-3 决策 / P1-7 / 补装依赖。
 
 **R1 元审视（提前触发，理由：本轮实证「验收口径覆盖不住新风险」，属立即触发条款）**
 - 问1 验收口径是否漏新风险：**是，且是本轮最大发现**。静态三项全 PASS 仍漏 3 处运行时缺陷 ⇒ 新增第 4 层 `tools/smoke_runtime.py`（依赖缺失显式 SKIP、error 级别日志纳入判定，不恒绿）；`loop_check.py` 增加 `SCOPE` 自证行，明确「PASS ≠ 服务能跑」。
