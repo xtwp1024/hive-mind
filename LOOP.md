@@ -35,16 +35,21 @@ python tools/loop_check.py                  # 静态体检：见下
 
 ## 三、当前快照（2026-11-10 R1 刷新）
 
-> 以 git 实测为准，不照抄上一轮台账（R0 快照曾漏记 `12b41ef` 回填提交）。
+> **易变值不写死**（R1 修订，源自 R-20261010-19「HEAD 是会移动的状态」）：
+> HEAD / 提交数 / 领先数一律以 git 实测为准，本表只记**不可变的开工基线**与**验收结论**。
+> 开工前跑：`git rev-parse HEAD` / `git rev-list --count HEAD` / `git ls-files | wc -l`。
+> R0 快照曾漏记 `12b41ef` 回填提交；R1 回填时又让「33 / 领先 1」立刻过期，故改为指针式。
+> 不可变历史：R1 主提交 `ec0930c`（7 文件 +358/-33）、R1 回填提交 `64a4089`。
 
 | 项 | 值 |
 | --- | --- |
-| HEAD | `12b41ef`（R1 开工基线；R1 提交后以 `git rev-parse HEAD` 为准） |
-| 提交数 | 33（R1 主提交 `ec0930c` 后；回填提交后以 `git rev-list --count HEAD` 为准） |
-| 跟踪文件 | 399（325 个 .py）；R1 新增 3 个入库文件 |
+| 开工基线 HEAD | `12b41ef`（R1 轮首实测，远端 `origin/master` 同值） |
+| 当前 HEAD | 以 `git rev-parse HEAD` 为准（R1 交付共 2 个本地提交，待推送） |
+| 提交数 | 以 `git rev-list --count HEAD` 为准（R1 开工基线 32） |
+| 跟踪文件 | 以 `git ls-files \| wc -l` 为准（R1 交付后 399，其中 325 个 .py；新增 3 个入库文件） |
 | 工作区 | 干净（R1 提交后） |
-| 推送状态 | **本地领先待补推**：直连 `Recv failure: Connection was reset`、代理 7897 `schannel: failed to receive handshake`；按约定各试一次即止，未反复重试。`gh api` 复核远端仍 `12b41ef`，未分叉 |
-| 静态体检 | `PASS`（325 个 .py 语法 0 失败 / 116 个 hive.* 目标 0 缺失 / 镜像与远端一致、本地领先 1 待推送） |
+| 推送状态 | **本地领先待补推**：直连 `Recv failure: Connection was reset`、代理 7897 `schannel: failed to receive handshake`；按约定各试一次即止，未反复重试。`gh api` 复核远端仍 `12b41ef`，未分叉。领先数以 `git rev-list --count origin/master..HEAD` 为准 |
+| 静态体检 | `PASS`（325 个 .py 语法 0 失败 / 116 个 hive.* 目标 0 缺失 / 镜像与远端一致、本地领先待推送） |
 | 运行时 | **已首次跑通且有界冒烟 PASS**：`smoke_runtime.py --cycles 1` EXIT=0、10 个 SUCCESS 载荷、正常收尾；`--cycles 2` 仍 FAIL（P0-3） |
 | 验证层级 | 静态 PASS + 1 周期冒烟 PASS；**完整运行时/服务仍不可用**（依赖未装齐、P0-1/P0-3 未清） |
 | 资料库档案 | `https://www.workbuddy.cn/space/d/URL2Tg73gmbxGrjut4nPoj` |
