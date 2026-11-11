@@ -14,6 +14,8 @@ R6 元审视新增「附加守卫」（三项编号与语义不变）：
       R7 口径修订：open 数量不再写死在本文与 SCOPE 行，改为从分诊台账
       EXPECTED_OPEN 静态派生（R-20261024-12 单一真源），否则每修一个历史失败
       就会让这行输出变成假陈述。
+      R8 口径修订：SCOPE 行的 P0 状态同改为从 LOOP.md 的 P0 标题派生，不再
+      写死「P0-1/P0-3 未清」——完成任一项即成假陈述（同 R7 形态）。
 
 只做静态检查，不 import 任何项目模块（不触发第三方依赖 / 服务启动）。
 ⚠ PASS 只代表「能解析、能编译 + 验收链工具自洽」，不代表服务能跑，
@@ -28,6 +30,7 @@ from __future__ import annotations
 
 import ast
 import py_compile
+import re
 import subprocess
 import sys
 import warnings
@@ -42,6 +45,7 @@ MIRROR = Path("D:/repos/hive-mind")
 # 台账写死的路径若漂移，体检必须报错而不是静默少跑一层。
 ACCEPTANCE_TOOLS = ("tools/smoke_runtime.py", "tools/triage_check.py")
 TRIAGE_TOOL = "tools/triage_check.py"
+LOOP_DOC = "LOOP.md"
 
 
 def git(*args: str, cwd: Path = ROOT) -> str:
@@ -177,6 +181,37 @@ def ledger_open_count(root: Path | None = None) -> int | None:
     return None
 
 
+_P0_HEADING = re.compile(r"^\*\*(P0-\d+)")
+
+
+def p0_open_ids(root: Path | None = None) -> list[str] | None:
+    """R8 口径修订：从 LOOP.md「四、待办队列 · P0」小节派生未清项。
+
+    唯一真源是台账里 `**P0-N ...**` 标题行是否带 `✅`（本项目标记完成的
+    约定）。纯文本解析，不 import、不 exec、不依赖第三方包。
+
+    返回 None 表示台账缺失或一条 P0 标题都解析不到（格式漂移），调用方须
+    输出「以 LOOP.md 为准」而不是编一个列表；返回空列表表示 P0 已清零。
+    R7 已把 open 数量改为派生，本函数把同一纪律扩到 P0 状态——R8 完成
+    P0-1 后，写死的「P0-1/P0-3 未清」立刻变成假陈述，正是这一形态。
+    """
+    base = root or ROOT
+    try:
+        text = (base / LOOP_DOC).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    found = False
+    open_ids: list[str] = []
+    for line in text.splitlines():
+        m = _P0_HEADING.match(line.strip())
+        if not m:
+            continue
+        found = True
+        if "✅" not in line:
+            open_ids.append(m.group(1))
+    return open_ids if found else None
+
+
 def check_acceptance_chain(root: Path | None = None) -> tuple[list[str], str]:
     """R6 附加守卫：验收工具链闭合 + 分诊台账静态自证。
 
@@ -246,8 +281,15 @@ def main() -> int:
           " ④ python tools/triage_check.py --report <全量报告> 对账")
     n_open = ledger_open_count()
     open_desc = f"{n_open} 个 open 历史失败" if n_open is not None else "open 历史失败"
-    print(f"SCOPE : PASS ≠ 服务能跑 ≠ {open_desc}已修；"
-          "P0-1/P0-3 未清、完整运行时不可用")
+    p0 = p0_open_ids()
+    if p0 is None:
+        p0_desc = "P0 状态以 LOOP.md 为准"
+    elif p0:
+        p0_desc = "/".join(p0) + " 未清"
+    else:
+        p0_desc = "P0 已清零（以 LOOP.md 为准）"
+    print(f"SCOPE : PASS ≠ 服务能跑 ≠ {open_desc}已修；{p0_desc}；"
+          "完整运行时状态见 LOOP.md「三、当前快照」")
     print("RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
