@@ -2,16 +2,23 @@
 # -*- coding: utf-8 -*-
 """hive-mind 静态体检 — 长效推进轮每轮必跑。
 
-三项口径：
+三项固定口径：
   1. 语法    所有入库 .py 通过 py_compile
   2. 模块闭合 所有 from hive.* / import hive.* 目标在检出树中可解析
   3. 镜像一致 D:/repos/hive-mind HEAD 与本机 origin/master、主工作区 HEAD 对齐
 
+R6 元审视新增「附加守卫」（三项编号与语义不变）：
+  [+] 验收链闭合 — 声明的验收工具必须存在且可编译；分诊台账静态自证必须 PASS。
+      把「13 个 open 历史失败的分诊台账是否漂移」纳入每轮一条命令的硬口径，
+      避免只跑静态三项就误以为全绿（沿用 R-20261104-02 收敛纪律）。
+
 只做静态检查，不 import 任何项目模块（不触发第三方依赖 / 服务启动）。
-⚠ PASS 只代表「能解析、能编译」，不代表服务能跑。2026-11-10 R1 实测：
-静态全 PASS 时仍存在 3 处只在运行时暴露的缺陷（缺 import os /
-get_system_info 少 key / hunt_sync 嵌套 asyncio.run）。运行时验证另跑
-tools/smoke_runtime.py（可选第 4 层，依赖缺失时显式 SKIP，不假报 PASS）。
+⚠ PASS 只代表「能解析、能编译 + 验收链工具自洽」，不代表服务能跑，
+  也不代表 13 个 open 历史失败已修。R1 实证静态三项全 PASS 时仍存在
+  3 处只在运行时暴露的缺陷（缺 import os / get_system_info 少 key /
+  hunt_sync 嵌套 asyncio.run）；R2/R3/R4 又三次实证静态层对路径默认值、
+  根锚点、局部 import 遮蔽均无感。四层验收口径与集合范围见 D:/Hive/LOOP.md 二。
+运行时验证另跑 tools/smoke_runtime.py（依赖缺失时显式 SKIP，不假报 PASS）。
 退出码 0 = 全绿，1 = 有失败项。
 """
 from __future__ import annotations
@@ -27,6 +34,11 @@ warnings.simplefilter("ignore", SyntaxWarning)
 
 ROOT = Path(__file__).resolve().parent.parent
 MIRROR = Path("D:/repos/hive-mind")
+
+# R6：验收链的唯一真源声明。LOOP.md 二、固定验收口径只做指针，不复制本清单。
+# 台账写死的路径若漂移，体检必须报错而不是静默少跑一层。
+ACCEPTANCE_TOOLS = ("tools/smoke_runtime.py", "tools/triage_check.py")
+TRIAGE_TOOL = "tools/triage_check.py"
 
 
 def git(*args: str, cwd: Path = ROOT) -> str:
@@ -138,6 +150,43 @@ def check_mirror() -> tuple[list[str], str]:
     return issues, status
 
 
+def check_acceptance_chain(root: Path | None = None) -> tuple[list[str], str]:
+    """R6 附加守卫：验收工具链闭合 + 分诊台账静态自证。
+
+    纯静态、无第三方依赖、不启动服务、不 import 项目模块。root 可注入，便于
+    回归测试在临时目录构造「工具缺失 / 台账自证 FAIL」的失效态反证，全程不
+    改写真实工作区（沿用 R-20261010-11 的「反证不得破坏工作区」纪律）。
+    """
+    base = root or ROOT
+    issues: list[str] = []
+    for rel in ACCEPTANCE_TOOLS:
+        path = base / rel
+        if not path.is_file():
+            issues.append(f"验收工具缺失: {rel}")
+            continue
+        try:
+            py_compile.compile(str(path), cfile=None, doraise=True)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(f"验收工具不可编译: {rel}: {str(exc).splitlines()[-1][:100]}")
+
+    triage = base / TRIAGE_TOOL
+    if triage.is_file():
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(triage)], cwd=str(base),
+                capture_output=True, text=True, timeout=30,
+            )
+        except (subprocess.SubprocessError, OSError) as exc:
+            issues.append(f"分诊台账自证无法执行: {exc}")
+        else:
+            if proc.returncode != 0 or "RESULT: PASS" not in proc.stdout:
+                tail = proc.stdout.strip().splitlines()[-1:] or ["无输出"]
+                issues.append(
+                    f"分诊台账静态自证未 PASS（退出码 {proc.returncode}）: {tail[0][:100]}"
+                )
+    return issues, f"{len(ACCEPTANCE_TOOLS)} 个工具 / 分诊台账自证"
+
+
 def main() -> int:
     files = tracked_py()
     if not files:
@@ -147,6 +196,7 @@ def main() -> int:
     bad_syntax = check_syntax(files)
     n_targets, bad_imports = check_imports(files)
     bad_mirror, mirror_status = check_mirror()
+    bad_chain, chain_status = check_acceptance_chain()
 
     print(f"[1/3] 语法       {len(files)} 个 .py，失败 {len(bad_syntax)}")
     for x in bad_syntax[:10]:
@@ -157,9 +207,18 @@ def main() -> int:
     print(f"[3/3] 镜像一致   问题 {len(bad_mirror)} | {mirror_status}")
     for x in bad_mirror[:5]:
         print("      X", x)
+    print(f"[+ ] 验收链闭合 问题 {len(bad_chain)} | {chain_status}（R6 附加守卫）")
+    for x in bad_chain[:5]:
+        print("      X", x)
 
-    ok = not (bad_syntax or bad_imports or bad_mirror)
-    print("SCOPE : 仅静态（语法/import 闭合/镜像一致），不含运行时；运行时另跑 tools/smoke_runtime.py")
+    ok = not (bad_syntax or bad_imports or bad_mirror or bad_chain)
+    print("SCOPE : 静态三项（语法/import 闭合/镜像一致）+ R6 附加守卫（验收链闭合）；"
+          "不含运行时，运行时另跑 tools/smoke_runtime.py --cycles 1")
+    print("SCOPE : 四层验收 = ① 本静态体检 ② 1 周期冒烟 ③ 带范围的两套 pytest"
+          "（tests/ 子集 + hive/tests/ 全量；数字必须带集合范围）"
+          " ④ python tools/triage_check.py --report <全量报告> 对账")
+    print("SCOPE : PASS ≠ 服务能跑 ≠ 13 个 open 历史失败已修；"
+          "P0-1/P0-3 未清、完整运行时不可用")
     print("RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
