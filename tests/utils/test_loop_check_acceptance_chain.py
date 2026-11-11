@@ -57,9 +57,33 @@ def test_failing_ledger_selfcheck_is_detected(tmp_path):
 
 
 def test_acceptance_chain_is_wired_into_main(capsys):
-    """守卫必须接入 main() 的输出与 RESULT 判定，不能只是孤立函数。"""
+    """守卫必须接入 main() 的输出与 RESULT 判定，不能只是孤立函数。
+
+    R7 口径修订：SCOPE 行里的 open 数量改为从分诊台账 EXPECTED_OPEN 静态派生，
+    不再写死「13」。本断言随台账走，避免每修一个历史失败就误报或变成假陈述。
+    """
     rc = loop_check.main()
     out = capsys.readouterr().out
     assert "验收链闭合" in out
-    assert "13 个 open" in out
+    n_open = loop_check.ledger_open_count()
+    assert n_open is not None, "分诊台账 EXPECTED_OPEN 未能静态派生"
+    assert f"{n_open} 个 open 历史失败" in out, out
     assert rc == 0, out
+
+
+def test_ledger_open_count_is_derived_not_hardcoded(tmp_path):
+    """反证（R7）：把临时台账的 EXPECTED_OPEN 换一个值，派生结果必须跟着变。
+
+    用临时目录注入 EXPECTED_OPEN = 7 / 3，若函数内部写死常量就会露出原形；
+    全程不改写真实工作区（沿用 R-20261010-11「反证不得破坏工作区」纪律）。
+    """
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    stub = tools / "triage_check.py"
+    stub.write_text("EXPECTED_OPEN = 7\n", encoding="utf-8")
+    assert loop_check.ledger_open_count(root=tmp_path) == 7
+    stub.write_text("EXPECTED_OPEN = 3\n", encoding="utf-8")
+    assert loop_check.ledger_open_count(root=tmp_path) == 3
+    stub.write_text("# 台账缺 EXPECTED_OPEN\n", encoding="utf-8")
+    assert loop_check.ledger_open_count(root=tmp_path) is None
+    assert (Path(loop_check.ROOT) / loop_check.TRIAGE_TOOL).is_file()

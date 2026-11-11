@@ -141,6 +141,22 @@ class TestSwarmCommunicationIntegration(unittest.TestCase):
         self.result_queue = multiprocessing.Queue()
         self.dna = BeeDNA(species="test")
         self.cognitive = CognitiveBee(self.dna, "test_bee_1", self.result_queue)
+
+        # --- R7 / P1-9③ fixture 隔离 BEGIN ---
+        # get_swarm_communication() 是进程级单例，registered_bees 跨用例累积：
+        # 按用例名字典序 test_broadcast_discovery 先注册 "test_bee_1"，轮到
+        # test_register_bee 时同名注册不再 +1，断言 initial_count + 1 变 1 != 2。
+        # 快照 -> 清空 -> addCleanup 复原，让每个用例从空注册表出发，且不把
+        # 本类状态泄漏给其它测试模块。只改测试，不改产品行为。
+        _registered_bees_snapshot = dict(self.swarm.registered_bees)
+        self.swarm.registered_bees.clear()
+
+        def _restore_registered_bees():
+            self.swarm.registered_bees.clear()
+            self.swarm.registered_bees.update(_registered_bees_snapshot)
+
+        self.addCleanup(_restore_registered_bees)
+        # --- R7 / P1-9③ fixture 隔离 END ---
     
     def test_swarm_initialization(self):
         """测试蜂群通信初始化"""

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""hive-mind 历史失败分诊台账 — R4/P1-8 建立，R5/P1-9 续修 — 单一真源 + 可复现校验命令。
+"""hive-mind 历史失败分诊台账 — R4/P1-8 建立，R5/P1-9② 续修，R7/P1-9③ 续修 — 单一真源 + 可复现校验命令。
 
 问题背景（R3 台账原话）：「全仓库 pytest -q 有 20 个 hive/tests/ 历史失败，
 台账与 CI 若只跑 tests/ 子集，这 20 个失败会被静默忽略」。本文件把「20 个
@@ -48,13 +48,14 @@ CATEGORIES = {
     "状态污染/顺序依赖",      # 单例/磁盘残留导致单跑 PASS、全量 FAIL
     "依赖缺失",             # 缺第三方包或配置文件（本项目实测 0 条）
 }
-DISPOSITIONS = {"已修(R4)", "已修(R5)", "立下一轮(P1-9)", "待人工"}
+DISPOSITIONS = {"已修(R4)", "已修(R5)", "已修(R7)", "立下一轮(P1-9)", "待人工"}
 FIXED_DISP_PREFIX = "已修"   # status=fixed <=> 去向以此开头；台账支持多轮陆续修复
 STATUSES = {"open", "fixed"}
 
 # 唯一真源：改这里就是改台账。每行都是 2026-11-11 R4 全仓库 pytest -q 实测证据，
 # 不是推测。evidence 记的是实测断言/异常，不是「应该是什么」。
 # R5 续修：#11~#16 六条「测试自身缺陷」已修，evidence 末尾追加 R5 实测记录；
+# R7 续修：#2/#9 两条「状态污染/顺序依赖」已修，evidence 末尾追加 R7 实测记录。
 # 台账支持多轮陆续修复（status=fixed <=> 去向以「已修」开头），不写死某一轮。
 LEDGER = [
     # id, nodeid, category, evidence, disposition, status
@@ -62,8 +63,8 @@ LEDGER = [
      "断言过期", ":341 assert True == False；hive.core.swarm_evolution 现已可导入，report_to_evolution_coordinator 返回 reported=True，测试前提「协调器不可用」不再成立",
      "立下一轮(P1-9)", "open"),
     (2, "hive/tests/test_evolution_integration.py::TestSwarmCommunicationIntegration::test_register_bee",
-     "状态污染/顺序依赖", "全量 AssertionError: 1 != 2；单独跑 19 failed/53 passed 时该用例 PASS。get_swarm_communication() 单例 registered_bees 跨用例累积",
-     "立下一轮(P1-9)", "open"),
+     "状态污染/顺序依赖", "全量 AssertionError: 1 != 2；单独跑 19 failed/53 passed 时该用例 PASS。get_swarm_communication() 单例 registered_bees 跨用例累积。【R7 已修】setUp 快照-清空 registered_bees + addCleanup 复原，每个用例从空注册表出发；整文件 21 passed（修复前 1 failed/20 passed）；旧实现注入反证精确复现 1 != 2",
+     "已修(R7)", "fixed"),
     (3, "hive/tests/test_ministers.py::TestEngineerBee::test_advise_method",
      "断言过期", "advise() 实返 {minister, analysis, recommendations, priority, risks, confidence, timestamp}；断言的 requirements_analysis/technical_debt 等旧契约不存在",
      "立下一轮(P1-9)", "open"),
@@ -83,8 +84,8 @@ LEDGER = [
      "断言过期", "实返 {status: delegated, message: Ministers delegate tasks to Workers}；断言的 project_path/architecture_type 属旧实现",
      "立下一轮(P1-9)", "open"),
     (9, "hive/tests/test_phase3_evolution.py::TestCapabilityGapAnalyzer::test_get_latest_report",
-     "状态污染/顺序依赖", "断言 assertIsNone(report) 但返回真实 GapAnalysisReport；get_latest_report() glob hive/data/gap_analyzer/report_*.json，该目录已有 7+ 历史落盘产物（被 .gitignore 的 Data/ 覆盖）",
-     "立下一轮(P1-9)", "open"),
+     "状态污染/顺序依赖", "断言 assertIsNone(report) 但返回真实 GapAnalysisReport；get_latest_report() glob hive/data/gap_analyzer/report_*.json，该目录已有 7+ 历史落盘产物（被 .gitignore 的 Data/ 覆盖）。【R7 已修】setUp 把 _persistence_path 重定向到独立空临时目录 + addCleanup 回收，既不读共享残留也不再写新残留；整类 8 passed（修复前该用例 FAIL）；旧实现注入反证在临时残留目录下精确复现 is not None",
+     "已修(R7)", "fixed"),
     (10, "hive/tests/test_phase3_evolution.py::TestSpeciesBlueprint::test_crossover",
      "真缺陷·已修", "R4 前：species_blueprint.py:545 UnboundLocalError: cannot access local variable 'random'；crossover() 内 3 处函数级 import random 遮蔽模块级导入（第 24 行），双亲能力互斥时 elif 分支访问未绑定局部名",
      "已修(R4)", "fixed"),
@@ -116,7 +117,7 @@ LEDGER = [
 ]
 
 EXPECTED_TOTAL = 20          # R4 实测基线；变更必须是有意的台账更新，不能静默漂移
-EXPECTED_OPEN = 13           # 20 - 7（#10 R4 已修 1 条 + #11~#16 R5 已修 6 条）
+EXPECTED_OPEN = 11           # 20 - 9（#10 R4 已修 1 条 + #11~#16 R5 已修 6 条 + #2/#9 R7 已修 2 条）
 EXPECTED_MISSING_DEPS = 0    # R4 实测：20 条里没有一条是缺依赖/缺配置
 
 
@@ -217,7 +218,7 @@ def main(argv: list[str]) -> int:
             return 2
 
     print("=" * 68)
-    print("hive-mind 历史失败分诊台账校验 (R4 建立 / R5 续修)")
+    print("hive-mind 历史失败分诊台账校验 (R4 建立 / R5 续修 / R7 续修)")
     print("=" * 68)
 
     print("[1/3] 台账完整性")

@@ -9,12 +9,15 @@
 
 R6 元审视新增「附加守卫」（三项编号与语义不变）：
   [+] 验收链闭合 — 声明的验收工具必须存在且可编译；分诊台账静态自证必须 PASS。
-      把「13 个 open 历史失败的分诊台账是否漂移」纳入每轮一条命令的硬口径，
+      把「open 历史失败的分诊台账是否漂移」纳入每轮一条命令的硬口径，
       避免只跑静态三项就误以为全绿（沿用 R-20261104-02 收敛纪律）。
+      R7 口径修订：open 数量不再写死在本文与 SCOPE 行，改为从分诊台账
+      EXPECTED_OPEN 静态派生（R-20261024-12 单一真源），否则每修一个历史失败
+      就会让这行输出变成假陈述。
 
 只做静态检查，不 import 任何项目模块（不触发第三方依赖 / 服务启动）。
 ⚠ PASS 只代表「能解析、能编译 + 验收链工具自洽」，不代表服务能跑，
-  也不代表 13 个 open 历史失败已修。R1 实证静态三项全 PASS 时仍存在
+  也不代表 open 历史失败已修（数量以 tools/triage_check.py LEDGER 为准）。R1 实证静态三项全 PASS 时仍存在
   3 处只在运行时暴露的缺陷（缺 import os / get_system_info 少 key /
   hunt_sync 嵌套 asyncio.run）；R2/R3/R4 又三次实证静态层对路径默认值、
   根锚点、局部 import 遮蔽均无感。四层验收口径与集合范围见 D:/Hive/LOOP.md 二。
@@ -150,6 +153,30 @@ def check_mirror() -> tuple[list[str], str]:
     return issues, status
 
 
+def ledger_open_count(root: Path | None = None) -> int | None:
+    """R7 口径修订：从分诊台账静态派生 open 数量（唯一真源 = EXPECTED_OPEN）。
+
+    纯 AST，不 import、不 exec 任何项目模块；读不到就返回 None，由调用方
+    在 SCOPE 行输出「数量以台账为准」而不是写死一个会过期的数字。
+    """
+    base = root or ROOT
+    path = base / TRIAGE_TOOL
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, SyntaxError):
+        return None
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if (isinstance(target, ast.Name) and target.id == "EXPECTED_OPEN"
+                    and isinstance(node.value, ast.Constant)
+                    and isinstance(node.value.value, int)
+                    and not isinstance(node.value.value, bool)):
+                return node.value.value
+    return None
+
+
 def check_acceptance_chain(root: Path | None = None) -> tuple[list[str], str]:
     """R6 附加守卫：验收工具链闭合 + 分诊台账静态自证。
 
@@ -217,7 +244,9 @@ def main() -> int:
     print("SCOPE : 四层验收 = ① 本静态体检 ② 1 周期冒烟 ③ 带范围的两套 pytest"
           "（tests/ 子集 + hive/tests/ 全量；数字必须带集合范围）"
           " ④ python tools/triage_check.py --report <全量报告> 对账")
-    print("SCOPE : PASS ≠ 服务能跑 ≠ 13 个 open 历史失败已修；"
+    n_open = ledger_open_count()
+    open_desc = f"{n_open} 个 open 历史失败" if n_open is not None else "open 历史失败"
+    print(f"SCOPE : PASS ≠ 服务能跑 ≠ {open_desc}已修；"
           "P0-1/P0-3 未清、完整运行时不可用")
     print("RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

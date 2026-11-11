@@ -39,6 +39,17 @@ class TestCapabilityGapAnalyzer(unittest.TestCase):
 
         self.analyzer = self.CapabilityGapAnalyzer(max_records=1000)
 
+        # --- R7 / P1-9③ fixture 隔离 BEGIN ---
+        # 默认 _persistence_path 是 CWD 相对的共享目录 hive/data/gap_analyzer/，
+        # 堆着历史 report_*.json（analyze() 每跑一次还会再写一份），
+        # get_latest_report() 把别人的报告当最新报告返回，断言 None 遂失败。
+        # 每个用例改用独立空临时目录并自动回收：不改产品行为、不删既有文件、
+        # 也不再往共享目录写新残留。
+        self._report_tmp = tempfile.TemporaryDirectory(prefix="hive_gap_report_")
+        self.addCleanup(self._report_tmp.cleanup)
+        self.analyzer._persistence_path = Path(self._report_tmp.name)
+        # --- R7 / P1-9③ fixture 隔离 END ---
+
     def test_record_task(self):
         """测试任务记录"""
         record = self.TaskExecutionRecord(
