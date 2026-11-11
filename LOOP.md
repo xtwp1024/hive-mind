@@ -131,6 +131,8 @@ R1 实测结论（`2026-11-10`）：
 - 是否调整项目公开/私有状态
 - 归档副本的去留
 - P0-3 `hunt_sync` 修法（涉及主动狩猎语义的行为决策）
+- **是否为 hive-mind 注册独立 deploy key**（R8 实测，未擅自做）：SSH over 443 认证本身通，但本机 `~/.ssh/id_ed25519` 已作为「星社仪表盘」的**仓库级** deploy key，对 hive-mind 报 `Permission ... denied to deploy key`；同一把 deploy key 不能跨仓库复用（注册时报 `key is already in use` 422）。要走 SSH 就得**新生成一对密钥**并给本仓库增加一份持久写凭证，属用户决策。
+- **补推通路诊断（非决策，仅备查）**：R8 轮末 git 传输层三路均失败——HTTPS 裸直连 `Recv failure: Connection was reset`、代理 7897 `Failed to connect ... over proxy`、openssl+tlsv1.2+token 头 `Could not connect to server`；同期 `gh api` 一直可用（远端 `b858ce3` 未分叉）。⇒ 传输层与 API 通路分离，下一轮轮首按「五、每轮流程」第 4 步补推，仍失败只记一行原因，别因一次失败认定通路已死（`R-20261015-05`）。
 
 ## 五、每轮流程
 
