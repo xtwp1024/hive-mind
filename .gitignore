@@ -77,6 +77,9 @@ progress.txt
 
 # 第三方二进制与运行报告
 vendor/*.whl
+# P0-1 (R8): pwp-qa workflow 依赖此版本，单独放行。
+# 已拆包核实：单文件 60KB / MIT 许可 / 无硬编码凭证与内部地址；其余 8 个历史 wheel 继续排除。
+!vendor/pwp_qa-0.2.3-py3-none-any.whl
 reports/
 shared-brain/events/
 obsidian_notes/

@@ -12,7 +12,7 @@
 - 远端 `github.com/xtwp1024/hive-mind.git`，默认分支 `master`。
 - 每轮**至少完成一个实质动作并留痕**；没有可推进项时只写一行说明，不硬凑改动、不刷「一切正常」的空转汇报。
 - 不删除文件、不 `git reset --hard`、不强推。破坏性操作一律转「待人工」。
-- 私有二进制（`vendor/*.whl`）**不得擅自提交到公开仓库**，需要用户明确决定。
+- `vendor/` 只放行 `pwp_qa-0.2.3-py3-none-any.whl` 一个版本（**P0-1 / R8 已由用户授权按方案 A 入库**）。拆包核实：单文件 60KB、`pwp_qa.py` 4702 行、MIT 许可、声明公开主页、**无硬编码凭证或内部地址**；workflow 注释里「私有部署」只是「未发布到 PyPI」的意思（公共 PyPI 实测 404）。R0 台账称其「私有工具、公开仓库有泄露顾虑」是照抄注释未拆包，**已更正**。其余 8 个历史 wheel 继续排除，**新增或升级 wheel 仍需用户确认**，不要批量 `git add -f vendor/`。
 - 单轮预算控制在 40 分钟内，宁可少做也不拖轮。
 
 ## 二、固定验收口径（每轮必跑，先于任何改动）
@@ -71,12 +71,16 @@ python tools/loop_check.py                  # 静态体检：见下
 
 ### P0 · 阻塞「可用」
 
-**P0-1　CI 引用了仓库里没有的私有 wheel**
-`.github/workflows/pwp-qa.yml` 两处 `pip install ./vendor/pwp_qa-0.2.3-py3-none-any.whl`，但 `vendor/*.whl` 被 `.gitignore` 排除，远端 CI 检不到文件，必然失败。这不是版本 bump 引入的，是从 10-28 建库起就存在的结构性缺陷。
-候选解法（**需用户决策，不要替他选**）：
-- A. 用 `git add -f` 把 0.2.3 纳入版本库（60KB，但属私有工具，公开仓库有泄露顾虑）
-- B. workflow 改为从内部源安装，缺源时显式跳过并标注 skip 原因
-- C. 把 QA 步骤改成不依赖 pwp-qa 的等价静态检查
+**P0-1　✅ R8 已完成 — CI 两处断点（wheel 缺失 + 分支不匹配）**
+
+**R8 实测发现的是两个断点，不是一个**（R0 只看到第一个）：
+1. `.github/workflows/pwp-qa.yml` 两处 `pip install ./vendor/pwp_qa-0.2.3-py3-none-any.whl`，而 `vendor/*.whl` 被 `.gitignore:79` 排除、`git ls-files vendor` 为空 ⇒ 云端检不到 wheel。从 10-28 建库起就存在。
+2. workflow `on.push.branches` / `on.pull_request.branches` 写的是 `[main, develop]`，**本仓库默认分支是 `master`** ⇒ 推 master 根本不触发。即便修好 wheel 也白搭。R0 完全漏了这条。
+
+**决策依据（2026-11-12 用户授权「推进本项目」，按上轮建议的方案 A 执行）**：拆包核实 wheel 非私有（MIT / 无凭证 / 无内部地址，`pwp-qa` 在公共 PyPI 实测 404），故 B「内部源」不成立；C 会丢掉这套多宇宙 prompt 分析，而仓库另有 `lint.yml`、`test.yml` 兜底，但不等于等价替代。**A 改动最小且保住 workflow 原意**。
+
+- 落地：`.gitignore` 用 `!vendor/pwp_qa-0.2.3-py3-none-any.whl` 单版本白名单放行（不 `git add -f`、不带入其余 8 个历史 wheel）；workflow 两处分支改 `[master]`，两处「私有部署」注释改为事实描述。
+- **边界**：修完只保证「任务能触发 + 工具能装上」，**不等于 CI 会绿**。`pwp-qa baseline establish / check / trend` 这套 mock 流程从未在本仓库跑通，可能仍缺配置或阈值文件；以 GitHub Actions 实际日志为准，见「八、推进日志」R8 行。CI 若仍失败，按新证据另立待办，不回滚本项。
 
 **P0-2　运行时首次跑通（R1 已达成「有界冒烟」，但项目仍非可用）**
 
@@ -101,7 +105,7 @@ R1 实测结论（`2026-11-10`）：
 - **P1-2** 版本 1.0.0 只写在 README / pyproject，远端没打 tag；确认版本口径后补 `git tag v1.0.0`。
 - **P1-3** `hive/core/vector_vault.py` 换成 SHA256 哈希嵌入后，语义检索能力实质下降（哈希无语义）。需要评估：是保留作离线兜底，还是加回可配置的可选语义嵌入。
 - **P1-4** `obsidian_notes/` 9 篇开发记录（五阶段进化路线图、代码改进总结、测试汇总）是项目史一手材料，整理进 `docs/` 后入库。
-- **P1-5** `vendor/` 现有 8 个 wheel（0.1.0–0.2.4），CI 只用 0.2.3；确认保留策略，别让版本继续无序堆积。
+- **P1-5** `vendor/` 现有 **9 个** wheel（0.1.0 / 0.1.1 / 0.1.2 / 0.1.3 / 0.1.4 / 0.2.1 / 0.2.2 / 0.2.3 / 0.2.4；R0 台账写「8 个」、R8 说明里写「另外七个」均为**未数清的口径错误**，已按 `ls vendor/*.whl` 实测更正），CI 只用 0.2.3 且已单独入库；确认其余 8 个的保留策略，别让版本继续无序堆积。
 - **P1-6** `web/swarm.html` 默认深色底 + emoji 标题，与既定「白主 / 黑 / 蓝辅、不用 emoji 改用开源图标、每个元素有出现-过渡-消失动画」规范不一致；按规范改版。
 - **P1-7　✅ R3 已完成（`696b76e`）** 散落 4 处的 `HIVE_HOME` 根锚点收敛成单一真源 `hive/paths.py`（`PROJECT_ROOT` / `resolve_hive_home` / `resolve_events_file`）；`hive/__init__.py`、`settings.py`、`librarian_bee.py`、`web_dashboard.py` 四处改为调用真源，`event_stream.py` 退化为转发薄壳并保留 P1-1 回归的可注入符号。新增 32 项回归（判据唯一性、消费点投影守卫、`__all__` 派生守卫、写读同路径、旧实现注入反证）。按 `R-20261024-01` 判定：`monitor.py` 取盘符、`.env` 的 `BASE_DIR`、3 处非根锚点 `cwd()` 语义不同，**不合并**并显式登记。详见「八、推进日志」R3 行。
 
@@ -121,9 +125,10 @@ R1 实测结论（`2026-11-10`）：
 
 ### 待人工（自动化不要碰）
 
-- 是否把私有 pwp-qa wheel 放进公开仓库（P0-1 的决策权）
+- ~~是否把私有 pwp-qa wheel 放进公开仓库~~ **已于 R8 决策并落地**：wheel 非私有，放行 0.2.3 单版本；**但新增/升级任何 wheel 仍需用户确认**
 - 是否调整项目公开/私有状态
 - 归档副本的去留
+- P0-3 `hunt_sync` 修法（涉及主动狩猎语义的行为决策）
 
 ## 五、每轮流程
 

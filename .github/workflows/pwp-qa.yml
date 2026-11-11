@@ -4,9 +4,9 @@ name: PWP-QA
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main, develop]
+    branches: [master]
   workflow_dispatch: # 手动触发 (用于真实 LLM 模式)
 
 env:
@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install pwp-qa (本地 vendor wheel, 私有部署)
+      - name: Install pwp-qa (仓库内 vendor wheel, MIT)
         run: pip install ./vendor/pwp_qa-0.2.3-py3-none-any.whl tree-sitter tree-sitter-python
 
       - name: PWP-QA baseline (mock)
@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install pwp-qa + openai (本地 vendor wheel, 私有部署)
+      - name: Install pwp-qa + openai (仓库内 vendor wheel, MIT)
         run: pip install ./vendor/pwp_qa-0.2.3-py3-none-any.whl openai tree-sitter tree-sitter-python
 
       - name: PWP-QA baseline (real LLM)
