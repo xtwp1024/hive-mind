@@ -762,8 +762,8 @@ class TestDNAAdaptiveEngine(unittest.TestCase):
 
         self.engine = self.DNAAdaptiveEngine()
 
-    def test_create_mock_dna(self):
-        """创建模拟 DNA 对象"""
+    def create_mock_dna(self):
+        """helper：构造模拟 DNA（不可加 test_ 前缀，否则被 pytest 误收为用例）"""
         mock_dna = MagicMock()
         mock_dna.learning_rate = 0.1
         mock_dna.mutation_rate = 0.1

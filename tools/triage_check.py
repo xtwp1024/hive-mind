@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""hive-mind 历史失败分诊台账 — R4 / P1-8 单一真源 + 可复现校验命令。
+"""hive-mind 历史失败分诊台账 — R4/P1-8 建立，R5/P1-9 续修 — 单一真源 + 可复现校验命令。
 
 问题背景（R3 台账原话）：「全仓库 pytest -q 有 20 个 hive/tests/ 历史失败，
 台账与 CI 若只跑 tests/ 子集，这 20 个失败会被静默忽略」。本文件把「20 个
@@ -48,11 +48,14 @@ CATEGORIES = {
     "状态污染/顺序依赖",      # 单例/磁盘残留导致单跑 PASS、全量 FAIL
     "依赖缺失",             # 缺第三方包或配置文件（本项目实测 0 条）
 }
-DISPOSITIONS = {"已修(R4)", "立下一轮(P1-9)", "待人工"}
+DISPOSITIONS = {"已修(R4)", "已修(R5)", "立下一轮(P1-9)", "待人工"}
+FIXED_DISP_PREFIX = "已修"   # status=fixed <=> 去向以此开头；台账支持多轮陆续修复
 STATUSES = {"open", "fixed"}
 
 # 唯一真源：改这里就是改台账。每行都是 2026-11-11 R4 全仓库 pytest -q 实测证据，
 # 不是推测。evidence 记的是实测断言/异常，不是「应该是什么」。
+# R5 续修：#11~#16 六条「测试自身缺陷」已修，evidence 末尾追加 R5 实测记录；
+# 台账支持多轮陆续修复（status=fixed <=> 去向以「已修」开头），不写死某一轮。
 LEDGER = [
     # id, nodeid, category, evidence, disposition, status
     (1, "hive/tests/test_cognitive_bee_enhanced.py::TestReportToEvolution::test_report_to_evolution_coordinator_import_error",
@@ -86,18 +89,18 @@ LEDGER = [
      "真缺陷·已修", "R4 前：species_blueprint.py:545 UnboundLocalError: cannot access local variable 'random'；crossover() 内 3 处函数级 import random 遮蔽模块级导入（第 24 行），双亲能力互斥时 elif 分支访问未绑定局部名",
      "已修(R4)", "fixed"),
     (11, "hive/tests/test_phase3_evolution.py::TestDNAAdaptiveEngine::test_monitor_dna",
-     "测试自身缺陷", ":781 AttributeError: create_mock_dna；helper 被命名为 test_create_mock_dna（自身被 pytest 当用例收集且 return MagicMock），调用方却写 self.create_mock_dna()",
-     "立下一轮(P1-9)", "open"),
+     "测试自身缺陷", ":781 AttributeError: create_mock_dna；helper 被命名为 test_create_mock_dna（自身被 pytest 当用例收集且 return MagicMock），调用方却写 self.create_mock_dna()。【R5 已修】helper 改名为 create_mock_dna（去掉 test_ 前缀），6 个调用点无需改动；修复前 6 failed 实测复现，修复后 6 passed",
+     "已修(R5)", "fixed"),
     (12, "hive/tests/test_phase3_evolution.py::TestDNAAdaptiveEngine::test_monitor_duplicate_dna",
-     "测试自身缺陷", ":791 AttributeError: create_mock_dna；同 #11", "立下一轮(P1-9)", "open"),
+     "测试自身缺陷", ":791 AttributeError: create_mock_dna；同 #11。【R5 已修】随 #11 一并修复，实测 PASS", "已修(R5)", "fixed"),
     (13, "hive/tests/test_phase3_evolution.py::TestDNAAdaptiveEngine::test_stop_monitoring",
-     "测试自身缺陷", ":797 AttributeError: create_mock_dna；同 #11", "立下一轮(P1-9)", "open"),
+     "测试自身缺陷", ":797 AttributeError: create_mock_dna；同 #11。【R5 已修】随 #11 一并修复，实测 PASS", "已修(R5)", "fixed"),
     (14, "hive/tests/test_phase3_evolution.py::TestDNAAdaptiveEngine::test_record_performance",
-     "测试自身缺陷", ":808 AttributeError: create_mock_dna；同 #11", "立下一轮(P1-9)", "open"),
+     "测试自身缺陷", ":808 AttributeError: create_mock_dna；同 #11。【R5 已修】随 #11 一并修复，实测 PASS", "已修(R5)", "fixed"),
     (15, "hive/tests/test_phase3_evolution.py::TestDNAAdaptiveEngine::test_suggest_adaptations_insufficient_data",
-     "测试自身缺陷", ":834 AttributeError: create_mock_dna；同 #11", "立下一轮(P1-9)", "open"),
+     "测试自身缺陷", ":834 AttributeError: create_mock_dna；同 #11。【R5 已修】随 #11 一并修复，实测 PASS", "已修(R5)", "fixed"),
     (16, "hive/tests/test_phase3_evolution.py::TestDNAAdaptiveEngine::test_get_status_single",
-     "测试自身缺陷", ":855 AttributeError: create_mock_dna；同 #11", "立下一轮(P1-9)", "open"),
+     "测试自身缺陷", ":855 AttributeError: create_mock_dna；同 #11。【R5 已修】随 #11 一并修复，实测 PASS", "已修(R5)", "fixed"),
     (17, "hive/tests/test_phase3_evolution.py::TestParameterState::test_record_value",
      "断言过期", "断言 len(historical_values)==3、len(historical_gradients)==2；record_value() 只 append 传入值、不播种 initial value，两次调用后实测 2 != 3",
      "立下一轮(P1-9)", "open"),
@@ -113,7 +116,7 @@ LEDGER = [
 ]
 
 EXPECTED_TOTAL = 20          # R4 实测基线；变更必须是有意的台账更新，不能静默漂移
-EXPECTED_OPEN = 19           # 20 - 1（#10 已修）
+EXPECTED_OPEN = 13           # 20 - 7（#10 R4 已修 1 条 + #11~#16 R5 已修 6 条）
 EXPECTED_MISSING_DEPS = 0    # R4 实测：20 条里没有一条是缺依赖/缺配置
 
 
@@ -142,9 +145,12 @@ def check_ledger() -> list[str]:
             problems.append(f"#{rid} 非法状态 {status!r}")
         if not ev.strip():
             problems.append(f"#{rid} 缺实测证据")
-        if (cat == "真缺陷·已修") != (disp == "已修(R4)"):
-            problems.append(f"#{rid} 分类与去向不自洽: {cat} / {disp}")
-        if (status == "fixed") != (disp == "已修(R4)"):
+        # 台账支持多轮陆续修复（R4 修 1 条、R5 修 6 条）：用「已修」前缀判定，
+        # 不写死某一轮的 disposition 字面量，否则每修一轮都要改校验逻辑。
+        is_fixed_disp = disp.startswith(FIXED_DISP_PREFIX)
+        if (cat == "真缺陷·已修") and status != "fixed":
+            problems.append(f"#{rid} 分类为真缺陷·已修却未标 fixed: {status}")
+        if (status == "fixed") != is_fixed_disp:
             problems.append(f"#{rid} 状态与去向不自洽: {status} / {disp}")
     opens = sum(1 for r in LEDGER if r[5] == "open")
     if opens != EXPECTED_OPEN:
@@ -211,7 +217,7 @@ def main(argv: list[str]) -> int:
             return 2
 
     print("=" * 68)
-    print("hive-mind 历史失败分诊台账校验 (R4 / P1-8)")
+    print("hive-mind 历史失败分诊台账校验 (R4 建立 / R5 续修)")
     print("=" * 68)
 
     print("[1/3] 台账完整性")
