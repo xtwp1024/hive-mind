@@ -56,12 +56,23 @@ def test_failing_ledger_selfcheck_is_detected(tmp_path):
     assert any("分诊台账静态自证未 PASS" in x for x in bad_issues), bad_issues
 
 
-def test_acceptance_chain_is_wired_into_main(capsys):
+def test_acceptance_chain_is_wired_into_main(capsys, monkeypatch):
     """守卫必须接入 main() 的输出与 RESULT 判定，不能只是孤立函数。
 
     R7 口径修订：SCOPE 行里的 open 数量改为从分诊台账 EXPECTED_OPEN 静态派生，
     不再写死「13」。本断言随台账走，避免每修一个历史失败就误报或变成假陈述。
+
+    R10 / P1-13 状态依赖隔离：main() 的 [3/3] 镜像一致要求「镜像 HEAD ==
+    origin/master」，这是本用例职责之外的外部 git 状态。R9 收尾实测「已推送
+    5e57aef 但镜像仍 cd19c4a」的窗口会让 main() 返回 1，本用例与 SCOPE 投影
+    无关却连带判红（2 failed / 167 passed）。镜像一致性由
+    tests/utils/test_loop_check_mirror.py 专门负责；此处 monkeypatch 固定为
+    「无问题」态，使 rc 只反映语法 / import 闭合 / 验收链自证三个本地可控项。
     """
+    monkeypatch.setattr(
+        loop_check, "check_mirror",
+        lambda: ([], "三方对齐（测试桩：隔离外部镜像状态）"),
+    )
     rc = loop_check.main()
     out = capsys.readouterr().out
     assert "验收链闭合" in out

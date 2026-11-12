@@ -23,8 +23,18 @@ def test_real_repo_p0_scope_matches_ledger():
     assert "P0-3" in ids, ids
 
 
-def test_main_scope_is_projected_from_ledger(capsys):
-    """main() 的 SCOPE 行必须用派生结果，且不得残留写死的 P0 编号。"""
+def test_main_scope_is_projected_from_ledger(capsys, monkeypatch):
+    """main() 的 SCOPE 行必须用派生结果，且不得残留写死的 P0 编号。
+
+    R10 / P1-13 状态依赖隔离：本用例只关心 SCOPE 行的 P0 投影，不应把
+    main() 的整体 rc 绑到「镜像 == origin/master」这类外部 git 状态
+    （R9 收尾曾因此连带误报）。镜像一致性由 test_loop_check_mirror.py
+    专门负责，此处 monkeypatch 固定为「无问题」态，rc 只反映本地三项检查。
+    """
+    monkeypatch.setattr(
+        loop_check, "check_mirror",
+        lambda: ([], "三方对齐（测试桩：隔离外部镜像状态）"),
+    )
     rc = loop_check.main()
     out = capsys.readouterr().out
     ids = loop_check.p0_open_ids()
