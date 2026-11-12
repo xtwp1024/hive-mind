@@ -9,23 +9,24 @@
 5. 与进化系统集成 (report_to_evolution_coordinator)
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, Mock
-from pathlib import Path
-from datetime import datetime, timedelta
-import tempfile
-import shutil
 import json
-import time
+import shutil
 import sys
+import tempfile
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from hive.bees.cognitive_bee import (
-    CognitiveBee,
-    CapabilityAssessment,
-    HistoricalComparison,
-    ImprovementRecommendation,
     ActiveLearningTrigger,
     BlindSpot,
+    CapabilityAssessment,
+    CognitiveBee,
+    HistoricalComparison,
+    ImprovementRecommendation,
     LearningPlan,
 )
 from hive.core.dna import BeeDNA
@@ -40,7 +41,7 @@ class TestCapabilityAssessment:
             capability_name="test_capability",
             score=0.85,
         )
-        
+
         assert assessment.capability_name == "test_capability"
         assert assessment.score == 0.85
         assert assessment.confidence == 1.0
@@ -59,7 +60,7 @@ class TestCapabilityAssessment:
             evidence=["成功生成 500+ 任务", "代码质量良好"],
             improvement_rate=0.05,
         )
-        
+
         assert len(assessment.evidence) == 2
         assert assessment.improvement_rate == 0.05
 
@@ -69,39 +70,39 @@ class TestHistoricalComparison:
 
     def test_compare_with_history_no_history(self):
         """测试无历史数据时返回 None"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_001")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_001", queue)
-            
+
             result = bee.compare_with_history("code_generation")
             assert result is None
 
     def test_compare_with_history_with_data(self):
         """测试有历史数据时的对比"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_002")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_002", queue)
-            
+
             older = CapabilityAssessment(
                 capability_name="code_generation",
                 score=0.70,
                 confidence=0.80,
                 last_updated=datetime.now() - timedelta(days=7),
             )
-            
+
             newer = CapabilityAssessment(
                 capability_name="code_generation",
                 score=0.80,
                 confidence=0.85,
                 last_updated=datetime.now(),
             )
-            
+
             bee.capability_history["code_generation"] = [older, newer]
-            
+
             comparison = bee.compare_with_history("code_generation")
-            
+
             assert comparison is not None
             assert comparison.capability_name == "code_generation"
             assert comparison.current_score == 0.80
@@ -111,51 +112,55 @@ class TestHistoricalComparison:
 
     def test_compare_with_history_declining(self):
         """测试下降趋势"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_003")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_003", queue)
-            
+
             older = CapabilityAssessment(
                 capability_name="bug_detection",
                 score=0.80,
                 confidence=0.80,
                 last_updated=datetime.now() - timedelta(days=7),
             )
-            
+
             newer = CapabilityAssessment(
                 capability_name="bug_detection",
                 score=0.60,
                 confidence=0.65,
                 last_updated=datetime.now(),
             )
-            
+
             bee.capability_history["bug_detection"] = [older, newer]
-            
+
             comparison = bee.compare_with_history("bug_detection")
-            
+
             assert comparison.improvement_trend == "declining"
             assert comparison.score_delta == pytest.approx(-0.20)
 
     def test_get_all_historical_trends(self):
         """测试获取所有历史趋势"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_004")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_004", queue)
-            
+
             bee.capability_history["code_generation"] = [
-                CapabilityAssessment("code_generation", 0.70, 0.80, last_updated=datetime.now() - timedelta(days=7)),
+                CapabilityAssessment(
+                    "code_generation", 0.70, 0.80, last_updated=datetime.now() - timedelta(days=7)
+                ),
                 CapabilityAssessment("code_generation", 0.80, 0.85, last_updated=datetime.now()),
             ]
-            
+
             bee.capability_history["code_analysis"] = [
-                CapabilityAssessment("code_analysis", 0.75, 0.80, last_updated=datetime.now() - timedelta(days=7)),
+                CapabilityAssessment(
+                    "code_analysis", 0.75, 0.80, last_updated=datetime.now() - timedelta(days=7)
+                ),
                 CapabilityAssessment("code_analysis", 0.76, 0.81, last_updated=datetime.now()),
             ]
-            
+
             trends = bee.get_all_historical_trends()
-            
+
             assert "code_generation" in trends
             assert trends["code_generation"].improvement_trend == "improving"
 
@@ -165,17 +170,17 @@ class TestImprovementRecommendations:
 
     def test_analyze_improvement_recommendations_generates_list(self):
         """测试生成改进建议列表"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_005")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_005", queue)
-            
+
             bee.memory["capabilities"]["low_score"] = {"score": 0.35, "improvement_rate": 0.01}
             bee.memory["capabilities"]["mid_score"] = {"score": 0.55, "improvement_rate": 0.02}
             bee.memory["capabilities"]["high_score"] = {"score": 0.85, "improvement_rate": 0.03}
-            
+
             recommendations = bee.analyze_improvement_recommendations()
-            
+
             assert len(recommendations) > 0
             for rec in recommendations:
                 assert isinstance(rec, ImprovementRecommendation)
@@ -183,13 +188,13 @@ class TestImprovementRecommendations:
 
     def test_recommendations_sorted_by_priority(self):
         """测试建议按优先级排序"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_006")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_006", queue)
-            
+
             recommendations = bee.analyze_improvement_recommendations()
-            
+
             if len(recommendations) > 1:
                 priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
                 for i in range(len(recommendations) - 1):
@@ -203,41 +208,44 @@ class TestActiveLearningTriggers:
 
     def test_check_active_learning_triggers_finds_triggers(self):
         """测试检查主动学习触发器"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_007")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_007", queue)
-            
+
             triggers = bee.check_active_learning_triggers()
-            
+
             for trigger in triggers:
                 assert isinstance(trigger, ActiveLearningTrigger)
                 assert trigger.trigger_type in [
-                    "low_score", "high_uncertainty", "knowledge_gap", "trend_down"
+                    "low_score",
+                    "high_uncertainty",
+                    "knowledge_gap",
+                    "trend_down",
                 ]
                 assert trigger.severity in ["critical", "high", "medium"]
 
     def test_missing_domains_trigger_knowledge_gap(self):
         """测试缺失领域触发知识缺口"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_008")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_008", queue)
-            
+
             bee.memory["missing_domains"] = ["quantum_computing", "blockchain"]
-            
+
             triggers = bee.check_active_learning_triggers()
-            
+
             knowledge_gap_triggers = [t for t in triggers if t.trigger_type == "knowledge_gap"]
             assert len(knowledge_gap_triggers) >= 2
 
     def test_execute_active_learning(self):
         """测试执行主动学习"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_009")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_009", queue)
-            
+
             trigger = ActiveLearningTrigger(
                 trigger_id="trigger_test_001",
                 trigger_type="low_score",
@@ -252,9 +260,9 @@ class TestActiveLearningTriggers:
                     "goal": "提升分数",
                 },
             )
-            
+
             result = bee.execute_active_learning(trigger)
-            
+
             assert result["trigger_id"] == "trigger_test_001"
             assert result["capability"] == "test_capability"
             assert result["status"] == "completed"
@@ -266,37 +274,43 @@ class TestMetaLearning:
 
     def test_record_learning_outcome(self):
         """测试记录学习结果"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_010")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_010", queue)
-            
+
             bee.record_learning_outcome(
                 capability_name="code_generation",
                 success=True,
                 effort_hours=2.0,
                 improvement=0.10,
             )
-            
+
             efficiencies = bee.meta_learning_stats.get("learning_efficiency", {})
             assert "code_generation" in efficiencies
 
     def test_recommend_learning_method(self):
         """测试推荐学习方法"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_011")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_011", queue)
-            
+
             bee.meta_learning_stats["learning_efficiency"] = {
                 "code_generation": 0.90,
                 "pattern_mining": 0.85,
                 "code_reading": 0.70,
             }
-            
+
             method, efficiency = bee.recommend_learning_method("test_capability")
-            
-            assert method in ["pattern_mining", "code_reading", "guided_learning", "trial_error", "code_generation"]
+
+            assert method in [
+                "pattern_mining",
+                "code_reading",
+                "guided_learning",
+                "trial_error",
+                "code_generation",
+            ]
             assert isinstance(efficiency, float)
 
 
@@ -305,23 +319,23 @@ class TestEnhancedReport:
 
     def test_generate_enhanced_report(self):
         """测试生成增强版报告"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_012")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_012", queue)
-            
+
             test_path = Path(tempfile.mkdtemp())
-            
+
             try:
                 report = bee.generate_enhanced_report(test_path)
-                
+
                 assert report["report_version"] == "2.0"
                 assert "enhanced" in report
                 assert "historical_trends" in report["enhanced"]
                 assert "improvement_recommendations" in report["enhanced"]
                 assert "active_learning_triggers" in report["enhanced"]
                 assert "meta_learning" in report["enhanced"]
-                
+
             finally:
                 if test_path.exists():
                     shutil.rmtree(test_path)
@@ -333,17 +347,17 @@ class TestReportToEvolution:
     def test_report_to_evolution_coordinator_import_error(self):
         """R11 契约核对：协调器现已可导入，默认路径返回 reported=True；
         只有显式注入 ImportError 才走 coordinator_unavailable 回退分支。"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_013")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_013", queue)
-            
+
             result = bee.report_to_evolution_coordinator()
-            
+
             assert result["reported"] is True
             for key in ("strengths", "weaknesses", "overall_intelligence", "timestamp"):
                 assert key in result
-            
+
             with patch.dict(sys.modules, {"hive.core.swarm_evolution": None}):
                 fallback = bee.report_to_evolution_coordinator()
             assert fallback["reported"] is False
@@ -355,48 +369,48 @@ class TestCognitiveBeeIntegration:
 
     def test_full_cognitive_flow(self):
         """测试完整的认知流程"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_014")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_014", queue)
-            
+
             capabilities = bee.assess_capabilities()
             assert len(capabilities) > 0
-            
+
             blind_spots = bee.identify_blind_spots()
             assert isinstance(blind_spots, list)
-            
+
             plan = bee.create_learning_plan()
             assert isinstance(plan, LearningPlan)
             assert len(plan.targets) > 0
-            
+
             status = bee.get_cognitive_status()
             assert status["bee_type"] == "CognitiveBee"
             assert "overall_intelligence" in status
 
     def test_update_capability(self):
         """测试更新能力分数"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_015")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_015", queue)
-            
+
             original_score = bee.memory["capabilities"].get("test_domain", {}).get("score", 0.0)
-            
+
             bee.update_capability("test_domain", score_delta=0.1)
-            
+
             new_score = bee.memory["capabilities"]["test_domain"]["score"]
             assert new_score == original_score + 0.1
 
     def test_get_cognitive_status_includes_uncertainty(self):
         """测试认知状态包含不确定性"""
-        with patch('hive.bees.base_bee.get_logger'):
+        with patch("hive.bees.base_bee.get_logger"):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_016")
             queue = MagicMock()
             bee = CognitiveBee(dna, "cog_016", queue)
-            
+
             status = bee.get_cognitive_status()
-            
+
             assert "uncertain_capabilities" in status
             assert "cognitive_uncertainty" in status
             assert "capabilities" in status

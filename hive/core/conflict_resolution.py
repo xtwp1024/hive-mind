@@ -40,19 +40,20 @@ import logging
 import threading
 import time
 import uuid
+from collections import defaultdict, deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
-from collections import defaultdict, deque
-from copy import deepcopy
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("Hive.ConflictResolution")
 
 
 class ConflictType(str, Enum):
     """冲突类型"""
+
     VERSION = "version"
     CONTENT = "content"
     SOURCE = "source"
@@ -63,6 +64,7 @@ class ConflictType(str, Enum):
 
 class ConflictSeverity(str, Enum):
     """冲突严重程度"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -71,6 +73,7 @@ class ConflictSeverity(str, Enum):
 
 class ResolutionStrategy(str, Enum):
     """解决策略"""
+
     LAST_WRITE_WINS = "last_write_wins"
     HIGHER_VERSION = "higher_version"
     MERGE_AUTO = "merge_auto"
@@ -81,6 +84,7 @@ class ResolutionStrategy(str, Enum):
 
 class ResolutionStatus(str, Enum):
     """解决状态"""
+
     DETECTED = "detected"
     AUTO_RESOLVED = "auto_resolved"
     PENDING_REVIEW = "pending_review"
@@ -166,7 +170,9 @@ class ConflictRecord:
             "remote_version": self.remote_version.to_dict() if self.remote_version else None,
             "detected_at": self.detected_at,
             "resolved_at": self.resolved_at,
-            "resolution_strategy": self.resolution_strategy.value if self.resolution_strategy else None,
+            "resolution_strategy": (
+                self.resolution_strategy.value if self.resolution_strategy else None
+            ),
             "resolution_status": self.resolution_status.value,
             "resolved_by": self.resolved_by,
             "resolved_version": self.resolved_version.to_dict() if self.resolved_version else None,
@@ -792,19 +798,13 @@ class ConflictLog:
         """获取某个条目的所有冲突"""
         with self._lock:
             conflict_ids = self._by_entry.get(entry_id, [])
-            return [
-                c for c in self._logs
-                if c.conflict_id in conflict_ids
-            ]
+            return [c for c in self._logs if c.conflict_id in conflict_ids]
 
     def get_by_status(self, status: ResolutionStatus) -> List[ConflictRecord]:
         """获取特定状态的冲突"""
         with self._lock:
             conflict_ids = self._by_status.get(status.value, [])
-            return [
-                c for c in self._logs
-                if c.conflict_id in conflict_ids
-            ]
+            return [c for c in self._logs if c.conflict_id in conflict_ids]
 
     def get_pending_review(self) -> List[ConflictRecord]:
         """获取待审核的冲突"""
@@ -917,9 +917,7 @@ class ConflictResolutionEngine:
                     f"strategy={conflict.resolution_strategy.value if conflict.resolution_strategy else 'N/A'}"
                 )
             elif conflict.resolution_status == ResolutionStatus.PENDING_REVIEW:
-                logger.warning(
-                    f"🔧 [ConflictEngine] 冲突待人工审核: {conflict.conflict_id}"
-                )
+                logger.warning(f"🔧 [ConflictEngine] 冲突待人工审核: {conflict.conflict_id}")
 
         return conflict, conflict.resolved_version
 

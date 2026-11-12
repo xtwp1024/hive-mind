@@ -1,10 +1,12 @@
 import random
-from typing import Iterable, Any
+from typing import Any, Iterable
+
 
 class Agent:
     """
     Agent class represents an individual in the swarm, capable of processing sentiment data.
     """
+
     def __init__(self, initial_sentiment: float):
         self.sentiment = initial_sentiment
 
@@ -25,6 +27,7 @@ class Swarm:
     """
     Swarm class represents the collective behavior of agents, capable of producing a consensus sentiment.
     """
+
     def __init__(self, agents: list):
         self.agents = agents
 
@@ -40,6 +43,7 @@ class SwarmIntelligence:
     """
     SwarmIntelligence class provides methods to simulate the swarm's behavior and perform sentiment analysis.
     """
+
     def __init__(self, sentiment_data: Iterable[float]):
         self.agents = [Agent(sentiment) for sentiment in sentiment_data]
 
@@ -52,8 +56,9 @@ class SwarmIntelligence:
                 # Simulate real-world noise in sentiment data
                 new_sentiment = random.uniform(-0.1, 0.1)
                 agent.update_sentiment(new_sentiment)
-        
+
         return Swarm(self.agents).calculate_consensus()
+
 
 # Example usage
 if __name__ == "__main__":

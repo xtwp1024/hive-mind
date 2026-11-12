@@ -205,8 +205,12 @@ class SelfMonitor:
         # 检查阈值
         new_alerts = []
         new_alerts.extend(self._check_threshold(metrics, "attention_load", metrics.attention_load))
-        new_alerts.extend(self._check_threshold(metrics, "memory_pressure", metrics.memory_pressure))
-        new_alerts.extend(self._check_threshold(metrics, "confidence", metrics.confidence, inverted=True))
+        new_alerts.extend(
+            self._check_threshold(metrics, "memory_pressure", metrics.memory_pressure)
+        )
+        new_alerts.extend(
+            self._check_threshold(metrics, "confidence", metrics.confidence, inverted=True)
+        )
         new_alerts.extend(self._check_threshold(metrics, "error_rate", metrics.error_rate))
         new_alerts.extend(self._check_threshold(metrics, "active_goals", metrics.active_goals))
 
@@ -219,7 +223,7 @@ class SelfMonitor:
 
         # 限制告警数量
         if len(self._alerts) > self._max_alerts:
-            self._alerts = self._alerts[-self._max_alerts:]
+            self._alerts = self._alerts[-self._max_alerts :]
 
         # 检查健康状态转换
         old_health = self._current_health

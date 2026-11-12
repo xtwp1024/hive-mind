@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
-import shutil
 import filecmp
 import logging
+import shutil
 from pathlib import Path
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class ImmuLink:
     """
     ImmuLink: 双向验证导回策略 (Two-Way Verification Merge Strategy)
-    
+
     负责将沙箱中的优化结果安全地应用回原始项目。
     包含前后两次验证逻辑，确保代码在导回前后都是可运行的。
     """
-    
+
     def __init__(self, src_root: Path, sandbox_root: Path):
         self.src_root = src_root
         self.sandbox_root = sandbox_root
@@ -27,20 +28,20 @@ class ImmuLink:
         python_files = list(self.sandbox_root.rglob("*.py"))
         if not python_files:
             return True
-            
+
         for py_file in python_files:
             try:
                 # 排除可能非常大的文件（可选）
-                if py_file.stat().st_size > 1024 * 1024: # > 1MB 
+                if py_file.stat().st_size > 1024 * 1024:  # > 1MB
                     continue
-                with open(py_file, 'r', encoding='utf-8') as f:
+                with open(py_file, "r", encoding="utf-8") as f:
                     content = f.read()
                     if content:
-                        compile(content, str(py_file), 'exec')
+                        compile(content, str(py_file), "exec")
             except Exception as e:
                 logger.error(f"🛡️ [ImmuLink] 沙箱验证失败: {py_file.name} 存在语法错误: {e}")
                 return False
-        
+
         logger.info(f"🛡️ [ImmuLink] 沙箱验证通过: 成功验证 {len(python_files)} 个 Python 文件")
         return True
 
@@ -62,7 +63,9 @@ class ImmuLink:
                     src_file = self.src_root / rel_path
 
                     # 如果原文件不存在，或者内容不一致，则认为是修改
-                    if not src_file.exists() or not filecmp.cmp(src_file, sandbox_file, shallow=False):
+                    if not src_file.exists() or not filecmp.cmp(
+                        src_file, sandbox_file, shallow=False
+                    ):
                         changed_files.append(rel_path)
                 except Exception as e:
                     logger.warning(f"🛡️ [ImmuLink] 识别文件对比失败 {sandbox_file}: {e}")
@@ -74,8 +77,8 @@ class ImmuLink:
         物理导回修改（使用临时目录实现原子性，失败时自动回滚）
         返回 (success, backups) — backups 供调用方在后续验证失败时回滚
         """
-        import tempfile
         import shutil as sh
+        import tempfile
 
         if not changed_files:
             logger.info("🛡️ [ImmuLink] 没有发现变更，无需导回。")
@@ -158,14 +161,15 @@ class ImmuLink:
             try:
                 if py_file.stat().st_size > 1024 * 1024:  # > 1MB，跳过
                     continue
-                with open(py_file, 'r', encoding='utf-8') as f:
+                with open(py_file, "r", encoding="utf-8") as f:
                     content = f.read()
                     if content:
-                        compile(content, str(py_file), 'exec')
+                        compile(content, str(py_file), "exec")
             except Exception as e:
                 logger.error(f"🛡️ [ImmuLink] 宿主验证失败: {py_file.name} 导回后出现错误: {e}")
                 return False
         return True
+
 
 def apply_sandbox_to_source(src_path: Path, sandbox_path: Path) -> bool:
     """

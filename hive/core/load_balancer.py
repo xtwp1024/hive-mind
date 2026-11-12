@@ -37,27 +37,28 @@ Phase 5: 分布式网络 - 高可用增强
 └─────────────────────────────────────────────────────────────┘
 """
 
+import hashlib
 import heapq
 import logging
 import random
 import threading
 import time
 import uuid
-import hashlib
+from collections import defaultdict, deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
-from collections import defaultdict, deque
-from copy import deepcopy
 from statistics import mean
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("Hive.LoadBalancer")
 
 
 class LoadBalanceStrategy(str, Enum):
     """负载均衡策略"""
+
     ROUND_ROBIN = "round_robin"
     WEIGHTED_ROUND_ROBIN = "weighted_round_robin"
     LEAST_LOAD = "least_load"
@@ -69,6 +70,7 @@ class LoadBalanceStrategy(str, Enum):
 
 class NodeHealthStatus(str, Enum):
     """节点健康状态"""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -78,6 +80,7 @@ class NodeHealthStatus(str, Enum):
 
 class FailoverAction(str, Enum):
     """故障转移动作"""
+
     REDIRECT = "redirect"
     RETRY = "retry"
     FALLBACK = "fallback"
@@ -717,7 +720,7 @@ class LoadBalancer:
             if node_id in self._nodes:
                 node = self._nodes[node_id]
                 node.success_count += 1
-                node.response_time_ms = (node.response_time_ms * 0.9 + response_time_ms * 0.1)
+                node.response_time_ms = node.response_time_ms * 0.9 + response_time_ms * 0.1
                 node.connection_count = max(0, node.connection_count - 1)
 
                 total = node.success_count + node.failure_count
@@ -816,9 +819,7 @@ class FailoverManager:
                 if metrics and metrics.can_accept_task():
                     node_id = preferred_node
                 else:
-                    node_id = self.load_balancer.select_node(
-                        task_id, required_capabilities
-                    )
+                    node_id = self.load_balancer.select_node(task_id, required_capabilities)
         else:
             node_id = self.load_balancer.select_node(task_id, required_capabilities)
 
@@ -1015,10 +1016,7 @@ class FailoverManager:
     def get_assignment_by_task(self, task_id: str) -> List[TaskAssignment]:
         """获取任务的所有分配"""
         with self._lock:
-            return [
-                a for a in self._assignments.values()
-                if a.task_id == task_id
-            ]
+            return [a for a in self._assignments.values() if a.task_id == task_id]
 
     def is_circuit_open(self, node_id: str) -> bool:
         """检查节点是否熔断"""
@@ -1035,8 +1033,7 @@ class FailoverManager:
                 by_status[assignment.status] += 1
 
             circuit_open_count = sum(
-                1 for cb in self._circuit_breakers.values()
-                if cb.get("circuit_open")
+                1 for cb in self._circuit_breakers.values() if cb.get("circuit_open")
             )
 
             return {

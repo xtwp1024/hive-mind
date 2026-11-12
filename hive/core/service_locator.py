@@ -15,8 +15,10 @@ from typing import Any, Dict, Type
 
 logger = logging.getLogger("Hive.ServiceLocator")
 
+
 class BeeServiceLocator:
     """单一的全局微件管理大本营"""
+
     _services: Dict[str, Any] = {}
     _factories: Dict[str, Type] = {}
     _lock: threading.Lock = threading.Lock()

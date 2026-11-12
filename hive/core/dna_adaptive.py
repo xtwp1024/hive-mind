@@ -17,17 +17,17 @@ Phase 3: 自主进化能力
 """
 
 import logging
+import math
+import statistics
 import threading
 import time
-import statistics
-import math
+from collections import defaultdict, deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from collections import defaultdict, deque
-from copy import deepcopy
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("Hive.DNAAdaptive")
 
@@ -244,9 +244,7 @@ class DNAAdaptiveEngine:
         self._monitored_dnas: Dict[str, Dict[str, Any]] = {}
         self._parameter_states: Dict[str, Dict[str, ParameterState]] = defaultdict(dict)
 
-        self._performance_history: Dict[str, deque] = defaultdict(
-            lambda: deque(maxlen=1000)
-        )
+        self._performance_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
 
         self._adaptation_history: Dict[str, List[AdaptationAction]] = defaultdict(list)
 
@@ -373,10 +371,11 @@ class DNAAdaptiveEngine:
                 success_count = sum(1 for s in history if s.success_rate > 0.5)
 
                 new_success_rate = (success_count + (1 if success else 0)) / (total_tasks + 1)
-                new_avg_duration = (last_sample.avg_duration * total_tasks + duration) / (total_tasks + 1)
-                new_error_rate = (
-                    (last_sample.error_rate * total_tasks + (1 if error else 0))
-                    / (total_tasks + 1)
+                new_avg_duration = (last_sample.avg_duration * total_tasks + duration) / (
+                    total_tasks + 1
+                )
+                new_error_rate = (last_sample.error_rate * total_tasks + (1 if error else 0)) / (
+                    total_tasks + 1
                 )
             else:
                 new_success_rate = 1.0 if success else 0.0
@@ -436,17 +435,13 @@ class DNAAdaptiveEngine:
 
             history = self._performance_history.get(dna_id, deque())
             if len(history) < 10:
-                logger.debug(
-                    f"🧬 [DNAAdaptiveEngine] DNA {dna_id} 历史数据不足，跳过适应建议"
-                )
+                logger.debug(f"🧬 [DNAAdaptiveEngine] DNA {dna_id} 历史数据不足，跳过适应建议")
                 return []
 
             monitored = self._monitored_dnas.get(dna_id, {})
             last_adapt = monitored.get("last_adaptation_at")
             if last_adapt and time.time() - last_adapt < self.ADAPTATION_COOLDOWN:
-                logger.debug(
-                    f"🧬 [DNAAdaptiveEngine] DNA {dna_id} 在冷却期内，跳过适应建议"
-                )
+                logger.debug(f"🧬 [DNAAdaptiveEngine] DNA {dna_id} 在冷却期内，跳过适应建议")
                 return []
 
             actions = []
@@ -467,16 +462,11 @@ class DNAAdaptiveEngine:
 
             actions.sort(key=lambda a: a.confidence, reverse=True)
 
-            logger.info(
-                f"🧬 [DNAAdaptiveEngine] 为 DNA {dna_id} 建议 {len(actions)} 个适应动作"
-            )
+            logger.info(f"🧬 [DNAAdaptiveEngine] 为 DNA {dna_id} 建议 {len(actions)} 个适应动作")
 
             return actions
 
-    def _analyze_performance_trend(
-        self,
-        history: deque
-    ) -> Tuple[PerformanceTrend, float]:
+    def _analyze_performance_trend(self, history: deque) -> Tuple[PerformanceTrend, float]:
         """分析性能趋势"""
         recent = list(history)[-30:]
 
@@ -486,10 +476,7 @@ class DNAAdaptiveEngine:
         fitness_values = [s.fitness_score for s in recent]
         success_values = [s.success_rate for s in recent]
 
-        combined = [
-            (f * 0.7 + s * 0.3)
-            for f, s in zip(fitness_values, success_values)
-        ]
+        combined = [(f * 0.7 + s * 0.3) for f, s in zip(fitness_values, success_values)]
 
         n = len(combined)
         x = list(range(n))
@@ -559,9 +546,7 @@ class DNAAdaptiveEngine:
                     continue
 
                 avg_usage = sum(usages) / len(usages)
-                success_correlation = self._calculate_capability_correlation(
-                    cap_name, recent
-                )
+                success_correlation = self._calculate_capability_correlation(cap_name, recent)
 
                 param_name = f"{cap_name}_capability"
                 state = states.get(param_name)
@@ -793,9 +778,7 @@ class DNAAdaptiveEngine:
             param_name = action.target_parameter
 
             if not hasattr(dna, param_name):
-                logger.warning(
-                    f"🧬 [DNAAdaptiveEngine] DNA {dna_id} 没有参数 {param_name}"
-                )
+                logger.warning(f"🧬 [DNAAdaptiveEngine] DNA {dna_id} 没有参数 {param_name}")
                 return False
 
             current_value = getattr(dna, param_name)
@@ -826,9 +809,7 @@ class DNAAdaptiveEngine:
                 try:
                     callback(dna_id, action)
                 except Exception as e:
-                    logger.warning(
-                        f"🧬 [DNAAdaptiveEngine] 回调执行失败: {e}"
-                    )
+                    logger.warning(f"🧬 [DNAAdaptiveEngine] 回调执行失败: {e}")
 
             logger.info(
                 f"🧬 [DNAAdaptiveEngine] 应用适应: {dna_id} -> "
@@ -856,10 +837,7 @@ class DNAAdaptiveEngine:
         """
         actions = self.suggest_adaptations(dna_id)
 
-        filtered = [
-            a for a in actions
-            if a.confidence >= min_confidence
-        ][:max_actions]
+        filtered = [a for a in actions if a.confidence >= min_confidence][:max_actions]
 
         applied_count = 0
         for action in filtered:
@@ -890,14 +868,9 @@ class DNAAdaptiveEngine:
                     "dna_id": dna_id,
                     "monitored": True,
                     "performance_samples": len(history),
-                    "parameter_states": {
-                        name: state.to_dict()
-                        for name, state in states.items()
-                    },
+                    "parameter_states": {name: state.to_dict() for name, state in states.items()},
                     "adaptation_count": len(adaptations),
-                    "recent_adaptations": [
-                        a.to_dict() for a in adaptations[-5:]
-                    ],
+                    "recent_adaptations": [a.to_dict() for a in adaptations[-5:]],
                 }
 
             return {
@@ -917,13 +890,11 @@ class DNAAdaptiveEngine:
             target=self._auto_adapt_loop,
             args=(interval_seconds,),
             daemon=True,
-            name="dna_auto_adapt"
+            name="dna_auto_adapt",
         )
         self._adapt_thread.start()
 
-        logger.info(
-            f"🧬 [DNAAdaptiveEngine] 自动适应已启动，间隔: {interval_seconds} 秒"
-        )
+        logger.info(f"🧬 [DNAAdaptiveEngine] 自动适应已启动，间隔: {interval_seconds} 秒")
 
     def stop_auto_adapt(self):
         """停止自动适应"""
@@ -950,18 +921,14 @@ class DNAAdaptiveEngine:
                 for dna_id in dna_ids:
                     try:
                         applied = self.apply_all_suggested(
-                            dna_id,
-                            min_confidence=0.7,
-                            max_actions=3
+                            dna_id, min_confidence=0.7, max_actions=3
                         )
                         if applied > 0:
                             logger.info(
                                 f"🧬 [DNAAdaptiveEngine] 自动适应: {dna_id} 应用了 {applied} 个动作"
                             )
                     except Exception as e:
-                        logger.error(
-                            f"🧬 [DNAAdaptiveEngine] 自动适应错误 {dna_id}: {e}"
-                        )
+                        logger.error(f"🧬 [DNAAdaptiveEngine] 自动适应错误 {dna_id}: {e}")
 
             except Exception as e:
                 logger.error(f"🧬 [DNAAdaptiveEngine] 自动适应循环错误: {e}")

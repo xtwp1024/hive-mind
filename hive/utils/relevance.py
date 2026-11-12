@@ -11,7 +11,6 @@ import re
 from dataclasses import dataclass
 from typing import Iterable
 
-
 _WORD_RE = re.compile(r"[a-z0-9_\-]+", re.IGNORECASE)
 
 
@@ -84,14 +83,13 @@ class RelevanceScorer:
 
         language_score = 0.0
         if self._config.preferred_languages:
-            if language and language.lower() in [l.lower() for l in self._config.preferred_languages]:
+            if language and language.lower() in [
+                l.lower() for l in self._config.preferred_languages
+            ]:
                 language_score = 1.0
 
         score = (
-            0.65 * keyword_score
-            + 0.15 * name_bonus
-            + 0.10 * stars_score
-            + 0.10 * language_score
+            0.65 * keyword_score + 0.15 * name_bonus + 0.10 * stars_score + 0.10 * language_score
         )
 
         return max(0.0, min(1.0, score))

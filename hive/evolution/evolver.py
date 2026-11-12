@@ -22,8 +22,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from hive.evolution.strategies import EvolutionStrategy, StrategyType
 from hive.evolution.gep_store import GEPStore
+from hive.evolution.strategies import EvolutionStrategy, StrategyType
 
 logger = logging.getLogger("Hive.Evolver")
 
@@ -31,6 +31,7 @@ logger = logging.getLogger("Hive.Evolver")
 @dataclass
 class EvolutionResult:
     """进化结果"""
+
     success: bool
     action: str  # repair, innovate, skip
     gene_id: Optional[str] = None
@@ -42,11 +43,11 @@ class EvolutionResult:
 class Evolver:
     """
     Hive 自我进化引擎
-    
+
     负责分析系统运行状态，识别问题和改进机会，
     并通过 GEP 协议存储和应用进化成果。
     """
-    
+
     def __init__(
         self,
         strategy: Optional[EvolutionStrategy] = None,
@@ -55,7 +56,7 @@ class Evolver:
     ):
         """
         初始化进化引擎
-        
+
         Args:
             strategy: 进化策略配置
             data_dir: GEP 数据目录
@@ -92,7 +93,7 @@ class Evolver:
         self._cycle_count = 0
         self._repairs_count = 0
         self._innovations_count = 0
-    
+
     def _ensure_gep_files(self):
         """确保 events.jsonl 存在（genes/capsules 已由 GEPStore 管理）"""
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -132,13 +133,14 @@ class Evolver:
     def get_capsule(self, capsule_id: str) -> Optional[dict]:
         """获取胶囊"""
         return self._store.get_capsule(capsule_id)
-    
+
     def _check_system_load(self) -> bool:
         """检查系统负载，决定是否退避"""
         try:
             # Windows 使用 CPU 使用率估算
             if os.name == "nt":
                 import ctypes
+
                 kernel32 = ctypes.windll.kernel32
                 # 简化处理：假设负载正常
                 return True
@@ -152,15 +154,15 @@ class Evolver:
         except Exception:
             pass
         return True
-    
+
     def _scan_morgue(self) -> List[dict]:
         """扫描 morgue 目录获取崩溃报告"""
         morgue_dir = self.data_dir.parent.parent / "morgue"
         reports = []
-        
+
         if not morgue_dir.exists():
             return reports
-        
+
         for cert_file in morgue_dir.glob("*.json"):
             try:
                 with open(cert_file, "r", encoding="utf-8") as f:
@@ -170,9 +172,9 @@ class Evolver:
                         reports.append(data)
             except Exception as e:
                 logger.debug(f"读取崩溃报告失败: {cert_file}, {e}")
-        
+
         return sorted(reports, key=lambda x: x.get("timestamp", 0), reverse=True)
-    
+
     def _scan_error_logs(self) -> List[dict]:
         """扫描错误日志（增量扫描，只读取上次位置之后的新增内容）"""
         errors = []
@@ -189,22 +191,24 @@ class Evolver:
                     f.seek(offset)
                     for line in f:
                         if "ERROR" in line or "Exception" in line:
-                            errors.append({
-                                "source": key,
-                                "line": line.strip()[:500],
-                                "timestamp": time.time(),
-                            })
+                            errors.append(
+                                {
+                                    "source": key,
+                                    "line": line.strip()[:500],
+                                    "timestamp": time.time(),
+                                }
+                            )
                     self._last_log_positions[key] = f.tell()
             except Exception as e:
                 logger.debug(f"扫描日志文件失败: {log_file}, {e}")
 
         return errors[-50:]  # 最近50条
-    
+
     def _analyze_failures(self) -> dict:
         """分析失败情况，计算错误率和稳定性"""
         morgue_reports = self._scan_morgue()
         error_logs = self._scan_error_logs()
-        
+
         # 从 events.jsonl 统计
         recent_events = []
         try:
@@ -218,13 +222,13 @@ class Evolver:
                         recent_events.append(evt)
         except Exception:
             pass
-        
+
         total_events = len(recent_events) or 1
         failure_events = [e for e in recent_events if "FAIL" in e.get("type", "")]
-        
+
         error_rate = len(failure_events) / total_events
         stability_score = 1.0 - min(error_rate * 2, 1.0)
-        
+
         return {
             "error_rate": error_rate,
             "stability_score": stability_score,
@@ -233,7 +237,7 @@ class Evolver:
             "recent_failures": failure_events[:5],
             "morgue_reports": morgue_reports[:3],
         }
-    
+
     def _synthesize_gene(self, issue: dict) -> str:
         """从问题中合成基因"""
         gene_id = f"gene-{uuid.uuid4().hex[:8]}"
@@ -282,30 +286,32 @@ class Evolver:
         logger.info(f" 创新胶囊生成: {capsule_id}")
 
         return capsule_id
-    
+
     def _request_review(self, action: str, details: dict) -> bool:
         """请求人工审核"""
         if not self.strategy.require_human_review:
             return True
-        
+
         if self.on_review:
             return self.on_review({"action": action, "details": details})
-        
+
         # 默认：打印并等待
         logger.info(f" 等待人工审核: {action}")
         logger.info(f"   详情: {json.dumps(details, ensure_ascii=False, indent=2)}")
         return True  # 非交互模式默认通过
-    
+
     def run_cycle(self) -> EvolutionResult:
         """
         运行一个进化周期
-        
+
         Returns:
             EvolutionResult: 进化结果
         """
         self._cycle_count += 1
-        logger.info(f" 进化周期 #{self._cycle_count} 开始 (策略: {self.strategy.strategy_type.value})")
-        
+        logger.info(
+            f" 进化周期 #{self._cycle_count} 开始 (策略: {self.strategy.strategy_type.value})"
+        )
+
         # 1. 检查系统负载
         if not self._check_system_load():
             time.sleep(self.strategy.backoff_seconds)
@@ -314,30 +320,30 @@ class Evolver:
                 action="skip",
                 message="系统负载过高，已退避",
             )
-        
+
         # 2. 分析系统状态
         analysis = self._analyze_failures()
         error_rate = analysis["error_rate"]
         stability_score = analysis["stability_score"]
-        
+
         logger.info(f" 系统分析: 错误率={error_rate:.2%}, 稳定性={stability_score:.2%}")
-        
+
         # 3. 决定行动
         if self.strategy.should_repair(error_rate):
             # 修复模式
             if analysis["morgue_reports"]:
                 issue = analysis["morgue_reports"][0]
-                
+
                 if not self._request_review("repair", issue):
                     return EvolutionResult(
                         success=False,
                         action="skip",
                         message="人工审核未通过",
                     )
-                
+
                 gene_id = self._synthesize_gene(issue)
                 self._repairs_count += 1
-                
+
                 return EvolutionResult(
                     success=True,
                     action="repair",
@@ -345,7 +351,7 @@ class Evolver:
                     message=f"修复基因已生成: {gene_id}",
                     details={"issue": issue.get("type"), "error_rate": error_rate},
                 )
-        
+
         elif self.strategy.should_innovate(error_rate, stability_score):
             # 创新模式
             if self._innovations_count >= self.strategy.max_innovations_per_cycle:
@@ -354,17 +360,17 @@ class Evolver:
                     action="skip",
                     message="本周期创新配额已用完",
                 )
-            
+
             if not self._request_review("innovate", {"stability_score": stability_score}):
                 return EvolutionResult(
                     success=False,
                     action="skip",
                     message="人工审核未通过",
                 )
-            
+
             capsule_id = self._create_innovation(analysis)
             self._innovations_count += 1
-            
+
             return EvolutionResult(
                 success=True,
                 action="innovate",
@@ -372,7 +378,7 @@ class Evolver:
                 message=f"创新胶囊已生成: {capsule_id}",
                 details={"stability_score": stability_score},
             )
-        
+
         # 无需行动
         self.record_event("CYCLE_SKIP", {"reason": "no_action_needed"})
         return EvolutionResult(
@@ -381,36 +387,39 @@ class Evolver:
             message="系统状态良好，无需进化",
             details=analysis,
         )
-    
+
     def run_loop(self, interval: int = 300, max_cycles: Optional[int] = None):
         """
         持续运行进化循环
-        
+
         Args:
             interval: 每个周期间隔秒数
             max_cycles: 最大周期数，None 表示无限
         """
         logger.info(f" 进化引擎启动 (间隔: {interval}s, 策略: {self.strategy.strategy_type.value})")
         self.record_event("EVOLVER_START", {"interval": interval, "max_cycles": max_cycles})
-        
+
         cycle = 0
         try:
             while max_cycles is None or cycle < max_cycles:
                 result = self.run_cycle()
                 logger.info(f"   结果: {result.action} - {result.message}")
-                
+
                 cycle += 1
                 if max_cycles is None or cycle < max_cycles:
                     time.sleep(interval)
         except KeyboardInterrupt:
             logger.info(" 进化引擎被中断")
         finally:
-            self.record_event("EVOLVER_STOP", {
-                "cycles": cycle,
-                "repairs": self._repairs_count,
-                "innovations": self._innovations_count,
-            })
-    
+            self.record_event(
+                "EVOLVER_STOP",
+                {
+                    "cycles": cycle,
+                    "repairs": self._repairs_count,
+                    "innovations": self._innovations_count,
+                },
+            )
+
     def get_status(self) -> dict:
         """获取进化引擎状态"""
         stats = self._store.get_stats()
@@ -422,25 +431,26 @@ class Evolver:
             "genes_count": stats["genes"],
             "capsules_count": stats["capsules"],
         }
-    
+
     # ==================== 集成增强 ====================
-    
+
     def run_with_monitoring(self, interval: int = 300, max_cycles: Optional[int] = None):
         """
         带监控的进化循环
-        
+
         使用 MonitorBridge 获取实时指标，动态调整进化策略。
         """
         try:
             from hive.evolution.monitor_bridge import MonitorBridge
+
             monitor = MonitorBridge()
         except ImportError:
             logger.warning("MonitorBridge 不可用，使用普通循环")
             return self.run_loop(interval, max_cycles)
-        
+
         logger.info(f"🚀 带监控的进化引擎启动")
         self.record_event("EVOLVER_START_MONITORED", {"interval": interval})
-        
+
         cycle = 0
         try:
             while max_cycles is None or cycle < max_cycles:
@@ -455,9 +465,13 @@ class Evolver:
 
                 # 动态调整策略
                 if recommendations["suggested_strategy"] != self.strategy.strategy_type.value:
-                    logger.info(f"🔄 策略调整: {self.strategy.strategy_type.value} -> {recommendations['suggested_strategy']}")
+                    logger.info(
+                        f"🔄 策略调整: {self.strategy.strategy_type.value} -> {recommendations['suggested_strategy']}"
+                    )
                     try:
-                        self.strategy.strategy_type = StrategyType(recommendations["suggested_strategy"])
+                        self.strategy.strategy_type = StrategyType(
+                            recommendations["suggested_strategy"]
+                        )
                     except ValueError:
                         pass
 
@@ -468,77 +482,90 @@ class Evolver:
                 cycle += 1
                 if max_cycles is None or cycle < max_cycles:
                     time.sleep(interval)
-                    
+
         except KeyboardInterrupt:
             logger.info("⏹️ 进化引擎被中断")
         finally:
-            self.record_event("EVOLVER_STOP", {
-                "cycles": cycle,
-                "repairs": self._repairs_count,
-                "innovations": self._innovations_count,
-            })
-    
+            self.record_event(
+                "EVOLVER_STOP",
+                {
+                    "cycles": cycle,
+                    "repairs": self._repairs_count,
+                    "innovations": self._innovations_count,
+                },
+            )
+
     def run_with_tests(self, interval: int = 300, max_cycles: Optional[int] = None):
         """
         带测试验证的进化循环
-        
+
         每次进化后自动运行测试，检测退化则回滚。
         """
         try:
             from hive.evolution.test_runner import TestRunner
+
             test_runner = TestRunner()
         except ImportError:
             logger.warning("TestRunner 不可用，使用普通循环")
             return self.run_loop(interval, max_cycles)
-        
+
         logger.info(f"🧪 带测试验证的进化引擎启动")
-        
+
         # 建立基线
         baseline = test_runner.establish_baseline()
         if not baseline.success:
             logger.warning(f"⚠️ 基线测试失败，但继续运行")
-        
-        self.record_event("EVOLVER_START_TESTED", {
-            "interval": interval,
-            "baseline_pass_rate": baseline.pass_rate,
-        })
-        
+
+        self.record_event(
+            "EVOLVER_START_TESTED",
+            {
+                "interval": interval,
+                "baseline_pass_rate": baseline.pass_rate,
+            },
+        )
+
         cycle = 0
         try:
             while max_cycles is None or cycle < max_cycles:
                 result = self.run_cycle()
                 logger.info(f"   结果: {result.action} - {result.message}")
-                
+
                 # 如果有实际变更，运行测试验证
                 if result.action in ("repair", "innovate") and result.success:
                     logger.info("🧪 运行测试验证...")
                     test_result = test_runner.run_quick_tests()
                     comparison = test_runner.compare_with_baseline(test_result)
-                    
+
                     if comparison.get("regression"):
                         logger.warning(f"⚠️ 检测到退化: {comparison['reasons']}")
-                        self.record_event("REGRESSION_DETECTED", {
-                            "gene_id": result.gene_id,
-                            "capsule_id": result.capsule_id,
-                            "reasons": comparison["reasons"],
-                        })
+                        self.record_event(
+                            "REGRESSION_DETECTED",
+                            {
+                                "gene_id": result.gene_id,
+                                "capsule_id": result.capsule_id,
+                                "reasons": comparison["reasons"],
+                            },
+                        )
                         # TODO: 实现回滚逻辑
                     else:
                         logger.info(f"✅ 测试通过: {test_result.pass_rate:.1%}")
-                
+
                 cycle += 1
                 if max_cycles is None or cycle < max_cycles:
                     time.sleep(interval)
-                    
+
         except KeyboardInterrupt:
             logger.info("⏹️ 进化引擎被中断")
         finally:
-            self.record_event("EVOLVER_STOP", {
-                "cycles": cycle,
-                "repairs": self._repairs_count,
-                "innovations": self._innovations_count,
-            })
-    
+            self.record_event(
+                "EVOLVER_STOP",
+                {
+                    "cycles": cycle,
+                    "repairs": self._repairs_count,
+                    "innovations": self._innovations_count,
+                },
+            )
+
     def sync_with_evomap(self) -> dict:
         """
         与 EvoMap 网络同步
@@ -547,6 +574,7 @@ class Evolver:
         """
         try:
             from hive.evolution.evomap_bridge import get_evomap_bridge
+
             bridge = get_evomap_bridge()
         except ImportError:
             logger.warning("EvoMapBridge 不可用")
@@ -569,7 +597,8 @@ class Evolver:
         # 读取待发布基因（锁外网络 I/O）
         genes = self._store.get_all_genes()
         to_publish = {
-            gid: gene for gid, gene in genes.items()
+            gid: gene
+            for gid, gene in genes.items()
             if gene.get("validated") and not gene.get("published_to_evomap")
         }
 
@@ -591,16 +620,14 @@ class Evolver:
         """
         try:
             from hive.evolution.dna_bridge import get_bridge
+
             bridge = get_bridge()
         except ImportError:
             logger.warning("DNABridge 不可用")
             return 0
 
         genes = self._store.get_all_genes()
-        candidates = {
-            gid: gene for gid, gene in genes.items()
-            if not gene.get("applied_to_dna")
-        }
+        candidates = {gid: gene for gid, gene in genes.items() if not gene.get("applied_to_dna")}
 
         applied = 0
         for gene_id, gene in candidates.items():

@@ -1,5 +1,6 @@
 import unittest
 
+
 class MachineLearningOpsManager:
     """
     The MachineLearningOpsManager class provides functionalities to demonstrate
@@ -56,6 +57,7 @@ class MachineLearningOpsManager:
         # Placeholder for evaluation logic
         return {"accuracy": 0.95}
 
+
 class TestMachineLearningOpsManager(unittest.TestCase):
     """
     Unit tests for the MachineLearningOpsManager class.
@@ -81,6 +83,7 @@ class TestMachineLearningOpsManager(unittest.TestCase):
         model = self.manager.train_model(self.data, self.labels)
         evaluation = self.manager.evaluate_model(model, self.test_data, self.test_labels)
         self.assertIsInstance(evaluation, dict)
+
 
 if __name__ == "__main__":
     unittest.main()

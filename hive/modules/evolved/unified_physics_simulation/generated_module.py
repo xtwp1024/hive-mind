@@ -1,6 +1,6 @@
 class Vector:
     """A class to represent a two-dimensional vector."""
-    
+
     def __init__(self, x=0, y=0):
         self.x = x
         self.y = y
@@ -23,7 +23,7 @@ class Vector:
 
     def magnitude(self):
         """Calculate the magnitude of the vector."""
-        return (self.x ** 2 + self.y ** 2) ** 0.5
+        return (self.x**2 + self.y**2) ** 0.5
 
     def __str__(self):
         return f"({self.x}, {self.y})"
@@ -31,7 +31,7 @@ class Vector:
 
 class Particle:
     """A class to represent a particle with position and velocity."""
-    
+
     def __init__(self, position=Vector(), velocity=Vector()):
         self.position = position
         self.velocity = velocity
@@ -46,7 +46,7 @@ class Particle:
 
 class UnifiedPhysicsSimulationManager:
     """A class to manage physics simulations."""
-    
+
     def __init__(self):
         self.particles = []
 
@@ -69,6 +69,7 @@ class UnifiedPhysicsSimulationManager:
 
 # Unit tests for the classes
 import unittest
+
 
 class TestVector(unittest.TestCase):
     def test_add(self):
@@ -124,5 +125,5 @@ class TestUnifiedPhysicsSimulationManager(unittest.TestCase):
         self.assertEqual(manager.get_particles(), [particle])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

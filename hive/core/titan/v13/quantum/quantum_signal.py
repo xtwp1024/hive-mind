@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class QuantumSignalProcessor:
     """
     QuantumSignalProcessor simulates Quantum-Coherent Signal Ensemble for financial trading.
@@ -52,6 +53,7 @@ class QuantumSignalProcessor:
             return processed_signals.tolist(), entanglement_status
         except Exception as e:
             raise RuntimeError(f"Error processing signals: {e}")
+
 
 # Example usage:
 # signal1 = np.array([[1+1j], [2+2j]])

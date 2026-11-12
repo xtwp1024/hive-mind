@@ -2,6 +2,7 @@ import random
 import time
 from typing import Any, Dict, List, Optional
 
+
 class DistributedSystemsManager:
     """
     A Python module for managing distributed systems functionalities.
@@ -67,11 +68,13 @@ class DistributedSystemsManager:
         """
         return self.systems_status
 
+
 # Unit tests for the DistributedSystemsManager class
 def test_add_system():
     manager = DistributedSystemsManager()
     manager.add_system("system1")
     assert "system1" in manager.systems_status
+
 
 def test_remove_system():
     manager = DistributedSystemsManager()
@@ -79,10 +82,12 @@ def test_remove_system():
     manager.remove_system("system1")
     assert "system1" not in manager.systems_status
 
+
 def test_check_system_status():
     manager = DistributedSystemsManager()
     manager.add_system("system1")
     assert manager.check_system_status("system1") == True
+
 
 def test_restart_system():
     manager = DistributedSystemsManager()
@@ -90,11 +95,13 @@ def test_restart_system():
     manager.restart_system("system1")
     assert manager.check_system_status("system1") == True
 
+
 def test_simulate_system_failure():
     manager = DistributedSystemsManager()
     manager.add_system("system1")
     manager.simulate_system_failure("system1")
     assert manager.check_system_status("system1") == False
+
 
 def test_get_all_systems_status():
     manager = DistributedSystemsManager()
@@ -103,6 +110,7 @@ def test_get_all_systems_status():
     status = manager.get_all_systems_status()
     assert "system1" in status and "system2" in status
     assert status["system1"] == True and status["system2"] == True
+
 
 # Run the unit tests
 if __name__ == "__main__":

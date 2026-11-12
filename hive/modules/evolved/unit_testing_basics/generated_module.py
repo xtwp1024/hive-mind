@@ -1,5 +1,6 @@
 import unittest
 
+
 class UnitTestingBasicsManager:
     """
     A class to manage basic unit testing functionalities.
@@ -31,6 +32,7 @@ class UnitTestingBasicsManager:
         Reports the results of the executed test cases.
         """
         pass
+
 
 class TestUnitTestingBasicsManager(unittest.TestCase):
     """
@@ -66,5 +68,6 @@ class TestUnitTestingBasicsManager(unittest.TestCase):
         manager.execute_tests()
         # This is a stub for the actual result reporting.
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

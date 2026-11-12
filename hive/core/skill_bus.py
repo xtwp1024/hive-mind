@@ -25,11 +25,12 @@ logger = logging.getLogger("Hive.SkillBus")
 @dataclass
 class SkillEntry:
     """一条技能注册记录（对标 nanobot skills/xxx.py 的元信息）"""
-    skill_id:   str
-    topic:      str                   # 匹配的 topic（支持通配符）
-    handler:    Callable[[str, dict], Any]
+
+    skill_id: str
+    topic: str  # 匹配的 topic（支持通配符）
+    handler: Callable[[str, dict], Any]
     description: str = ""
-    async_mode: bool = False          # True=后台线程执行（对标 nanobot subagent）
+    async_mode: bool = False  # True=后台线程执行（对标 nanobot subagent）
 
 
 class SkillBus:
@@ -42,19 +43,19 @@ class SkillBus:
 
     def __init__(self):
         self._skills: list[SkillEntry] = []
-        self._lock   = threading.RLock()
-        self._counters: dict[str, int] = {}   # topic → 已处理计数
+        self._lock = threading.RLock()
+        self._counters: dict[str, int] = {}  # topic → 已处理计数
         logger.info("[SkillBus] 技能路由总线已上线")
 
     # ─────────────────────────────────── 注册/注销 ──
 
     def register(
         self,
-        topic:       str,
-        handler:     Callable[[str, dict], Any],
-        skill_id:    str   = "",
-        description: str   = "",
-        async_mode:  bool  = False,
+        topic: str,
+        handler: Callable[[str, dict], Any],
+        skill_id: str = "",
+        description: str = "",
+        async_mode: bool = False,
     ) -> str:
         """
         注册技能处理函数（对标 nanobot skills/xxx.md 自动加载）。
@@ -63,8 +64,11 @@ class SkillBus:
         """
         sid = skill_id or f"{topic}#{id(handler):x}"
         entry = SkillEntry(
-            skill_id=sid, topic=topic, handler=handler,
-            description=description, async_mode=async_mode,
+            skill_id=sid,
+            topic=topic,
+            handler=handler,
+            description=description,
+            async_mode=async_mode,
         )
         with self._lock:
             self._skills.append(entry)
@@ -103,9 +107,9 @@ class SkillBus:
             if entry.async_mode:
                 # 后台线程执行（对标 nanobot subagent 异步任务）
                 t = threading.Thread(
-                    target  = self._safe_call,
-                    args    = (entry, topic, payload),
-                    daemon  = True,
+                    target=self._safe_call,
+                    args=(entry, topic, payload),
+                    daemon=True,
                 )
                 t.start()
             else:
@@ -119,10 +123,10 @@ class SkillBus:
         with self._lock:
             return [
                 {
-                    "skill_id":   s.skill_id,
-                    "topic":      s.topic,
-                    "description":s.description,
-                    "async":      s.async_mode,
+                    "skill_id": s.skill_id,
+                    "topic": s.topic,
+                    "description": s.description,
+                    "async": s.async_mode,
                 }
                 for s in self._skills
             ]

@@ -21,12 +21,12 @@ logger = logging.getLogger("Hive.DHTRouter")
 
 # K-bucket 参数（对标 Kademlia 论文中 k=20）
 K_BUCKET_SIZE = 8
-KEY_BITS      = 64  # 简化版：64 位 ID 空间（hivemind 原版 160 位）
+KEY_BITS = 64  # 简化版：64 位 ID 空间（hivemind 原版 160 位）
 
 
 def _node_id(name: str) -> int:
     """将节点名字哈希为 64 位整数 ID"""
-    return int(hashlib.sha256(name.encode()).hexdigest(), 16) % (2 ** KEY_BITS)
+    return int(hashlib.sha256(name.encode()).hexdigest(), 16) % (2**KEY_BITS)
 
 
 def _xor_distance(a: int, b: int) -> int:
@@ -37,11 +37,12 @@ def _xor_distance(a: int, b: int) -> int:
 @dataclass
 class DHTEntry:
     """DHT 中存储的一条知识记录"""
-    key:     str
-    value:   Any
-    owner:   str        # 发布者节点名
-    ttl:     float      # 过期时间戳（unix）
-    hops:    int = 0    # 经过转发的跳数
+
+    key: str
+    value: Any
+    owner: str  # 发布者节点名
+    ttl: float  # 过期时间戳（unix）
+    hops: int = 0  # 经过转发的跳数
 
 
 class DHTRouter:
@@ -56,9 +57,9 @@ class DHTRouter:
 
     def __init__(self, node_name: str):
         self.node_name = node_name
-        self.node_id   = _node_id(node_name)
-        self._store: dict[str, DHTEntry] = {}     # 本地存储
-        self._routing_table: list[str] = []        # 已知邻居节点名列表
+        self.node_id = _node_id(node_name)
+        self._store: dict[str, DHTEntry] = {}  # 本地存储
+        self._routing_table: list[str] = []  # 已知邻居节点名列表
         self._lock = threading.Lock()
 
         # 自注册到全局 peer 表
@@ -75,8 +76,7 @@ class DHTRouter:
 
         # 将所有已知节点按 XOR 距离排序，取最近的 K 个加入路由表
         distances = [
-            (n, _xor_distance(self.node_id, _node_id(n)))
-            for n in all_names if n != self.node_name
+            (n, _xor_distance(self.node_id, _node_id(n))) for n in all_names if n != self.node_name
         ]
         distances.sort(key=lambda x: x[1])
         with self._lock:
@@ -104,10 +104,9 @@ class DHTRouter:
         key_id = _node_id(key)
         with self._lock:
             neighbors = list(self._routing_table)
-        neighbors_sorted = sorted(
-            neighbors,
-            key=lambda n: _xor_distance(key_id, _node_id(n))
-        )[:K_BUCKET_SIZE]
+        neighbors_sorted = sorted(neighbors, key=lambda n: _xor_distance(key_id, _node_id(n)))[
+            :K_BUCKET_SIZE
+        ]
 
         with DHTRouter._peers_lock:
             peers = dict(DHTRouter._global_peers)
@@ -142,10 +141,7 @@ class DHTRouter:
         key_id = _node_id(key)
         with self._lock:
             neighbors = list(self._routing_table)
-        neighbors_sorted = sorted(
-            neighbors,
-            key=lambda n: _xor_distance(key_id, _node_id(n))
-        )
+        neighbors_sorted = sorted(neighbors, key=lambda n: _xor_distance(key_id, _node_id(n)))
 
         with DHTRouter._peers_lock:
             peers = dict(DHTRouter._global_peers)
@@ -176,8 +172,8 @@ class DHTRouter:
     def status(self) -> dict:
         with self._lock:
             return {
-                "node":           self.node_name,
-                "node_id":        f"{self.node_id:016x}",
-                "local_entries":  len(self._store),
-                "known_peers":    len(self._routing_table),
+                "node": self.node_name,
+                "node_id": f"{self.node_id:016x}",
+                "local_entries": len(self._store),
+                "known_peers": len(self._routing_table),
             }

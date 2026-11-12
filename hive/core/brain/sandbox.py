@@ -136,7 +136,9 @@ class SandboxEnvironment:
         if self._start_time is not None:
             elapsed = timestamp - self._start_time
             if elapsed > self.config.timeout_seconds:
-                logger.warning(f"⏱️ Sandbox timeout exceeded: {elapsed:.1f}s > {self.config.timeout_seconds}s")
+                logger.warning(
+                    f"⏱️ Sandbox timeout exceeded: {elapsed:.1f}s > {self.config.timeout_seconds}s"
+                )
                 self._log_operation(SimulatedOp(op_type, target, timestamp, False))
                 return False
 
@@ -162,10 +164,7 @@ class SandboxEnvironment:
         elif op_type == "execute":
             # 检查白名单
             if self.config.allow_execute:
-                allowed = any(
-                    cmd in target.lower()
-                    for cmd in self.config.allow_execute
-                )
+                allowed = any(cmd in target.lower() for cmd in self.config.allow_execute)
             else:
                 allowed = False
             if not allowed:
@@ -211,7 +210,9 @@ class SandboxEnvironment:
             risks.append("Potential mass deletion detected")
 
         # 中文高风险组合
-        if ("删除" in task or "清空" in task or "移除" in task) and ("所有" in task or "全部" in task or "*" in task):
+        if ("删除" in task or "清空" in task or "移除" in task) and (
+            "所有" in task or "全部" in task or "*" in task
+        ):
             risks.append("Potential mass deletion detected")
 
         if "exec" in task_lower and "rm" in task_lower:
@@ -259,7 +260,11 @@ class SandboxEnvironment:
                     result["operations"].append(f"write: {path}")
 
         # 检测删除操作
-        if any(word in task_lower for word in ["delete", "remove", "rm", "drop"]) or "删除" in task or "移除" in task:
+        if (
+            any(word in task_lower for word in ["delete", "remove", "rm", "drop"])
+            or "删除" in task
+            or "移除" in task
+        ):
             paths = re.findall(r"[\w./\\-]+\.\w+", task)
             if paths:
                 for path in paths:
@@ -271,7 +276,9 @@ class SandboxEnvironment:
                 result["files_deleted"].append("*")
                 result["operations"].append("delete: *")
                 # 记录到操作日志
-                self._log_operation(SimulatedOp("delete", "*", time.time(), self.config.allow_file_delete))
+                self._log_operation(
+                    SimulatedOp("delete", "*", time.time(), self.config.allow_file_delete)
+                )
 
         return result
 
@@ -294,8 +301,12 @@ class SandboxEnvironment:
         task_lower = task.lower()
 
         # 提取命令
-        commands = re.findall(r"(?:exec|run|execute|do)\s+(?:['\"]?)([\w\s\-./\\]+)(?:['\"]?)", task_lower)
-        commands.extend(re.findall(r"^\s*(?:bash|sh|python|node)\s+([\w./\\-]+)", task_lower, re.MULTILINE))
+        commands = re.findall(
+            r"(?:exec|run|execute|do)\s+(?:['\"]?)([\w\s\-./\\]+)(?:['\"]?)", task_lower
+        )
+        commands.extend(
+            re.findall(r"^\s*(?:bash|sh|python|node)\s+([\w./\\-]+)", task_lower, re.MULTILINE)
+        )
 
         for cmd in commands:
             if self._check_permission("execute", cmd):
@@ -368,11 +379,13 @@ class SandboxEnvironment:
             "execute_operations": exec_ops,
             "network_operations": net_ops,
             "would_succeed": len(risks) == 0 or self._is_low_risk_task(task),
-            "blocked_count": sum([
-                len(file_ops.get("files_deleted", [])),
-                len(exec_ops.get("blocked", [])),
-                len(net_ops.get("blocked", [])),
-            ]),
+            "blocked_count": sum(
+                [
+                    len(file_ops.get("files_deleted", [])),
+                    len(exec_ops.get("blocked", [])),
+                    len(net_ops.get("blocked", [])),
+                ]
+            ),
         }
 
         # 判断安全合规性

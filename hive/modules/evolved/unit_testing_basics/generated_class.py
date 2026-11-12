@@ -1,5 +1,6 @@
 import unittest
 
+
 class UnitTestingBasicsManager(unittest.TestCase):
     """
     A class that encapsulates unit testing fundamentals with methods for setup, test execution, and teardown.
@@ -9,7 +10,7 @@ class UnitTestingBasicsManager(unittest.TestCase):
         """
         Sets up the necessary environment for each test case.
         """
-        self.test_data = {'key': 'value'}
+        self.test_data = {"key": "value"}
 
     def test_data_structure(self):
         """
@@ -21,7 +22,7 @@ class UnitTestingBasicsManager(unittest.TestCase):
         """
         Tests if the test data contains a specific key-value pair.
         """
-        self.assertEqual(self.test_data['key'], 'value')
+        self.assertEqual(self.test_data["key"], "value")
 
     def tearDown(self):
         """
@@ -29,5 +30,6 @@ class UnitTestingBasicsManager(unittest.TestCase):
         """
         del self.test_data
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

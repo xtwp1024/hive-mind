@@ -8,19 +8,21 @@ Memory Box (智能体物理海马体 / 记忆匣子引擎)
 基于轻量级、无包依赖的原则，内部由标准库 shelve / jsonline 作为底层驱动。
 """
 
-import os
 import atexit
-import shelve
 import logging
+import os
+import shelve
 import threading
 from pathlib import Path
-from typing import Any, Optional, Dict
+from typing import Any, Dict, Optional
+
 from hive.config.settings import get_settings
 
 logger = logging.getLogger("Hive.MemoryBox")
 
+
 class MemoryBox:
-    _open_boxes: Dict[str, 'MemoryBox'] = {}
+    _open_boxes: Dict[str, "MemoryBox"] = {}
     _lock = threading.Lock()
 
     def __init__(self, box_name: str):
@@ -39,7 +41,7 @@ class MemoryBox:
         atexit.register(self.close)
 
     @classmethod
-    def open_box(cls, box_name: str) -> 'MemoryBox':
+    def open_box(cls, box_name: str) -> "MemoryBox":
         """极速并安全的开启一个箱子，采用了进程隔离单例控制
 
         box_name 应包含 PID（由调用方传入），确保每个子进程使用独立的 shelve 文件，
@@ -49,6 +51,7 @@ class MemoryBox:
         使用进程特定缓存替代类级共享字典，彻底避免fork后的状态污染。
         """
         import os
+
         current_pid = os.getpid()
         # 使用进程特定的缓存key，避免fork后状态污染
         process_cache_key = f"_boxes_pid{current_pid}"
@@ -59,7 +62,8 @@ class MemoryBox:
 
         # 如果box_name包含其他进程的PID（_pid存在但不是当前PID），说明是跨进程传入的，绕过缓存直接创建
         import re
-        pid_pattern = re.search(r'_pid(\d+)', box_name)
+
+        pid_pattern = re.search(r"_pid(\d+)", box_name)
         if pid_pattern:
             embedded_pid = int(pid_pattern.group(1))
             if embedded_pid != current_pid:
@@ -95,11 +99,12 @@ class MemoryBox:
     def close(self):
         """断开连接"""
         import os
+
         current_pid = os.getpid()
         process_cache_key = f"_boxes_pid{current_pid}"
         process_cache = getattr(MemoryBox, process_cache_key, None)
         try:
-            if hasattr(self, '_shelf') and self._shelf is not None:
+            if hasattr(self, "_shelf") and self._shelf is not None:
                 self._shelf.close()
                 self._shelf = None
             if process_cache and self.box_name in process_cache:
@@ -107,10 +112,10 @@ class MemoryBox:
             logger.debug(f"🗃️ [Memory Box] '{self.box_name}' 已安全封闭。")
         except Exception as e:
             logger.debug(f"🗃️ [Memory Box] 关闭时出现异常: {e}")
-            
+
     def __del__(self):
         """析构时确保资源释放"""
         self.close()
-            
+
     def get_all_keys(self) -> list:
         return list(self._shelf.keys())

@@ -150,10 +150,22 @@ class Planner:
 
     # 风险关键词
     RISKY_KEYWORDS = {
-        "delete", "remove", "drop", "rm", "destroy",
-        "force", "kill", "terminate", "abort",
-        "database", "db", "disk", "partition",
-        "root", "sudo", "admin",
+        "delete",
+        "remove",
+        "drop",
+        "rm",
+        "destroy",
+        "force",
+        "kill",
+        "terminate",
+        "abort",
+        "database",
+        "db",
+        "disk",
+        "partition",
+        "root",
+        "sudo",
+        "admin",
     }
 
     def __init__(self, max_parallel: int = 5):
@@ -213,9 +225,7 @@ class Planner:
         )
 
         self._stats["plans_created"] += 1
-        self._stats["parallel_steps"] += sum(
-            len(g) for g in parallel_groups if len(g) > 1
-        )
+        self._stats["parallel_steps"] += sum(len(g) for g in parallel_groups if len(g) > 1)
 
         logger.info(
             f"🧠 Created plan: {len(plan_steps)} steps, "
@@ -316,9 +326,10 @@ class Planner:
         risk = self._assess_risk(goal.description)
 
         # 判断是否可以并行
-        can_parallel = any(goal in group for group in parallel_groups) and len(
-            [g for g in goal.dependencies if g]
-        ) <= 1
+        can_parallel = (
+            any(goal in group for group in parallel_groups)
+            and len([g for g in goal.dependencies if g]) <= 1
+        )
 
         # 选择策略
         if can_parallel and len([g for g in parallel_groups if goal in g]) > 1:
@@ -386,9 +397,7 @@ class Planner:
                     continue
 
                 # 检查依赖
-                deps_satisfied = all(
-                    dep in completed_ids for dep in step.sub_goal.dependencies
-                )
+                deps_satisfied = all(dep in completed_ids for dep in step.sub_goal.dependencies)
 
                 if deps_satisfied:
                     batch.append((step, step.strategy))

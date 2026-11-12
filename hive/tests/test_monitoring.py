@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 """测试监控和指标功能"""
 
-import pytest
 import time
 
-from hive.utils.monitor import ResourceMonitor, ResourceSnapshot, get_monitor
+import pytest
+
 from hive.utils.metrics import (
-    MetricsCollector,
     MetricPoint,
+    MetricsCollector,
     MetricStats,
     Timer,
     get_metrics,
 )
+from hive.utils.monitor import ResourceMonitor, ResourceSnapshot, get_monitor
 
 
 class TestResourceSnapshot:

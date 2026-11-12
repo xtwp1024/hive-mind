@@ -6,9 +6,9 @@ Async-capable GitHub Hunter
 """
 
 import asyncio
-import os
 import logging
-from typing import List, Dict, Any, Optional
+import os
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -145,14 +145,16 @@ class GithubHunter:
                     if self._relevance.strict and not self._relevance.is_relevant(score):
                         continue
 
-                    results.append({
-                        "name": name,
-                        "url": url,
-                        "description": description,
-                        "stars": stars,
-                        "language": language,
-                        "relevance_score": score,
-                    })
+                    results.append(
+                        {
+                            "name": name,
+                            "url": url,
+                            "description": description,
+                            "stars": stars,
+                            "language": language,
+                            "relevance_score": score,
+                        }
+                    )
 
             elif response.status_code == 403:
                 logger.warning("🧱 遭遇反爬虫护盾 (Rate Limit Exceeded)")
@@ -179,10 +181,7 @@ class GithubHunter:
         selected_keywords = keywords[:max_keywords]
 
         # 并发搜索所有关键词
-        tasks = [
-            self._search_one_keyword(keyword, count)
-            for keyword in selected_keywords
-        ]
+        tasks = [self._search_one_keyword(keyword, count) for keyword in selected_keywords]
         results_tuples = await asyncio.gather(*tasks)
 
         # 合并结果（按 relevance_score 排序）
@@ -199,8 +198,7 @@ class GithubHunter:
 
         # 按 stars + relevance_score 排序
         all_results.sort(
-            key=lambda r: r.get("stars", 0) * 0.4 + r.get("relevance_score", 0) * 0.6,
-            reverse=True
+            key=lambda r: r.get("stars", 0) * 0.4 + r.get("relevance_score", 0) * 0.6, reverse=True
         )
 
         logger.info(f"🏹 捕获到 {len(all_results)} 个潜在猎物")

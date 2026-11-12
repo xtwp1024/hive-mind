@@ -5,10 +5,10 @@
 集中管理所有蜜蜂类型
 """
 
-from typing import Dict, Type, Optional
-from functools import lru_cache
 import sys
+from functools import lru_cache
 from pathlib import Path
+from typing import Dict, Optional, Type
 
 # 添加hive到Python路径
 hive_root = Path(__file__).parent.parent
@@ -29,7 +29,11 @@ try:
         CyberMinerMinerAntibodyBee,
         CyberSentinelMinerBee,
         EchoBee,
-        LibrarianBee as VariantLibrarianBee, # Alias to avoid conflict if core has LibrarianBee
+    )
+    from hive.bees.variants import (
+        LibrarianBee as VariantLibrarianBee,  # Alias to avoid conflict if core has LibrarianBee
+    )
+    from hive.bees.variants import (
         LoggerBee,
         MergerBee,
         MinerAntibodyBee,
@@ -50,6 +54,7 @@ try:
         VortexPrimeArchitectBee,
         WatcherBee,
     )
+
     EVOLVED_BEES_IMPORTED = True
     try:
         print("✓ Evolved bees imported successfully")
@@ -64,16 +69,17 @@ except ImportError as e:
 
 # 导入核心蜜蜂类型（从旧系统迁移）
 try:
-    from hive.bees.seeker_bee import SeekerBee
-    from hive.bees.sentinel_bee import SentinelBee
-    from hive.bees.librarian_bee import LibrarianBee
+    from hive.bees.antibody_bee import AntibodyBee
     from hive.bees.architect_bee import ArchitectBee
     from hive.bees.darwin_bee import DarwinBee
-    from hive.bees.miner_bee import MinerBee
-    from hive.bees.antibody_bee import AntibodyBee
-    from hive.bees.warden_bee import WardenBee
-    from hive.bees.mcp_tool_bee import MCPToolBee
     from hive.bees.evolver_bee import EvolverBee
+    from hive.bees.librarian_bee import LibrarianBee
+    from hive.bees.mcp_tool_bee import MCPToolBee
+    from hive.bees.miner_bee import MinerBee
+    from hive.bees.seeker_bee import SeekerBee
+    from hive.bees.sentinel_bee import SentinelBee
+    from hive.bees.warden_bee import WardenBee
+
     CORE_BEES_IMPORTED = True
     try:
         print("✓ 核心蜜蜂导入成功")
@@ -136,16 +142,15 @@ EVOLVED_BEE_TYPES = {
 }
 
 # 合并所有蜜蜂类型
-BEE_SPECIES = {
-    **STANDARD_BEE_TYPES,
-    **EVOLVED_BEE_TYPES
-}
+BEE_SPECIES = {**STANDARD_BEE_TYPES, **EVOLVED_BEE_TYPES}
+
 
 # 获取有效蜜蜂类型（过滤None值）
 @lru_cache(maxsize=1)
 def get_valid_species() -> Dict[str, Type[BaseBee]]:
     """获取所有有效的蜜蜂类型"""
     return {k: v for k, v in BEE_SPECIES.items() if v is not None}
+
 
 # 获取蜜蜂类型数量
 def get_species_count() -> tuple:
@@ -155,18 +160,19 @@ def get_species_count() -> tuple:
     evolved_count = len([k for k in valid.keys() if k in EVOLVED_BEE_TYPES])
     return standard_count, evolved_count
 
+
 # 打印蜜蜂类型统计
 def print_species_stats():
     """Print bee species statistics"""
     standard_count, evolved_count = get_species_count()
-    
+
     print("=" * 60)
     print("🐝 Bee Species Statistics")
     print("=" * 60)
     print(f"Standard Species: {standard_count}")
     print(f"Evolved Species: {evolved_count}")
     print(f"Total: {standard_count + evolved_count}")
-    
+
     # List valid species
     valid = get_valid_species()
     print(f"\n✅ Loaded Species:")
@@ -177,13 +183,14 @@ def print_species_stats():
         except (UnicodeEncodeError, UnicodeDecodeError):
             status = "[S]" if name in STANDARD_BEE_TYPES else "[E]"
             print(f"  {i:2d}. [{status}] {name}: {bee_class.__name__}")
-    
+
     # List pending species
     print(f"\n⏳ Pending Species:")
     for i, (name, bee_class) in enumerate(BEE_SPECIES.items(), 1):
         if bee_class is None:
             print(f"  {i:2d}. [..] {name}")
     print("=" * 60)
+
 
 if __name__ == "__main__":
     print_species_stats()

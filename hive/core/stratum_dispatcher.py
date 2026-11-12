@@ -10,12 +10,13 @@ StratumDispatcher - 类 Stratum 矿池任务分发中心
 4. 触发事件钩子（on_job / on_accepted / on_rejected）
 """
 
-import time
-import uuid
 import logging
 import threading
+import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
+
 from hive.core.proof_of_work import PoWJob, PoWSolution, ProofOfWork
 
 logger = logging.getLogger("Hive.StratumDispatcher")
@@ -24,12 +25,13 @@ logger = logging.getLogger("Hive.StratumDispatcher")
 @dataclass
 class MinerStats:
     """单个矿工（工蜂）的统计信息（对标 coin-hive update 事件数据）"""
-    bee_id:          str
-    total_jobs:      int   = 0
-    accepted_hashes: int   = 0
-    rejected_hashes: int   = 0
-    total_attempts:  int   = 0
-    total_elapsed:   float = 0.0
+
+    bee_id: str
+    total_jobs: int = 0
+    accepted_hashes: int = 0
+    rejected_hashes: int = 0
+    total_attempts: int = 0
+    total_elapsed: float = 0.0
 
     @property
     def hashes_per_second(self) -> float:
@@ -49,25 +51,25 @@ class StratumDispatcher:
 
     def __init__(
         self,
-        pool_name:   str   = "HiveStratum",
-        difficulty:  int   = 2,
-        job_ttl:     float = 60.0,
+        pool_name: str = "HiveStratum",
+        difficulty: int = 2,
+        job_ttl: float = 60.0,
     ):
-        self.pool_name  = pool_name
+        self.pool_name = pool_name
         self.difficulty = difficulty
-        self.job_ttl    = job_ttl
+        self.job_ttl = job_ttl
 
-        self._active_jobs:  dict[str, PoWJob]     = {}  # job_id → job
-        self._bee_jobs:     dict[str, str]         = {}  # bee_id → job_id
-        self._stats:        dict[str, MinerStats]  = {}  # bee_id → stats
+        self._active_jobs: dict[str, PoWJob] = {}  # job_id → job
+        self._bee_jobs: dict[str, str] = {}  # bee_id → job_id
+        self._stats: dict[str, MinerStats] = {}  # bee_id → stats
         self._lock = threading.Lock()
 
         # 事件钩子（对标 coin-hive miner.on(event, callback)）
         self._hooks: dict[str, list[Callable]] = {
-            "job":      [],
+            "job": [],
             "accepted": [],
             "rejected": [],
-            "error":    [],
+            "error": [],
         }
 
         logger.info(f"[Stratum:{self.pool_name}] 矿池已上线，难度={difficulty}")
@@ -97,14 +99,14 @@ class StratumDispatcher:
             task_blob = f"task://{bee_id}/{uuid.uuid4().hex[:12]}"
 
         job = PoWJob(
-            job_id     = uuid.uuid4().hex,
-            blob       = task_blob,
-            difficulty = self.difficulty,
-            ttl_seconds= self.job_ttl,
+            job_id=uuid.uuid4().hex,
+            blob=task_blob,
+            difficulty=self.difficulty,
+            ttl_seconds=self.job_ttl,
         )
         with self._lock:
             self._active_jobs[job.job_id] = job
-            self._bee_jobs[bee_id]        = job.job_id
+            self._bee_jobs[bee_id] = job.job_id
             if bee_id not in self._stats:
                 self._stats[bee_id] = MinerStats(bee_id=bee_id)
             self._stats[bee_id].total_jobs += 1
@@ -137,7 +139,7 @@ class StratumDispatcher:
         with self._lock:
             if stats:
                 stats.total_attempts += solution.attempts
-                stats.total_elapsed  += solution.elapsed
+                stats.total_elapsed += solution.elapsed
                 if valid:
                     stats.accepted_hashes += 1
                 else:
@@ -162,14 +164,17 @@ class StratumDispatcher:
         with self._lock:
             all_stats = list(self._stats.values())
         return {
-            "pool":            self.pool_name,
-            "total_miners":    len(all_stats),
-            "total_accepted":  sum(s.accepted_hashes for s in all_stats),
-            "total_rejected":  sum(s.rejected_hashes for s in all_stats),
-            "total_attempts":  sum(s.total_attempts for s in all_stats),
-            "miners":          {s.bee_id: {
-                "hashes_per_second": round(s.hashes_per_second),
-                "accepted":          s.accepted_hashes,
-                "acceptance_rate":   f"{s.acceptance_rate:.1%}",
-            } for s in all_stats},
+            "pool": self.pool_name,
+            "total_miners": len(all_stats),
+            "total_accepted": sum(s.accepted_hashes for s in all_stats),
+            "total_rejected": sum(s.rejected_hashes for s in all_stats),
+            "total_attempts": sum(s.total_attempts for s in all_stats),
+            "miners": {
+                s.bee_id: {
+                    "hashes_per_second": round(s.hashes_per_second),
+                    "accepted": s.accepted_hashes,
+                    "acceptance_rate": f"{s.acceptance_rate:.1%}",
+                }
+                for s in all_stats
+            },
         }

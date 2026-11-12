@@ -17,25 +17,33 @@ Hive Evolution Module - 自我进化引擎
 
 __version__ = "1.1.0"
 
-from hive.evolution.evolver import Evolver, EvolutionResult
-from hive.evolution.strategies import EvolutionStrategy, StrategyType
 from hive.evolution.dna_bridge import DNABridge, get_bridge
+from hive.evolution.evolver import EvolutionResult, Evolver
+from hive.evolution.strategies import EvolutionStrategy, StrategyType
+
 
 # 延迟导入可选模块
 def get_evomap_bridge():
     """获取 EvoMap 桥接器"""
-    from hive.evolution.evomap_bridge import EvoMapBridge, get_evomap_bridge as _get
+    from hive.evolution.evomap_bridge import EvoMapBridge
+    from hive.evolution.evomap_bridge import get_evomap_bridge as _get
+
     return _get()
+
 
 def get_monitor_bridge():
     """获取监控桥接器"""
     from hive.evolution.monitor_bridge import MonitorBridge
+
     return MonitorBridge()
+
 
 def get_test_runner():
     """获取测试运行器"""
     from hive.evolution.test_runner import TestRunner
+
     return TestRunner()
+
 
 __all__ = [
     # 核心

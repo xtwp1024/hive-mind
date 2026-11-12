@@ -26,16 +26,18 @@ logger = logging.getLogger("Hive.Brain.Archival")
 
 class StorageTier(str, Enum):
     """存储层级"""
-    HOT = "hot"           # 最近/重要，毫秒级访问
-    WARM = "warm"         # 30天内未访问
-    COLD = "cold"         # 归档到独立存储，秒级检索
-    FROZEN = "frozen"     # 极低访问频率，分钟级检索
+
+    HOT = "hot"  # 最近/重要，毫秒级访问
+    WARM = "warm"  # 30天内未访问
+    COLD = "cold"  # 归档到独立存储，秒级检索
+    FROZEN = "frozen"  # 极低访问频率，分钟级检索
     DEEP_FREEZE = "deep_freeze"  # 几乎不访问，小时级检索
 
 
 @dataclass
 class MemoryArchive:
     """归档记忆"""
+
     id: str
     content: Any
     memory_type: str  # episodic/semantic/procedural
@@ -74,7 +76,7 @@ class MemoryArchiver:
 
     # 层级迁移时间阈值 (秒)
     TIER_TRANSITION_TIMES = {
-        StorageTier.HOT: 0,           # 始终在HOT
+        StorageTier.HOT: 0,  # 始终在HOT
         StorageTier.WARM: 30 * 24 * 3600,  # 30天
         StorageTier.COLD: 90 * 24 * 3600,  # 90天
         StorageTier.FROZEN: 365 * 24 * 3600,  # 1年
@@ -112,10 +114,7 @@ class MemoryArchiver:
             thresholds = self.ARCHIVAL_THRESHOLDS[memory_type]
 
             # 检查是否超过大小限制
-            current_size = len([
-                a for a in self.archives.values()
-                if a.memory_type == memory_type
-            ])
+            current_size = len([a for a in self.archives.values() if a.memory_type == memory_type])
 
             if current_size >= thresholds["max_size"]:
                 # 需要归档：找出最低重要性的记忆
@@ -123,7 +122,10 @@ class MemoryArchiver:
                 return True
 
             # 检查重要性是否低于阈值
-            if hasattr(memory, 'importance') and memory.importance < thresholds["importance_cutoff"]:
+            if (
+                hasattr(memory, "importance")
+                and memory.importance < thresholds["importance_cutoff"]
+            ):
                 # 检查访问频率
                 days_since_access = (time.time() - memory.last_accessed) / (24 * 3600)
                 if days_since_access > 7:  # 7天未访问
@@ -134,10 +136,7 @@ class MemoryArchiver:
 
     async def _archive_lowest_priority(self, memory_type: str, new_memory_id: str):
         """归档最低优先级的记忆"""
-        candidates = [
-            a for a in self.archives.values()
-            if a.memory_type == memory_type
-        ]
+        candidates = [a for a in self.archives.values() if a.memory_type == memory_type]
 
         if not candidates:
             return
@@ -208,14 +207,11 @@ class MemoryArchiver:
         # 计算需要驱逐的数量
         evict_count = min(
             self.EVICTION_BATCH_SIZE,
-            len(self.archives) - self.MAX_ARCHIVES_SIZE + self.EVICTION_BATCH_SIZE
+            len(self.archives) - self.MAX_ARCHIVES_SIZE + self.EVICTION_BATCH_SIZE,
         )
 
         # 按最后访问时间排序（最旧的在前）
-        candidates = sorted(
-            self.archives.values(),
-            key=lambda a: (a.last_accessed, a.access_count)
-        )
+        candidates = sorted(self.archives.values(), key=lambda a: (a.last_accessed, a.access_count))
 
         # 驱逐最旧的
         to_evict = candidates[:evict_count]
@@ -238,7 +234,7 @@ class MemoryArchiver:
             StorageTier: 推荐存储层级
         """
         # 基于重要性和访问频率计算
-        importance = getattr(memory, 'importance', 0.5)
+        importance = getattr(memory, "importance", 0.5)
         access_count = memory.access_count
         days_since_access = (time.time() - memory.last_accessed) / (24 * 3600)
 
@@ -285,7 +281,10 @@ class MemoryArchiver:
                 # 如果从深层回到浅层，考虑升级
                 if archive.storage_tier != StorageTier.HOT:
                     new_tier = self._determine_tier_from_access(archive)
-                    if self.TIER_ORDER[new_tier.value] < self.TIER_ORDER[archive.storage_tier.value]:
+                    if (
+                        self.TIER_ORDER[new_tier.value]
+                        < self.TIER_ORDER[archive.storage_tier.value]
+                    ):
                         await self.migrate_tier(memory_id, new_tier)
 
                 logger.debug(f"🧠 Retrieved archived memory: {memory_id[:20]}...")
@@ -386,7 +385,8 @@ class MemoryArchiver:
             cutoff = time.time() - (max_age_days * 24 * 3600)
 
             to_remove = [
-                aid for aid, a in self.archives.items()
+                aid
+                for aid, a in self.archives.items()
                 if a.last_accessed < cutoff and a.storage_tier == StorageTier.DEEP_FREEZE
             ]
 

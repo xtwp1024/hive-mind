@@ -3,8 +3,8 @@
 
 import pytest
 
-from hive.bees.base_bee import validate_git_url, ALLOWED_GIT_DOMAINS
-from hive.components.shell_runner import validate_command, ALLOWED_BASE_COMMANDS
+from hive.bees.base_bee import ALLOWED_GIT_DOMAINS, validate_git_url
+from hive.components.shell_runner import ALLOWED_BASE_COMMANDS, validate_command
 
 
 class TestGitURLValidation:

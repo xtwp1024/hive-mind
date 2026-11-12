@@ -369,7 +369,9 @@ class GoalDecomposer:
             sub_goals.append(sub_goal)
 
         # 第二步：建立依赖关系，确保索引正确映射到实际 goal id
-        goal_id_map = {i: sub_goals[i].id for i in range(len(sub_goals)) if i < len(matched_template)}
+        goal_id_map = {
+            i: sub_goals[i].id for i in range(len(sub_goals)) if i < len(matched_template)
+        }
         for i, sub_goal in enumerate(sub_goals):
             if i < len(matched_template):
                 _, _, _, template_deps = matched_template[i]
@@ -414,9 +416,7 @@ class GoalDecomposer:
         except Exception as e:
             logger.error(f"❌ LLM decomposition failed: {e}")
             # 回退到模板分解
-            return await self._decompose_with_template(
-                goal, GoalType.COMPOSITE, parent_id
-            )
+            return await self._decompose_with_template(goal, GoalType.COMPOSITE, parent_id)
 
     def _parse_llm_response(
         self,

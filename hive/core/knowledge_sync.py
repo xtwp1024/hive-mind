@@ -38,21 +38,23 @@ logger = logging.getLogger("Hive.KnowledgeSync")
 
 # ===== 知识条目 =====
 
+
 @dataclass
 class KnowledgeEntry:
     """知识条目"""
+
     id: str
-    type: str           # "pattern", "strategy", "code", "insight", "lesson"
-    content: Any        # 知识内容 (dict/list/str)
-    content_hash: str   # 内容摘要
+    type: str  # "pattern", "strategy", "code", "insight", "lesson"
+    content: Any  # 知识内容 (dict/list/str)
+    content_hash: str  # 内容摘要
     priority: str = "normal"  # "critical", "high", "normal", "low"
     tags: list[str] = field(default_factory=list)
-    source_node: str = ""      # 来源节点
+    source_node: str = ""  # 来源节点
     source_timestamp: float = 0  # 来源节点创建时间
-    local_timestamp: float = 0   # 本地接收时间
-    version: int = 1             # 版本号
-    refs: int = 0                # 被引用次数
-    失效: bool = False            # 是否已失效
+    local_timestamp: float = 0  # 本地接收时间
+    version: int = 1  # 版本号
+    refs: int = 0  # 被引用次数
+    失效: bool = False  # 是否已失效
 
     def to_dict(self) -> dict:
         return {
@@ -96,6 +98,7 @@ class KnowledgeEntry:
 
 # ===== 知识同步 =====
 
+
 class KnowledgeSync:
     """
     知识同步器
@@ -104,11 +107,11 @@ class KnowledgeSync:
     """
 
     # 知识类型
-    TYPE_PATTERN = "pattern"       # 代码模式
-    TYPE_STRATEGY = "strategy"    # 策略
-    TYPE_CODE = "code"            # 代码片段
-    TYPE_INSIGHT = "insight"     # 洞察
-    TYPE_LESSON = "lesson"       # 经验教训
+    TYPE_PATTERN = "pattern"  # 代码模式
+    TYPE_STRATEGY = "strategy"  # 策略
+    TYPE_CODE = "code"  # 代码片段
+    TYPE_INSIGHT = "insight"  # 洞察
+    TYPE_LESSON = "lesson"  # 经验教训
 
     # 优先级
     PRIORITY_CRITICAL = "critical"
@@ -120,8 +123,8 @@ class KnowledgeSync:
         self,
         federation,  # HiveFederation 实例
         sync_interval: float = 30.0,  # 同步间隔 (秒)
-        max_knowledge: int = 10000,    # 最大知识条数
-        push_on_receive: bool = True,   # 收到知识后是否立即转发
+        max_knowledge: int = 10000,  # 最大知识条数
+        push_on_receive: bool = True,  # 收到知识后是否立即转发
     ):
         """
         初始化知识同步器
@@ -142,9 +145,9 @@ class KnowledgeSync:
         self._kb_lock = threading.RLock()
 
         # 索引 (加速查询)
-        self._by_type: dict[str, set[str]] = {}      # type -> entry ids
-        self._by_hash: dict[str, str] = {}          # content_hash -> entry id
-        self._by_tag: dict[str, set[str]] = {}      # tag -> entry ids
+        self._by_type: dict[str, set[str]] = {}  # type -> entry ids
+        self._by_hash: dict[str, str] = {}  # content_hash -> entry id
+        self._by_tag: dict[str, set[str]] = {}  # tag -> entry ids
 
         # 同步状态
         self._running = False
@@ -169,9 +172,7 @@ class KnowledgeSync:
 
         # 启动定时同步
         self._sync_thread = threading.Thread(
-            target=self._sync_loop,
-            daemon=True,
-            name="knowledge-sync"
+            target=self._sync_loop, daemon=True, name="knowledge-sync"
         )
         self._sync_thread.start()
 
@@ -227,9 +228,7 @@ class KnowledgeSync:
         # 生产环境应该传 my_hashes 让对方计算差量
         try:
             result = self._federation._send_and_receive(
-                node,
-                "knowledge_sync_request",
-                {"node_hashes": list(my_hashes)}
+                node, "knowledge_sync_request", {"node_hashes": list(my_hashes)}
             )
             if result:
                 return result.get("missing_hashes", [])
@@ -240,11 +239,7 @@ class KnowledgeSync:
     def _pull_knowledge(self, node, hashes: list[str]):
         """从节点拉取指定知识"""
         try:
-            result = self._federation._send_and_receive(
-                node,
-                "knowledge_pull",
-                {"hashes": hashes}
-            )
+            result = self._federation._send_and_receive(node, "knowledge_pull", {"hashes": hashes})
             if result:
                 entries = result.get("entries", [])
                 for entry_dict in entries:
@@ -260,17 +255,17 @@ class KnowledgeSync:
 
             # 获取未同步的知识
             new_entries = [
-                e for e in self._knowledge.values()
-                if e.content_hash not in self._synced_hashes
+                e for e in self._knowledge.values() if e.content_hash not in self._synced_hashes
             ]
 
             if not new_entries:
                 continue
 
             # 按优先级排序
-            new_entries.sort(key=lambda e: (
-                ["low", "normal", "high", "critical"].index(e.priority)
-            ), reverse=True)
+            new_entries.sort(
+                key=lambda e: (["low", "normal", "high", "critical"].index(e.priority)),
+                reverse=True,
+            )
 
             # 分批推送 (避免单次过大)
             batch = []
@@ -288,11 +283,7 @@ class KnowledgeSync:
 
             if batch:
                 try:
-                    self._federation._send_to_node(
-                        node,
-                        "knowledge_push",
-                        {"entries": batch}
-                    )
+                    self._federation._send_to_node(node, "knowledge_push", {"entries": batch})
                     for entry_dict in batch:
                         self._synced_hashes.add(entry_dict["content_hash"])
                 except Exception as e:
@@ -311,7 +302,8 @@ class KnowledgeSync:
                     id=knowledge.get("id", str(uuid.uuid4())),
                     type=knowledge.get("type", "insight"),
                     content=knowledge.get("content"),
-                    content_hash=knowledge.get("content_hash") or KnowledgeEntry.compute_hash(knowledge.get("content", "")),
+                    content_hash=knowledge.get("content_hash")
+                    or KnowledgeEntry.compute_hash(knowledge.get("content", "")),
                     priority=knowledge.get("priority", "normal"),
                     tags=knowledge.get("tags", []),
                     source_node=data.get("origin", ""),
@@ -371,7 +363,9 @@ class KnowledgeSync:
         if self._running:
             self._broadcast_entry(entry)
 
-        logger.info(f"📚 [KnowledgeSync] 知识已推送: {entry.id} type={knowledge_type} priority={priority}")
+        logger.info(
+            f"📚 [KnowledgeSync] 知识已推送: {entry.id} type={knowledge_type} priority={priority}"
+        )
         return entry.id
 
     def _add_entry(self, entry: KnowledgeEntry):
@@ -397,24 +391,17 @@ class KnowledgeSync:
         """清理超量知识 (保留高价值知识)"""
         while len(self._knowledge) > self._max_knowledge:
             # 删除最低优先级的最早条目
-            candidates = [
-                (eid, e) for eid, e in self._knowledge.items()
-                if e.失效 and e.refs == 0
-            ]
+            candidates = [(eid, e) for eid, e in self._knowledge.items() if e.失效 and e.refs == 0]
             if not candidates:
-                candidates = [
-                    (eid, e) for eid, e in self._knowledge.items()
-                    if e.priority == "low"
-                ]
+                candidates = [(eid, e) for eid, e in self._knowledge.items() if e.priority == "low"]
             if not candidates:
                 candidates = list(self._knowledge.items())
 
             # 按 (优先级索引, 时间) 排序
             priority_order = ["critical", "high", "normal", "low"]
-            candidates.sort(key=lambda x: (
-                priority_order.index(x[1].priority),
-                x[1].local_timestamp
-            ))
+            candidates.sort(
+                key=lambda x: (priority_order.index(x[1].priority), x[1].local_timestamp)
+            )
 
             remove_id = candidates[0][0]
             self._remove_entry(remove_id)
@@ -465,11 +452,7 @@ class KnowledgeSync:
         for node in nodes:
             if node.node_id == self._federation.node_id:
                 continue
-            self._federation._send_to_node(
-                node,
-                "knowledge_push",
-                {"entries": [entry.to_dict()]}
-            )
+            self._federation._send_to_node(node, "knowledge_push", {"entries": [entry.to_dict()]})
 
     # ===== 查询 =====
 
@@ -528,10 +511,9 @@ class KnowledgeSync:
                 results.append(entry)
 
             # 按优先级和时间排序
-            results.sort(key=lambda e: (
-                priority_order.index(e.priority),
-                -e.source_timestamp
-            ), reverse=True)
+            results.sort(
+                key=lambda e: (priority_order.index(e.priority), -e.source_timestamp), reverse=True
+            )
 
             return results[:limit]
 

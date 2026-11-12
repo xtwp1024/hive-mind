@@ -97,9 +97,7 @@ class WorkingMemory:
         self._lock = asyncio.Lock()
         self._last_decay = time.time()
 
-        logger.debug(
-            f"🧠 WorkingMemory initialized (max_items={max_items}, max_goals={max_goals})"
-        )
+        logger.debug(f"🧠 WorkingMemory initialized (max_items={max_items}, max_goals={max_goals})")
 
     @property
     def attention_focus(self) -> Optional[AttentionItem]:
@@ -174,9 +172,7 @@ class WorkingMemory:
                     del self._items[oldest_id]
                     if self._attention_focus == oldest_id:
                         self._attention_focus = (
-                            list(self._items.keys())[-1]
-                            if self._items
-                            else None
+                            list(self._items.keys())[-1] if self._items else None
                         )
 
             logger.debug(f"🧠 WorkingMemory added item {item_id}, total={len(self._items)}")
@@ -194,9 +190,7 @@ class WorkingMemory:
                 return True
             return False
 
-    async def update_attention(
-        self, item_id: str, delta: float
-    ) -> bool:
+    async def update_attention(self, item_id: str, delta: float) -> bool:
         """更新注意力水平"""
         async with self._lock:
             if item_id in self._items:
@@ -274,7 +268,10 @@ class WorkingMemory:
         if not goal.children_ids:
             return 1.0 if goal.status == "completed" else 0.0
         completed = sum(
-            1 for cid in goal.children_ids if self._goals.get(cid, Goal(id="", description="", status="failed")).status == "completed"
+            1
+            for cid in goal.children_ids
+            if self._goals.get(cid, Goal(id="", description="", status="failed")).status
+            == "completed"
         )
         return completed / len(goal.children_ids) if goal.children_ids else 0.0
 
@@ -307,7 +304,9 @@ class WorkingMemory:
     def get_attention_load(self) -> float:
         """获取注意力负载 (0-1)"""
         active_items = sum(
-            1 for item in self._items.values() if item.attention_level > self.LOW_ATTENTION_THRESHOLD
+            1
+            for item in self._items.values()
+            if item.attention_level > self.LOW_ATTENTION_THRESHOLD
         )
         return active_items / self.max_items
 

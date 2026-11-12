@@ -15,8 +15,8 @@ Usage:
 
 import asyncio
 import logging
-import time
 import random
+import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -35,6 +35,7 @@ AUTOTUNABLE_PARAMS = {
 @dataclass
 class PerformanceMetrics:
     """性能指标"""
+
     task_type: str
     success_rate: float
     avg_duration: float
@@ -45,6 +46,7 @@ class PerformanceMetrics:
 @dataclass
 class Adjustment:
     """调整记录"""
+
     parameter: str
     current_value: Any
     suggested_value: Any
@@ -84,7 +86,9 @@ class CognitiveModel:
             "strengths": self.strengths,
             "weaknesses": self.weaknesses,
             "preferred_modes": self.preferred_modes,
-            "learned_patterns": dict(sorted(self.learned_patterns.items(), key=lambda x: -x[1])[:10]),
+            "learned_patterns": dict(
+                sorted(self.learned_patterns.items(), key=lambda x: -x[1])[:10]
+            ),
             "optimal_contexts": self.optimal_contexts,
         }
 
@@ -130,7 +134,11 @@ class SelfImprovementEngine:
 
         self._last_analysis_time = now
 
-        recent = self.performance_history[-50:] if len(self.performance_history) >= 50 else self.performance_history
+        recent = (
+            self.performance_history[-50:]
+            if len(self.performance_history) >= 50
+            else self.performance_history
+        )
         if len(recent) < 5:
             return []
 
@@ -203,7 +211,9 @@ class SelfImprovementEngine:
 
         return analysis
 
-    def _suggest_adjustment(self, param: str, current: Any, analysis: Dict[str, Any]) -> Optional[Adjustment]:
+    def _suggest_adjustment(
+        self, param: str, current: Any, analysis: Dict[str, Any]
+    ) -> Optional[Adjustment]:
         """
         建议参数调整
 
@@ -528,13 +538,15 @@ class MetaCognitionLayer:
                 self.model.optimal_contexts[key] = 1.0
 
         # 保存学习历史（deque 自动管理长度，O(1) 复杂度）
-        self._learning_history.append({
-            "timestamp": time.time(),
-            "input": input_text[:50],
-            "intent": intent,
-            "success": success,
-            "duration": duration,
-        })
+        self._learning_history.append(
+            {
+                "timestamp": time.time(),
+                "input": input_text[:50],
+                "intent": intent,
+                "success": success,
+                "duration": duration,
+            }
+        )
 
         result.model_updates = model_updates
         result.recommendations = self._generate_recommendations(intent, success)
@@ -628,8 +640,15 @@ class MetaCognitionLayer:
 
         # 复杂度关键词
         complex_keywords = [
-            "分析", "设计", "实现", "重构", "优化",
-            "系统", "架构", "分布式", "并发",
+            "分析",
+            "设计",
+            "实现",
+            "重构",
+            "优化",
+            "系统",
+            "架构",
+            "分布式",
+            "并发",
         ]
         complex_count = sum(1 for kw in complex_keywords if kw in task)
         difficulty += complex_count * 0.05

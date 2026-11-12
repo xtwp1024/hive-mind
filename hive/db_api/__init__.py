@@ -7,11 +7,13 @@ Hive DB-API v2.0 兼容门面包。
 
 from .connection import Connection
 
+
 # PEP-249 规定的入口标准函数
 def connect(*args, **kwargs):
     return Connection(*args, **kwargs)
 
+
 # PEP-249 标准属性
-apilevel = '2.0'
+apilevel = "2.0"
 threadsafety = 2  # 线程安全的游标跨连接
-paramstyle = 'pyformat'
+paramstyle = "pyformat"

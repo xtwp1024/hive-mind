@@ -15,6 +15,7 @@ from hive.utils.github_hunter import GithubHunter
 @dataclass
 class GitHubTask:
     """GitHub 采集任务"""
+
     id: str
     keywords: list[str]
     target_count: int = 5
@@ -43,7 +44,7 @@ class GitHubHarvester:
 
             # 提取知识（同步，轻量）
             knowledge = []
-            for repo in repos[:task.target_count]:
+            for repo in repos[: task.target_count]:
                 k = self._extract_repo_knowledge(repo, task)
                 knowledge.append(k)
 
@@ -54,24 +55,17 @@ class GitHubHarvester:
                 "task_id": task.id,
                 "repos_found": len(repos),
                 "knowledge_extracted": len(knowledge),
-                "knowledge": knowledge
+                "knowledge": knowledge,
             }
 
         except Exception as e:
-            return {
-                "status": "FAILED",
-                "task_id": task.id,
-                "error": str(e)
-            }
+            return {"status": "FAILED", "task_id": task.id, "error": str(e)}
 
     async def _search_repos(self, task: GitHubTask) -> list[dict]:
         """搜索仓库（异步并发）"""
         try:
             # GithubHunter.hunt() 是异步并发方法
-            repos = await self.hunter.hunt(
-                keywords=task.keywords,
-                count=task.target_count * 2
-            )
+            repos = await self.hunter.hunt(keywords=task.keywords, count=task.target_count * 2)
             return repos
         except Exception as e:
             print(f"搜索仓库失败: {e}")
@@ -103,7 +97,7 @@ class GitHubHarvester:
             "summary": summary,
             "importance": importance,
             "url": url,
-            "keywords": task.keywords
+            "keywords": task.keywords,
         }
 
     async def cleanup(self) -> None:
@@ -112,9 +106,7 @@ class GitHubHarvester:
 
     def get_status(self) -> dict[str, Any]:
         """获取状态"""
-        return {
-            "total_harvested": self.harvest_count
-        }
+        return {"total_harvested": self.harvest_count}
 
 
 # 默认采集任务关键词
@@ -128,5 +120,5 @@ DEFAULT_KEYWORDS = [
     "microservice",
     "docker kubernetes",
     "react vue",
-    "rust go"
+    "rust go",
 ]

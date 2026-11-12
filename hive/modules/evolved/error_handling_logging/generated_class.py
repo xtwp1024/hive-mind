@@ -1,15 +1,16 @@
 import logging
 from typing import Any, Optional
 
+
 class HiveEvolutionManager:
     """A class for managing error handling and logging functionalities in the Hive's self-evolution process."""
 
-    def __init__(self, log_level: Optional[str] = 'INFO'):
+    def __init__(self, log_level: Optional[str] = "INFO"):
         """Initialize the logger with the specified level."""
-        self.logger = logging.getLogger('HiveEvolutionManager')
+        self.logger = logging.getLogger("HiveEvolutionManager")
         self.logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
         handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
@@ -29,6 +30,7 @@ class HiveEvolutionManager:
             self.log_error("An error occurred during the Hive's self-evolution process.", e)
             raise
 
+
 # Unit tests for the HiveEvolutionManager class
 if __name__ == "__main__":
     import unittest
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     class TestHiveEvolutionManager(unittest.TestCase):
         def test_log_info(self):
             manager = HiveEvolutionManager()
-            with unittest.mock.patch.object(manager.logger, 'info') as mocked_info:
+            with unittest.mock.patch.object(manager.logger, "info") as mocked_info:
                 manager.log_info("This is an info message")
                 mocked_info.assert_called_once_with("This is an info message")
 
@@ -44,17 +46,19 @@ if __name__ == "__main__":
             manager = HiveEvolutionManager()
             error_message = "This is an error message"
             exception = Exception("Test exception")
-            with unittest.mock.patch.object(manager.logger, 'error') as mocked_error:
+            with unittest.mock.patch.object(manager.logger, "error") as mocked_error:
                 manager.log_error(error_message, exception)
                 mocked_error.assert_called_once_with(f"{error_message} - {str(exception)}")
 
         def test_handle_exception(self):
             manager = HiveEvolutionManager()
+
             def test_function():
                 raise Exception("Test exception")
+
             with self.assertRaises(Exception) as context:
                 manager.handle_exception(test_function)
             self.assertEqual(str(context.exception), "Test exception")
-            with unittest.mock.patch.object(manager.logger, 'error') as mocked_error:
+            with unittest.mock.patch.object(manager.logger, "error") as mocked_error:
                 manager.handle_exception(test_function)
                 mocked_error.assert_called_once()

@@ -6,19 +6,20 @@ Darwin Bee (达尔文蜂)
 """
 
 import logging
-import re
 import random
+import re
 import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 from hive.bees.base_bee import BaseBee
-from hive.core.dna import BeeDNA
 from hive.config.settings import get_settings
+from hive.core.dna import BeeDNA
+from hive.core.swarm_communication import MessageType, SwarmMessage, get_swarm_communication
 from hive.utils.brain_interface import BrainInterface
-from hive.core.swarm_communication import get_swarm_communication, MessageType, SwarmMessage
 
 logger = logging.getLogger("Hive.Darwin")
+
 
 class DarwinBee(BaseBee):
     """
@@ -56,6 +57,7 @@ class DarwinBee(BaseBee):
         """Phase 3: 注册到 SwarmEvolutionCoordinator"""
         try:
             from hive.core.swarm_evolution import get_swarm_evolution_coordinator
+
             self._evolution = get_swarm_evolution_coordinator()
             self._evolution.register_bee(
                 bee_id=self.id,
@@ -104,15 +106,15 @@ class DarwinBee(BaseBee):
             if is_medic_mission:
                 logger.info(f"🚑 [Medic] 这是一次救援行动! 正在分析尸检报告: {death_cert_path}")
                 try:
-                    with open(death_cert_path, 'r', encoding='utf-8') as f:
+                    with open(death_cert_path, "r", encoding="utf-8") as f:
                         cert_data = json.load(f)
 
-                    error_msg = cert_data.get('error_message', 'Unknown Error')
-                    traceback_str = cert_data.get('traceback_str', '')
-                    target_name = cert_data.get('target_name', 'Unknown')
+                    error_msg = cert_data.get("error_message", "Unknown Error")
+                    traceback_str = cert_data.get("traceback_str", "")
+                    target_name = cert_data.get("target_name", "Unknown")
 
                     if target_path.exists():
-                        source_content = target_path.read_text(encoding='utf-8')
+                        source_content = target_path.read_text(encoding="utf-8")
                     else:
                         return {"error": "Corpse missing (Source file not found)"}
 
@@ -146,7 +148,7 @@ class DarwinBee(BaseBee):
                 if not target_path.exists():
                     return {"error": "Source verification failed"}
 
-                source_content = target_path.read_text(encoding='utf-8')[:3000]
+                source_content = target_path.read_text(encoding="utf-8")[:3000]
 
                 # 2. Phase 2: 先向 SentinelBee 请求安全扫描
                 security_result = self.request_security_review(target_path, timeout=10.0)
@@ -167,9 +169,13 @@ Top issues:
                     for iss in issues[:5]:
                         security_context += f"  [{iss['severity']}] {iss['description']} in {iss['file']}:{iss['line']}\n"
                     security_context += "\nIMPORTANT: Avoid these patterns in the generated code!\n"
-                    logger.info(f"🛡️ [Darwin] 安全上下文已准备: H{stats.get('high', 0)} M{stats.get('medium', 0)}")
+                    logger.info(
+                        f"🛡️ [Darwin] 安全上下文已准备: H{stats.get('high', 0)} M{stats.get('medium', 0)}"
+                    )
                 elif security_result and security_result.get("status") == "error":
-                    security_context = f"\n(Security scan failed: {security_result.get('message', 'unknown')})\n"
+                    security_context = (
+                        f"\n(Security scan failed: {security_result.get('message', 'unknown')})\n"
+                    )
 
                 # 3. 向大脑请求变异（注入安全上下文）
                 logger.info("🧠 [Darwin] 正在向大脑请求基因编辑...")
@@ -207,13 +213,13 @@ New Agent Name: MutantBee_{int(time.time())}
 
             # 5. 产卵 (Spawn Larva)
             prefix = "healed_" if is_medic_mission else "larva_"
-            safe_stem = re.sub(r'[^\w\-]', '_', target_path.stem)
+            safe_stem = re.sub(r"[^\w\-]", "_", target_path.stem)
             larva_name = f"{prefix}{safe_stem}_{int(time.time())}.py"
             larva_path = (self.larvae_dir / larva_name).resolve()
             if not str(larva_path).startswith(str(self.larvae_dir.resolve())):
                 logger.error(f"[Darwin] 拒绝非法产卵路径: {larva_name}")
                 return {"error": "Invalid larva path"}
-            larva_path.write_text(new_code, encoding='utf-8')
+            larva_path.write_text(new_code, encoding="utf-8")
 
             # Phase 3: 报告进化成功到适应度追踪
             if self._evolution:
@@ -229,13 +235,15 @@ New Agent Name: MutantBee_{int(time.time())}
                 "larva": str(larva_path),
                 "genes_source": target_path.name,
                 "is_fix": is_medic_mission,
-                "security_context": security_context if not is_medic_mission else None
+                "security_context": security_context if not is_medic_mission else None,
             }
 
         except Exception as e:
             # Phase 3: 报告进化失败到适应度追踪
             if self._evolution:
-                self._evolution.report_task_result(self.id, success=False, duration=0.0, error=str(e))
+                self._evolution.report_task_result(
+                    self.id, success=False, duration=0.0, error=str(e)
+                )
             logger.error(f"❌ 进化失败: {e}")
             return {"error": str(e)}
 

@@ -21,26 +21,23 @@ Architecture:
 """
 
 import asyncio
-import uuid
-import os
-import time
-import shutil
-import subprocess
 import logging
 import multiprocessing
-from concurrent.futures import ProcessPoolExecutor, Future
+import os
+import shutil
+import subprocess
+import time
+import uuid
+from concurrent.futures import Future, ProcessPoolExecutor
 from pathlib import Path
-from typing import Optional, Dict, Any, Callable
+from typing import Any, Callable, Dict, Optional
 
-from hive.core.interfaces import BeeInterface, Task, TaskResult
 from hive.core.dna import BeeDNA
+from hive.core.interfaces import BeeInterface, Task, TaskResult
+from hive.core.service_locator import BeeServiceLocator
 from hive.utils.logger import get_logger
 from hive.utils.memory_box import MemoryBox
-from hive.core.service_locator import BeeServiceLocator
-from hive.utils.security import (
-    validate_git_url,
-    ALLOWED_GIT_DOMAINS
-)
+from hive.utils.security import ALLOWED_GIT_DOMAINS, validate_git_url
 
 logger = get_logger(__name__)
 
@@ -78,8 +75,8 @@ def _cpu_bound_task_executor(task_func: str, task_data: Dict[str, Any]) -> Dict[
     try:
         # Simulate CPU-bound work (in real implementation, this would be actual code analysis)
         # Using hash calculation as a realistic CPU-bound benchmark
-        data = task_data.get('data', b'x' * 10000)
-        iterations = task_data.get('iterations', 1000)
+        data = task_data.get("data", b"x" * 10000)
+        iterations = task_data.get("iterations", 1000)
 
         # CPU-bound computation
         result = 0
@@ -92,14 +89,14 @@ def _cpu_bound_task_executor(task_func: str, task_data: Dict[str, Any]) -> Dict[
             "success": True,
             "result": {"hash_sum": result, "iterations": iterations},
             "execution_time": execution_time,
-            "pid": pid
+            "pid": pid,
         }
     except Exception as e:
         return {
             "success": False,
             "error": str(e),
             "execution_time": time.time() - start_time,
-            "pid": pid
+            "pid": pid,
         }
 
 
@@ -124,7 +121,7 @@ class AsyncBaseBee(BeeInterface):
         dna: BeeDNA,
         id: str,
         result_queue: Optional[multiprocessing.Queue] = None,
-        max_workers: int = 4
+        max_workers: int = 4,
     ):
         """
         Initialize AsyncBaseBee.
@@ -145,14 +142,18 @@ class AsyncBaseBee(BeeInterface):
         self._completed_count = 0
         self._failed_count = 0
 
-        logger.info(f"[{self.__class__.__name__}-{self.id}] Initialized (async mode, pid={self.pid_str})")
+        logger.info(
+            f"[{self.__class__.__name__}-{self.id}] Initialized (async mode, pid={self.pid_str})"
+        )
 
     @property
     def process_pool(self) -> ProcessPoolExecutor:
         """Lazy-initialize process pool"""
         if self._process_pool is None:
             self._process_pool = ProcessPoolExecutor(max_workers=self.max_workers)
-            logger.debug(f"[{self.__class__.__name__}-{self.id}] ProcessPool created with {self.max_workers} workers")
+            logger.debug(
+                f"[{self.__class__.__name__}-{self.id}] ProcessPool created with {self.max_workers} workers"
+            )
         return self._process_pool
 
     def _get_memory_box(self) -> MemoryBox:
@@ -194,11 +195,14 @@ class AsyncBaseBee(BeeInterface):
 
             # Record success in memory
             memory = self._get_memory_box()
-            memory.put(mem_key, {
-                "summary": "This path was successful.",
-                "tools_used": getattr(self.dna, 'required_tools', []),
-                "outcome_status": "SUCCESS" if result.success else "FAILED"
-            })
+            memory.put(
+                mem_key,
+                {
+                    "summary": "This path was successful.",
+                    "tools_used": getattr(self.dna, "required_tools", []),
+                    "outcome_status": "SUCCESS" if result.success else "FAILED",
+                },
+            )
 
             self._completed_count += 1
             return result
@@ -210,7 +214,7 @@ class AsyncBaseBee(BeeInterface):
                 task_id=task.id,
                 success=False,
                 error=f"[INTERRUPTED] {int_e}",
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
         except Exception as e:
             logger.error(f"Task execution failed: {e}", exc_info=True)
@@ -219,7 +223,7 @@ class AsyncBaseBee(BeeInterface):
                 task_id=task.id,
                 success=False,
                 error=str(e),
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
 
     async def _execute_cpu_bound_task_async(self, task: Task) -> TaskResult:
@@ -236,18 +240,15 @@ class AsyncBaseBee(BeeInterface):
 
         # Prepare task data for CPU-bound execution
         task_data = {
-            "data": task.payload.get('data', b'x' * 10000),
-            "iterations": task.payload.get('iterations', 5000),
-            "task_id": task.id
+            "data": task.payload.get("data", b"x" * 10000),
+            "iterations": task.payload.get("iterations", 5000),
+            "task_id": task.id,
         }
 
         # Submit to process pool (non-blocking via asyncio)
         loop = asyncio.get_event_loop()
         future = loop.run_in_executor(
-            self.process_pool,
-            _cpu_bound_task_executor,
-            "cpu_analysis",
-            task_data
+            self.process_pool, _cpu_bound_task_executor, "cpu_analysis", task_data
         )
 
         # Store reference for potential cancellation
@@ -263,7 +264,7 @@ class AsyncBaseBee(BeeInterface):
                 task_id=task.id,
                 success=False,
                 error=f"Task timed out after {task.timeout}s",
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
         finally:
             self._active_tasks.pop(task.id, None)
@@ -273,7 +274,7 @@ class AsyncBaseBee(BeeInterface):
             success=result_dict.get("success", False),
             result=result_dict.get("result"),
             error=result_dict.get("error"),
-            execution_time=time.time() - start_time
+            execution_time=time.time() - start_time,
         )
 
     async def _execute_io_bound_task_async(self, task: Task) -> TaskResult:
@@ -292,12 +293,14 @@ class AsyncBaseBee(BeeInterface):
             TaskResult
         """
         start_time = time.time()
-        target_path = task.payload.get('target_path', task.payload.get('target_url'))
+        target_path = task.payload.get("target_path", task.payload.get("target_url"))
 
         try:
             if target_path:
                 # Check if it's a git URL or local path
-                if isinstance(target_path, str) and target_path.startswith(('http://', 'https://', 'git@')):
+                if isinstance(target_path, str) and target_path.startswith(
+                    ("http://", "https://", "git@")
+                ):
                     # Async git clone
                     cloned_path = await self._async_clone_repo(target_path)
                     if cloned_path:
@@ -307,14 +310,14 @@ class AsyncBaseBee(BeeInterface):
                             task_id=task.id,
                             success=True,
                             result={"path": str(cloned_path), "files_scanned": file_count},
-                            execution_time=time.time() - start_time
+                            execution_time=time.time() - start_time,
                         )
                     else:
                         return TaskResult(
                             task_id=task.id,
                             success=False,
                             error="Git clone failed",
-                            execution_time=time.time() - start_time
+                            execution_time=time.time() - start_time,
                         )
                 elif Path(target_path).exists():
                     # Async directory scan
@@ -323,14 +326,14 @@ class AsyncBaseBee(BeeInterface):
                         task_id=task.id,
                         success=True,
                         result={"path": target_path, "files_scanned": file_count},
-                        execution_time=time.time() - start_time
+                        execution_time=time.time() - start_time,
                     )
 
             return TaskResult(
                 task_id=task.id,
                 success=True,
                 result={"status": "io_task_completed"},
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
 
         except Exception as e:
@@ -338,7 +341,7 @@ class AsyncBaseBee(BeeInterface):
                 task_id=task.id,
                 success=False,
                 error=str(e),
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
 
     async def _execute_mixed_task_async(self, task: Task) -> TaskResult:
@@ -360,36 +363,37 @@ class AsyncBaseBee(BeeInterface):
             TaskResult
         """
         start_time = time.time()
-        target_path = task.payload.get('target_path', task.payload.get('target_url'))
+        target_path = task.payload.get("target_path", task.payload.get("target_url"))
 
         try:
             cloned_path = None
 
             # Phase 1: I/O (non-blocking git clone)
-            if target_path and isinstance(target_path, str) and target_path.startswith(('http://', 'https://', 'git@')):
+            if (
+                target_path
+                and isinstance(target_path, str)
+                and target_path.startswith(("http://", "https://", "git@"))
+            ):
                 cloned_path = await self._async_clone_repo(target_path)
                 if not cloned_path:
                     return TaskResult(
                         task_id=task.id,
                         success=False,
                         error="Git clone failed",
-                        execution_time=time.time() - start_time
+                        execution_time=time.time() - start_time,
                     )
 
             # Phase 2: CPU-bound work (submitted to process pool)
             # Overlap with any remaining I/O
             task_data = {
                 "data": str(target_path or "").encode() * 100,
-                "iterations": task.payload.get('iterations', 3000),
-                "task_id": task.id
+                "iterations": task.payload.get("iterations", 3000),
+                "task_id": task.id,
             }
 
             loop = asyncio.get_event_loop()
             future = loop.run_in_executor(
-                self.process_pool,
-                _cpu_bound_task_executor,
-                "mixed_analysis",
-                task_data
+                self.process_pool, _cpu_bound_task_executor, "mixed_analysis", task_data
             )
 
             self._active_tasks[task.id] = future
@@ -397,13 +401,15 @@ class AsyncBaseBee(BeeInterface):
             try:
                 result_dict = await asyncio.wait_for(future, timeout=task.timeout)
             except asyncio.TimeoutError:
-                logger.warning(f"[{self.__class__.__name__}-{self.id}] Mixed task {task.id} timed out")
+                logger.warning(
+                    f"[{self.__class__.__name__}-{self.id}] Mixed task {task.id} timed out"
+                )
                 future.cancel()
                 return TaskResult(
                     task_id=task.id,
                     success=False,
                     error=f"Task timed out after {task.timeout}s",
-                    execution_time=time.time() - start_time
+                    execution_time=time.time() - start_time,
                 )
             finally:
                 self._active_tasks.pop(task.id, None)
@@ -413,10 +419,10 @@ class AsyncBaseBee(BeeInterface):
                 success=result_dict.get("success", False),
                 result={
                     "path": str(cloned_path) if cloned_path else target_path,
-                    "cpu_result": result_dict.get("result")
+                    "cpu_result": result_dict.get("result"),
                 },
                 error=result_dict.get("error"),
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
 
         except Exception as e:
@@ -424,7 +430,7 @@ class AsyncBaseBee(BeeInterface):
                 task_id=task.id,
                 success=False,
                 error=str(e),
-                execution_time=time.time() - start_time
+                execution_time=time.time() - start_time,
             )
 
     async def _async_clone_repo(self, url: str) -> Optional[Path]:
@@ -450,7 +456,7 @@ class AsyncBaseBee(BeeInterface):
 
         settings = get_settings()
         download_dir = settings.BASE_DIR
-        target_dir = download_dir / Path(url.split('/')[-1].replace('.git', ''))
+        target_dir = download_dir / Path(url.split("/")[-1].replace(".git", ""))
 
         if target_dir.exists():
             logger.info(f"Repository already exists at {target_dir}")
@@ -465,8 +471,8 @@ class AsyncBaseBee(BeeInterface):
                     ["git", "clone", "--depth", "1", "--", url, str(target_dir)],
                     check=True,
                     capture_output=True,
-                    timeout=300
-                )
+                    timeout=300,
+                ),
             )
             logger.info(f"Async clone completed: {url} -> {target_dir}")
             return target_dir
@@ -492,13 +498,13 @@ class AsyncBaseBee(BeeInterface):
         Returns:
             Number of files found
         """
+
         def _scan():
             count = 0
             try:
-                for f in path.rglob('*'):
+                for f in path.rglob("*"):
                     if f.is_file() and not any(
-                        part in ('.git', 'node_modules', '__pycache__', '.venv')
-                        for part in f.parts
+                        part in (".git", "node_modules", "__pycache__", ".venv") for part in f.parts
                     ):
                         count += 1
             except Exception as e:
@@ -522,12 +528,9 @@ class AsyncBaseBee(BeeInterface):
         self.dna.update_performance(
             success=performance.success,
             completion_time=performance.execution_time,
-            error=not performance.success
+            error=not performance.success,
         )
-        logger.debug(
-            f"[{self.__class__.__name__}-{self.id}] DNA updated",
-            fitness=self.dna.fitness
-        )
+        logger.debug(f"[{self.__class__.__name__}-{self.id}] DNA updated", fitness=self.dna.fitness)
 
     async def devour_async(self) -> Dict[str, Any]:
         """
@@ -537,6 +540,7 @@ class AsyncBaseBee(BeeInterface):
             Result dictionary with bee execution outcome
         """
         from hive.config.settings import get_settings
+
         settings = get_settings()
 
         bee_type = self.__class__.__name__
@@ -548,14 +552,13 @@ class AsyncBaseBee(BeeInterface):
             "status": "PENDING",
             "artifacts": [],
             "timestamp": time.time(),
-            "sandbox_active": False
+            "sandbox_active": False,
         }
 
         # Check for warmup/idle task
-        is_warmup = (
-            getattr(self.dna, 'metadata', {}).get('idle_task', False) or
-            (not getattr(self.dna, 'target_url', '') and
-             not getattr(self.dna, 'metadata', {}).get('target_path'))
+        is_warmup = getattr(self.dna, "metadata", {}).get("idle_task", False) or (
+            not getattr(self.dna, "target_url", "")
+            and not getattr(self.dna, "metadata", {}).get("target_path")
         )
 
         if is_warmup:
@@ -597,12 +600,12 @@ class AsyncBaseBee(BeeInterface):
 
     async def _prepare_project_async(self) -> Path:
         """Async project preparation (clone or use local path)"""
-        explicit_path = self.dna.metadata.get('target_path')
+        explicit_path = self.dna.metadata.get("target_path")
         if explicit_path and Path(explicit_path).exists():
             logger.info(f"[Async] Using local path: {explicit_path}")
             return Path(explicit_path)
 
-        url = getattr(self.dna, 'target_url', None)
+        url = getattr(self.dna, "target_url", None)
         if url:
             cloned = await self._async_clone_repo(url)
             if cloned:
@@ -611,12 +614,11 @@ class AsyncBaseBee(BeeInterface):
         raise Exception("Project preparation failed: no valid path or clone failed")
 
     async def _setup_sandbox_async(
-        self,
-        project_path: Path,
-        result: Dict
+        self, project_path: Path, result: Dict
     ) -> tuple[Optional[Path], Path]:
         """Async sandbox setup using process pool for directory copy"""
         from hive.config.settings import get_settings
+
         settings = get_settings()
 
         if not settings.ENABLE_SANDBOX:
@@ -628,8 +630,18 @@ class AsyncBaseBee(BeeInterface):
             sandbox_path = settings.SANDBOX_DIR / f"bee_{self.id}_{uuid.uuid4().hex[:8]}"
             settings.SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
 
-            ignore_patterns = ('.git', '.gitignore', 'node_modules', '__pycache__',
-                             '.venv', 'venv', '.env', '*.pyc', '*.pyo', '.DS_Store')
+            ignore_patterns = (
+                ".git",
+                ".gitignore",
+                "node_modules",
+                "__pycache__",
+                ".venv",
+                "venv",
+                ".env",
+                "*.pyc",
+                "*.pyo",
+                ".DS_Store",
+            )
             ignore = shutil.ignore_patterns(*ignore_patterns)
 
             shutil.copytree(project_path, sandbox_path, ignore=ignore)
@@ -637,8 +649,7 @@ class AsyncBaseBee(BeeInterface):
 
         try:
             sandbox_path = await loop.run_in_executor(
-                self.process_pool,  # Use process pool for CPU-bound copy
-                _copy_to_sandbox
+                self.process_pool, _copy_to_sandbox  # Use process pool for CPU-bound copy
             )
             result["sandbox_active"] = True
             logger.info(f"[Async] Sandbox ready: {sandbox_path}")
@@ -665,23 +676,22 @@ class AsyncBaseBee(BeeInterface):
         logger.info(f"[Async] Mission completed with hash: {cpu_result}")
 
     async def _handle_merge_back_async(
-        self,
-        project_path: Path,
-        sandbox_path: Optional[Path],
-        result: Dict
+        self, project_path: Path, sandbox_path: Optional[Path], result: Dict
     ):
         """Async merge back operation"""
         from hive.config.settings import get_settings
+
         settings = get_settings()
 
         if not settings.ENABLE_SANDBOX or not sandbox_path:
             return
 
-        if settings.AUTO_MERGE_BACK or getattr(self.dna, 'can_merge_back', False):
+        if settings.AUTO_MERGE_BACK or getattr(self.dna, "can_merge_back", False):
             logger.info("[Async] Preparing sandbox merge back")
 
             def _apply_merge():
                 from hive.core.immulink import apply_sandbox_to_source
+
                 return apply_sandbox_to_source(project_path, sandbox_path)
 
             loop = asyncio.get_event_loop()
@@ -696,6 +706,7 @@ class AsyncBaseBee(BeeInterface):
 
     async def _cleanup_sandbox_async(self, sandbox_path: Path):
         """Async sandbox cleanup"""
+
         def _cleanup():
             if sandbox_path.exists():
                 shutil.rmtree(sandbox_path, ignore_errors=True)
@@ -716,10 +727,9 @@ class AsyncBaseBee(BeeInterface):
         # MemoryBox failure record
         mem_key = f"exp_task_{self.dna.id}"
         if self.memory:
-            self.memory.put(mem_key, {
-                "summary": f"FAILED with error: {str(e)[:50]}",
-                "avoid": True
-            })
+            self.memory.put(
+                mem_key, {"summary": f"FAILED with error: {str(e)[:50]}", "avoid": True}
+            )
 
         # SIRP Alert
         sirp = BeeServiceLocator.get_service("TheHiveSIRP")
@@ -731,18 +741,18 @@ class AsyncBaseBee(BeeInterface):
                 severity = 4
                 alert_type = "NETWORK_BLOCKADE"
             sirp.raise_alert(
-                severity=severity,
-                alert_type=alert_type,
-                bee_id=self.pid_str,
-                payload=err_str
+                severity=severity, alert_type=alert_type, bee_id=self.pid_str, payload=err_str
             )
         else:
             logger.warning(f"[SIRP Offline] Alert not sent: {str(e)[:30]}")
 
         # Death certificate
         try:
-            from hive.core.diagnostics import create_death_certificate
             from dataclasses import asdict
+
+            from hive.config.settings import get_settings
+            from hive.core.diagnostics import create_death_certificate
+
             cert = create_death_certificate(self, e)
             cert_path = cert.save(get_settings().BASE_DIR / "hive" / "morgue")
             result["death_cert"] = asdict(cert)
@@ -783,7 +793,7 @@ class AsyncBaseBee(BeeInterface):
             "pid": self.pid_str,
             "completed_tasks": self._completed_count,
             "failed_tasks": self._failed_count,
-            "async_mode": True
+            "async_mode": True,
         }
 
     def shutdown(self):

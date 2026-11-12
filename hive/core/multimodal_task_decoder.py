@@ -41,24 +41,25 @@ Phase 4: 多模态扩展
 ```
 """
 
+import json
 import logging
+import math
 import threading
 import time
-import math
-import json
+from collections import defaultdict, deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Union
-from collections import defaultdict, deque
-from copy import deepcopy
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("Hive.TaskDecoder")
 
 
 class TaskType(Enum):
     """任务类型"""
+
     QUESTION_ANSWERING = "qa"
     TEXT_CLASSIFICATION = "classification"
     TEXT_SUMMARIZATION = "summarization"
@@ -76,6 +77,7 @@ class TaskType(Enum):
 
 class OutputFormat(Enum):
     """输出格式"""
+
     PLAIN_TEXT = "text"
     MARKDOWN = "markdown"
     JSON = "json"
@@ -171,42 +173,121 @@ class TaskTypeClassifier:
     def __init__(self):
         self._type_keywords = {
             TaskType.QUESTION_ANSWERING: [
-                "what", "who", "when", "where", "why", "how",
-                "什么", "谁", "什么时候", "哪里", "为什么", "怎么",
-                "?", "？", "question", "answer", "问答", "问题"
+                "what",
+                "who",
+                "when",
+                "where",
+                "why",
+                "how",
+                "什么",
+                "谁",
+                "什么时候",
+                "哪里",
+                "为什么",
+                "怎么",
+                "?",
+                "？",
+                "question",
+                "answer",
+                "问答",
+                "问题",
             ],
             TaskType.TEXT_SUMMARIZATION: [
-                "summary", "summarize", "summarization",
-                "总结", "摘要", "概括", "简述", "提炼"
+                "summary",
+                "summarize",
+                "summarization",
+                "总结",
+                "摘要",
+                "概括",
+                "简述",
+                "提炼",
             ],
             TaskType.TEXT_CLASSIFICATION: [
-                "classify", "classification", "category", "label",
-                "分类", "归类", "标签", "类别"
+                "classify",
+                "classification",
+                "category",
+                "label",
+                "分类",
+                "归类",
+                "标签",
+                "类别",
             ],
             TaskType.CODE_GENERATION: [
-                "code", "generate", "function", "class", "module",
-                "代码", "生成", "函数", "类", "模块", "编程",
-                "implement", "实现", "write code", "写代码"
+                "code",
+                "generate",
+                "function",
+                "class",
+                "module",
+                "代码",
+                "生成",
+                "函数",
+                "类",
+                "模块",
+                "编程",
+                "implement",
+                "实现",
+                "write code",
+                "写代码",
             ],
             TaskType.CODE_ANALYSIS: [
-                "analyze", "analysis", "review", "bug", "optimize",
-                "分析", "代码分析", "审查", "bug", "优化", "重构"
+                "analyze",
+                "analysis",
+                "review",
+                "bug",
+                "optimize",
+                "分析",
+                "代码分析",
+                "审查",
+                "bug",
+                "优化",
+                "重构",
             ],
             TaskType.IMAGE_UNDERSTANDING: [
-                "image", "picture", "photo", "screenshot", "diagram",
-                "图像", "图片", "照片", "截图", "图表", "架构图"
+                "image",
+                "picture",
+                "photo",
+                "screenshot",
+                "diagram",
+                "图像",
+                "图片",
+                "照片",
+                "截图",
+                "图表",
+                "架构图",
             ],
             TaskType.AUDIO_UNDERSTANDING: [
-                "audio", "sound", "voice", "speech", "record",
-                "音频", "声音", "语音", "录音", "音频分析"
+                "audio",
+                "sound",
+                "voice",
+                "speech",
+                "record",
+                "音频",
+                "声音",
+                "语音",
+                "录音",
+                "音频分析",
             ],
             TaskType.MULTIMODAL_REASONING: [
-                "reason", "reasoning", "infer", "inference",
-                "推理", "推断", "逻辑", "综合分析", "跨模态"
+                "reason",
+                "reasoning",
+                "infer",
+                "inference",
+                "推理",
+                "推断",
+                "逻辑",
+                "综合分析",
+                "跨模态",
             ],
             TaskType.KNOWLEDGE_EXTRACTION: [
-                "extract", "extraction", "knowledge", "insight",
-                "提取", "知识提取", "要点", "洞察", "关键信息"
+                "extract",
+                "extraction",
+                "knowledge",
+                "insight",
+                "提取",
+                "知识提取",
+                "要点",
+                "洞察",
+                "关键信息",
             ],
         }
 
@@ -318,6 +399,7 @@ class FusionDecoder:
         if self._brain is None:
             try:
                 from hive.utils.brain_interface import get_brain
+
                 self._brain = get_brain()
                 logger.info("🔓 [FusionDecoder] BrainInterface 已加载")
             except ImportError:
@@ -401,40 +483,50 @@ class FusionDecoder:
         image_inputs = raw_inputs.get("images", [])
         audio_inputs = raw_inputs.get("audio", [])
 
-        combined_prompt = self._build_combined_prompt(prompt, text_inputs, image_inputs, audio_inputs)
+        combined_prompt = self._build_combined_prompt(
+            prompt, text_inputs, image_inputs, audio_inputs
+        )
 
         if image_inputs:
-            reasoning_steps.append({
-                "step": "1",
-                "action": "分析图像内容",
-                "modality": "image",
-                "count": len(image_inputs),
-            })
+            reasoning_steps.append(
+                {
+                    "step": "1",
+                    "action": "分析图像内容",
+                    "modality": "image",
+                    "count": len(image_inputs),
+                }
+            )
 
         if audio_inputs:
-            reasoning_steps.append({
-                "step": "2",
-                "action": "分析音频转录",
-                "modality": "audio",
-                "count": len(audio_inputs),
-            })
+            reasoning_steps.append(
+                {
+                    "step": "2",
+                    "action": "分析音频转录",
+                    "modality": "audio",
+                    "count": len(audio_inputs),
+                }
+            )
 
         if text_inputs:
-            reasoning_steps.append({
-                "step": "3",
-                "action": "分析文本内容",
-                "modality": "text",
-                "count": len(text_inputs),
-            })
+            reasoning_steps.append(
+                {
+                    "step": "3",
+                    "action": "分析文本内容",
+                    "modality": "text",
+                    "count": len(text_inputs),
+                }
+            )
 
-        reasoning_steps.append({
-            "step": "4",
-            "action": "综合多模态信息生成输出",
-            "modality": "multimodal",
-        })
+        reasoning_steps.append(
+            {
+                "step": "4",
+                "action": "综合多模态信息生成输出",
+                "modality": "multimodal",
+            }
+        )
 
         try:
-            if image_inputs and hasattr(brain, 'consult_vision'):
+            if image_inputs and hasattr(brain, "consult_vision"):
                 result = brain.consult_vision(
                     prompt=combined_prompt,
                     image_path=image_inputs[0],
@@ -490,7 +582,7 @@ class FusionDecoder:
 
         hasher = hashlib.sha256()
         for val in unified_embedding[:32]:
-            hasher.update(struct.pack('d', val))
+            hasher.update(struct.pack("d", val))
 
         embedding_hash = hasher.hexdigest()[:8]
 
@@ -525,6 +617,7 @@ class CrossModalReasoningEngine:
         if self._brain is None:
             try:
                 from hive.utils.brain_interface import get_brain
+
                 self._brain = get_brain()
             except ImportError:
                 pass
@@ -557,12 +650,14 @@ class CrossModalReasoningEngine:
 
         for modality, inputs in modality_inputs.items():
             if inputs:
-                reasoning_steps.append({
-                    "modality": modality,
-                    "action": f"分析 {modality} 输入",
-                    "count": len(inputs),
-                    "status": "processed",
-                })
+                reasoning_steps.append(
+                    {
+                        "modality": modality,
+                        "action": f"分析 {modality} 输入",
+                        "count": len(inputs),
+                        "status": "processed",
+                    }
+                )
 
         brain = self._get_brain()
 
@@ -592,11 +687,13 @@ class CrossModalReasoningEngine:
                 if result:
                     conclusion = result
                     confidence = 0.75
-                    reasoning_steps.append({
-                        "modality": "multimodal",
-                        "action": "综合推理完成",
-                        "status": "success",
-                    })
+                    reasoning_steps.append(
+                        {
+                            "modality": "multimodal",
+                            "action": "综合推理完成",
+                            "status": "success",
+                        }
+                    )
 
             except Exception as e:
                 logger.warning(f"🧠 [CrossModalReasoning] LLM 推理失败: {e}")
@@ -688,9 +785,7 @@ class MultimodalTaskDecoder:
         self._task_history: deque = deque(maxlen=100)
         self._lock = threading.Lock()
 
-        logger.info(
-            f"🎯 [MultimodalTaskDecoder] 初始化，嵌入维度: {embedding_dim}"
-        )
+        logger.info(f"🎯 [MultimodalTaskDecoder] 初始化，嵌入维度: {embedding_dim}")
 
     def decode_task(
         self,
@@ -755,13 +850,15 @@ class MultimodalTaskDecoder:
         )
 
         with self._lock:
-            self._task_history.append({
-                "context_id": context_id,
-                "task_type": expected_task_type.value,
-                "prompt_length": len(prompt),
-                "modalities": input_modalities,
-                "timestamp": time.time(),
-            })
+            self._task_history.append(
+                {
+                    "context_id": context_id,
+                    "task_type": expected_task_type.value,
+                    "prompt_length": len(prompt),
+                    "modalities": input_modalities,
+                    "timestamp": time.time(),
+                }
+            )
 
         return output
 
@@ -932,30 +1029,30 @@ class MultimodalTaskDecoder:
         """生成 fallback 嵌入"""
         import hashlib
 
-        hasher = hashlib.sha256(text.encode('utf-8'))
+        hasher = hashlib.sha256(text.encode("utf-8"))
         hash_bytes = hasher.digest()
 
         embedding = []
         for i in range(0, min(len(hash_bytes), 64), 4):
-            chunk = hash_bytes[i:i+4]
+            chunk = hash_bytes[i : i + 4]
             if len(chunk) < 4:
-                chunk = chunk + b'\x00' * (4 - len(chunk))
-            value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                chunk = chunk + b"\x00" * (4 - len(chunk))
+            value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
             embedding.append(value * 2 - 1)
 
         while len(embedding) < self.embedding_dim:
-            hasher.update(b'salt')
+            hasher.update(b"salt")
             hash_bytes = hasher.digest()
             for i in range(0, len(hash_bytes), 4):
-                chunk = hash_bytes[i:i+4]
+                chunk = hash_bytes[i : i + 4]
                 if len(chunk) < 4:
-                    chunk = chunk + b'\x00' * (4 - len(chunk))
-                value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                    chunk = chunk + b"\x00" * (4 - len(chunk))
+                value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
                 embedding.append(value * 2 - 1)
                 if len(embedding) >= self.embedding_dim:
                     break
 
-        return embedding[:self.embedding_dim]
+        return embedding[: self.embedding_dim]
 
     def get_stats(self) -> Dict[str, Any]:
         """获取统计信息"""

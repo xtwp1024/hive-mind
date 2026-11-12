@@ -1,7 +1,8 @@
-from typing import Any, Dict, List
 import hashlib
 import json
 import unittest
+from typing import Any, Dict, List
+
 
 class ZeroKnowledgeProofsManager:
     """

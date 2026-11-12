@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""hive-mind 历史失败分诊台账 — R4/P1-8 建立，R5/P1-9② / R7/P1-9③ / R11/P1-9① 续修 — 单一真源 + 可复现校验命令。
+"""hive-mind 历史失败分诊台账 — R4/P1-8 建立，R5/P1-9② / R7/P1-9③ / R11/P1-9① / R12/#18 续修 — 单一真源 + 可复现校验命令。
 
 问题背景（R3 台账原话）：「全仓库 pytest -q 有 20 个 hive/tests/ 历史失败，
 台账与 CI 若只跑 tests/ 子集，这 20 个失败会被静默忽略」。本文件把「20 个
@@ -48,7 +48,7 @@ CATEGORIES = {
     "状态污染/顺序依赖",      # 单例/磁盘残留导致单跑 PASS、全量 FAIL
     "依赖缺失",             # 缺第三方包或配置文件（本项目实测 0 条）
 }
-DISPOSITIONS = {"已修(R4)", "已修(R5)", "已修(R7)", "已修(R11)", "立下一轮(P1-9)", "待人工"}
+DISPOSITIONS = {"已修(R4)", "已修(R5)", "已修(R7)", "已修(R11)", "已修(R12)", "立下一轮(P1-9)", "待人工"}
 FIXED_DISP_PREFIX = "已修"   # status=fixed <=> 去向以此开头；台账支持多轮陆续修复
 STATUSES = {"open", "fixed"}
 
@@ -58,6 +58,8 @@ STATUSES = {"open", "fixed"}
 # R7 续修：#2/#9 两条「状态污染/顺序依赖」已修，evidence 末尾追加 R7 实测记录。
 # R11 续修：P1-9① 的 10 条「断言过期」逐条核对产品当前契约后改断言（只改测试、
 # 不改产品行为），evidence 末尾追加 R11 运行时实测记录；#18 仍留 open（需行为决策）。
+# R12 续修：#18 经用户拍板后按 AudioEncoder 既有语义修复产品输入校验，evidence 末尾追加
+# R12 运行时实测记录；台账 20 条至此全部 fixed，open 归零（对账口径 FAILED 0 == open 0）。
 # 台账支持多轮陆续修复（status=fixed <=> 去向以「已修」开头），不写死某一轮。
 LEDGER = [
     # id, nodeid, category, evidence, disposition, status
@@ -108,8 +110,8 @@ LEDGER = [
      "断言过期", "断言 len(historical_values)==3、len(historical_gradients)==2；record_value() 只 append 传入值、不播种 initial value，两次调用后实测 2 != 3；【R11 已修】实测 record_value() 只 append 传入值、不播种 current_value；两次调用后 historical_values=[0.2,0.3]、gradients 长度 1（0.1）、current_value=0.3",
      "已修(R11)", "fixed"),
     (18, "hive/tests/test_phase4_multimodal.py::TestImageEncoder::test_nonexistent_image",
-     "真缺陷·待行为决策", "断言 assertFalse(result.success) 但为 True；encode() 用 Path(x).exists() 判定路径，不存在的路径字符串落入 else 分支被当作 base64 原样处理 → 静默成功。修法需引入输入校验、改变对外行为，本轮不擅改",
-     "立下一轮(P1-9)", "open"),
+     "真缺陷·已修", "断言 assertFalse(result.success) 但为 True；encode() 用 Path(x).exists() 判定路径，不存在的路径字符串落入 else 分支被当作 base64 原样处理 → 静默成功。修法需引入输入校验、改变对外行为，本轮不擅改；【R12 已修】经用户拍板，新增 _is_path_like_image_input() 显式区分「路径」与「base64 数据」语义，路径语义输入不存在时对齐 AudioEncoder 既有行为返回 success=False + 'Image file not found: ...'；base64/data URI/短文本输入保持原有数据语义，不误伤。新增 22 项回归（判定表 / 真调 / 旧判定注入反证 / 字节级 SAME / AST 守卫）",
+     "已修(R12)", "fixed"),
     (19, "hive/tests/test_phase4_multimodal.py::TestTaskTypeClassifier::test_classify_empty",
      "断言过期", "断言 TaskType.QUESTION_ANSWERING，实测 UNKNOWN；multimodal_task_decoder.py:229 对空 prompt/空 modalities 显式返回 (UNKNOWN, 0.0)，属当前正确行为；【R11 已修】实测 classify("") 显式返回 (TaskType.UNKNOWN, 0.0)，属当前正确行为，断言与 confidence 一并更新",
      "已修(R11)", "fixed"),
@@ -119,7 +121,7 @@ LEDGER = [
 ]
 
 EXPECTED_TOTAL = 20          # R4 实测基线；变更必须是有意的台账更新，不能静默漂移
-EXPECTED_OPEN = 1            # 20 - 19（#10 R4 1 条 + #11~#16 R5 6 条 + #2/#9 R7 2 条 + P1-9① 10 条 R11）；唯一 open = #18
+EXPECTED_OPEN = 0            # 20 - 20（#10 R4 1 条 + #11~#16 R5 6 条 + #2/#9 R7 2 条 + P1-9① 10 条 R11 + #18 R12 1 条）；open 归零
 EXPECTED_MISSING_DEPS = 0    # R4 实测：20 条里没有一条是缺依赖/缺配置
 
 
@@ -220,7 +222,7 @@ def main(argv: list[str]) -> int:
             return 2
 
     print("=" * 68)
-    print("hive-mind 历史失败分诊台账校验 (R4 建立 / R5 / R7 / R11 续修)")
+    print("hive-mind 历史失败分诊台账校验 (R4 建立 / R5 / R7 / R11 / R12 续修)")
     print("=" * 68)
 
     print("[1/3] 台账完整性")

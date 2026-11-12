@@ -33,36 +33,39 @@ logger = logging.getLogger("Hive.GEPGene")
 # Function and Terminal Definitions
 # ============================================================================
 
+
 class FunctionType(str, Enum):
     """Function node types for expression trees."""
+
     # Conditional
-    IF = "IF"           # if(condition, then, else)
+    IF = "IF"  # if(condition, then, else)
 
     # Logical
-    AND = "AND"         # and(left, right)
-    OR = "OR"           # or(left, right)
-    NOT = "NOT"         # not(value)
+    AND = "AND"  # and(left, right)
+    OR = "OR"  # or(left, right)
+    NOT = "NOT"  # not(value)
 
     # Comparison
-    GT = "GT"           # greater than
-    LT = "LT"           # less than
-    EQ = "EQ"           # equal
+    GT = "GT"  # greater than
+    LT = "LT"  # less than
+    EQ = "EQ"  # equal
 
     # Arithmetic
-    ADD = "ADD"         # addition
-    SUB = "SUB"         # subtraction
-    MUL = "MUL"         # multiplication
-    DIV = "DIV"         # division (protected)
+    ADD = "ADD"  # addition
+    SUB = "SUB"  # subtraction
+    MUL = "MUL"  # multiplication
+    DIV = "DIV"  # division (protected)
 
     # Aggregation
-    MAX = "MAX"         # max of two values
-    MIN = "MIN"         # min of two values
+    MAX = "MAX"  # max of two values
+    MIN = "MIN"  # min of two values
 
 
 class TerminalType(str, Enum):
     """Terminal (leaf) node types for expression trees."""
+
     # Task context
-    TASK_TYPE = "TASK_TYPE"           # Type of current task
+    TASK_TYPE = "TASK_TYPE"  # Type of current task
     TASK_COMPLEXITY = "TASK_COMPLEXITY"
 
     # Metrics
@@ -73,7 +76,7 @@ class TerminalType(str, Enum):
     METRIC_CPU_USAGE = "METRIC_CPU_USAGE"
 
     # Thresholds (numeric constants)
-    THRESHOLD = "THRESHOLD"           # Numeric constant
+    THRESHOLD = "THRESHOLD"  # Numeric constant
 
     # Actions (output values)
     ACTION_PRIORITY = "ACTION_PRIORITY"
@@ -83,7 +86,7 @@ class TerminalType(str, Enum):
 
 # Function arity (number of children)
 FUNCTION_ARITY: dict[FunctionType, int] = {
-    FunctionType.IF: 3,      # condition, then, else
+    FunctionType.IF: 3,  # condition, then, else
     FunctionType.AND: 2,
     FunctionType.OR: 2,
     FunctionType.NOT: 1,
@@ -93,7 +96,7 @@ FUNCTION_ARITY: dict[FunctionType, int] = {
     FunctionType.ADD: 2,
     FunctionType.SUB: 2,
     FunctionType.MUL: 2,
-    FunctionType.DIV: 2,     # protected division
+    FunctionType.DIV: 2,  # protected division
     FunctionType.MAX: 2,
     FunctionType.MIN: 2,
 }
@@ -129,6 +132,7 @@ TERMINAL_CATEGORIES = {
 # Gene Node Structure
 # ============================================================================
 
+
 @dataclass
 class GeneNode:
     """
@@ -136,6 +140,7 @@ class GeneNode:
 
     Can be either a Function node (internal) or Terminal node (leaf).
     """
+
     is_function: bool
     function_type: Optional[FunctionType] = None
     terminal_type: Optional[TerminalType] = None
@@ -195,6 +200,7 @@ class GeneNode:
 # GEP Gene (Single Expression Tree)
 # ============================================================================
 
+
 @dataclass
 class GEPGene:
     """
@@ -209,6 +215,7 @@ class GEPGene:
         id: Unique identifier for this gene
         fitness: Current fitness score (0.0-1.0)
     """
+
     root: GeneNode
     max_depth: int = 10
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
@@ -230,7 +237,9 @@ class GEPGene:
             # Check arity
             expected_arity = node.arity
             if len(node.children) != expected_arity:
-                logger.warning(f"Node {node.function_type} has wrong arity: expected {expected_arity}, got {len(node.children)}")
+                logger.warning(
+                    f"Node {node.function_type} has wrong arity: expected {expected_arity}, got {len(node.children)}"
+                )
                 return False
             # Recursively validate children
             for child in node.children:
@@ -374,10 +383,7 @@ class GEPGene:
         """Create a deep copy of this gene."""
         new_root = self._clone_node(self.root)
         return GEPGene(
-            root=new_root,
-            max_depth=self.max_depth,
-            id=str(uuid.uuid4())[:8],
-            fitness=0.0
+            root=new_root, max_depth=self.max_depth, id=str(uuid.uuid4())[:8], fitness=0.0
         )
 
     def _clone_node(self, node: GeneNode) -> GeneNode:
@@ -388,7 +394,7 @@ class GEPGene:
             function_type=node.function_type,
             terminal_type=node.terminal_type,
             value=copy.deepcopy(node.value),
-            children=new_children
+            children=new_children,
         )
 
     def __repr__(self) -> str:
@@ -398,6 +404,7 @@ class GEPGene:
 # ============================================================================
 # GEP Chromosome (Collection of Genes)
 # ============================================================================
+
 
 @dataclass
 class GEPChromosome:
@@ -416,6 +423,7 @@ class GEPChromosome:
         id: Unique identifier
         fitness: Current fitness score
     """
+
     genes: list[GEPGene] = field(default_factory=list)
     linking_function: FunctionType = FunctionType.AND
     max_genes: int = 5
@@ -468,7 +476,7 @@ class GEPChromosome:
             linking_function=self.linking_function,
             max_genes=self.max_genes,
             id=str(uuid.uuid4())[:8],
-            fitness=0.0
+            fitness=0.0,
         )
 
     def __repr__(self) -> str:
@@ -480,6 +488,7 @@ class GEPChromosome:
 # Genetic Operators
 # ============================================================================
 
+
 class GEPOperators:
     """
     Genetic operators for GEP evolution.
@@ -488,11 +497,13 @@ class GEPOperators:
     that preserve gene validity.
     """
 
-    def __init__(self,
-                 max_gene_depth: int = 10,
-                 max_genes_per_chromosome: int = 5,
-                 mutation_rate: float = 0.1,
-                 crossover_rate: float = 0.7):
+    def __init__(
+        self,
+        max_gene_depth: int = 10,
+        max_genes_per_chromosome: int = 5,
+        mutation_rate: float = 0.1,
+        crossover_rate: float = 0.7,
+    ):
         self.max_gene_depth = max_gene_depth
         self.max_genes_per_chromosome = max_genes_per_chromosome
         self.mutation_rate = mutation_rate
@@ -517,10 +528,7 @@ class GEPOperators:
         mutated_root = self._mutate_node(gene.root, mutate_rate)
 
         new_gene = GEPGene(
-            root=mutated_root,
-            max_depth=gene.max_depth,
-            id=str(uuid.uuid4())[:8],
-            fitness=0.0
+            root=mutated_root, max_depth=gene.max_depth, id=str(uuid.uuid4())[:8], fitness=0.0
         )
         return new_gene
 
@@ -533,27 +541,17 @@ class GEPOperators:
             for _ in range(FUNCTION_ARITY[func_type]):
                 # For mutation, create terminals as children to avoid deep recursion
                 child = GeneNode(
-                    is_function=False,
-                    terminal_type=TerminalType.THRESHOLD,
-                    value=random.random()
+                    is_function=False, terminal_type=TerminalType.THRESHOLD, value=random.random()
                 )
                 children.append(child)
-            return GeneNode(
-                is_function=True,
-                function_type=func_type,
-                children=children
-            )
+            return GeneNode(is_function=True, function_type=func_type, children=children)
         else:
             # Create a random terminal node
             terminal_type = random.choice(list(TerminalType))
             value = None
             if terminal_type == TerminalType.THRESHOLD:
                 value = random.random()
-            return GeneNode(
-                is_function=False,
-                terminal_type=terminal_type,
-                value=value
-            )
+            return GeneNode(is_function=False, terminal_type=terminal_type, value=value)
 
     def _mutate_node(self, node: GeneNode, rate: float) -> GeneNode:
         """Recursively apply point mutation to a node and its children."""
@@ -569,14 +567,12 @@ class GEPOperators:
                 function_type=node.function_type,
                 terminal_type=node.terminal_type,
                 value=copy.deepcopy(node.value),
-                children=new_children
+                children=new_children,
             )
 
         return node
 
-    def subtree_crossover(self,
-                         gene1: GEPGene,
-                         gene2: GEPGene) -> tuple[GEPGene, GEPGene]:
+    def subtree_crossover(self, gene1: GEPGene, gene2: GEPGene) -> tuple[GEPGene, GEPGene]:
         """
         Swap random subtrees between two genes.
 
@@ -632,11 +628,9 @@ class GEPOperators:
         traverse(node)
         return results
 
-    def _swap_subtree(self,
-                     root: GeneNode,
-                     old_subtree_parent: GeneNode,
-                     new_subtree: GeneNode,
-                     position: str) -> GeneNode:
+    def _swap_subtree(
+        self, root: GeneNode, old_subtree_parent: GeneNode, new_subtree: GeneNode, position: str
+    ) -> GeneNode:
         """Replace a subtree at a given position with a new subtree."""
         root_copy = self._deep_copy(root)
 
@@ -653,7 +647,7 @@ class GEPOperators:
                 function_type=node.function_type,
                 terminal_type=node.terminal_type,
                 value=copy.deepcopy(node.value),
-                children=new_children
+                children=new_children,
             )
 
         # Find and replace
@@ -668,7 +662,7 @@ class GEPOperators:
                     function_type=node.function_type,
                     terminal_type=node.terminal_type,
                     value=copy.deepcopy(node.value),
-                    children=new_children
+                    children=new_children,
                 )
             return node
 
@@ -681,12 +675,12 @@ class GEPOperators:
             function_type=node.function_type,
             terminal_type=node.terminal_type,
             value=copy.deepcopy(node.value),
-            children=[self._deep_copy(child) for child in node.children]
+            children=[self._deep_copy(child) for child in node.children],
         )
 
-    def gene_crossover(self,
-                      chrom1: GEPChromosome,
-                      chrom2: GEPChromosome) -> tuple[GEPChromosome, GEPChromosome]:
+    def gene_crossover(
+        self, chrom1: GEPChromosome, chrom2: GEPChromosome
+    ) -> tuple[GEPChromosome, GEPChromosome]:
         """
         Chromosome-level crossover: swap entire genes between chromosomes.
 
@@ -714,14 +708,10 @@ class GEPOperators:
         new_genes1[idx1], new_genes2[idx2] = new_genes2[idx2].clone(), new_genes1[idx1].clone()
 
         new_chrom1 = GEPChromosome(
-            genes=new_genes1,
-            linking_function=chrom1.linking_function,
-            max_genes=chrom1.max_genes
+            genes=new_genes1, linking_function=chrom1.linking_function, max_genes=chrom1.max_genes
         )
         new_chrom2 = GEPChromosome(
-            genes=new_genes2,
-            linking_function=chrom2.linking_function,
-            max_genes=chrom2.max_genes
+            genes=new_genes2, linking_function=chrom2.linking_function, max_genes=chrom2.max_genes
         )
 
         return new_chrom1, new_chrom2
@@ -761,6 +751,7 @@ class GEPOperators:
 # Gene Factory - Random Gene Generation
 # ============================================================================
 
+
 class GEPGeneFactory:
     """
     Factory for creating random GEP genes and chromosomes.
@@ -782,10 +773,7 @@ class GEPGeneFactory:
     # All terminals
     ALL_TERMINALS = list(TerminalType)
 
-    def __init__(self,
-                 max_depth: int = 10,
-                 max_genes: int = 5,
-                 function_ratio: float = 0.3):
+    def __init__(self, max_depth: int = 10, max_genes: int = 5, function_ratio: float = 0.3):
         """
         Initialize factory.
 
@@ -813,12 +801,11 @@ class GEPGeneFactory:
         # Start with full tree generation (all positions filled)
         root = self._generate_tree(target_depth, 0, parent_function=None)
 
-        return GEPGene(
-            root=root,
-            max_depth=self.max_depth
-        )
+        return GEPGene(root=root, max_depth=self.max_depth)
 
-    def _generate_tree(self, max_depth: int, current_depth: int, parent_function: Optional[FunctionType] = None) -> GeneNode:
+    def _generate_tree(
+        self, max_depth: int, current_depth: int, parent_function: Optional[FunctionType] = None
+    ) -> GeneNode:
         """Generate a random tree with given depth constraints."""
         is_root = current_depth == 0
 
@@ -835,11 +822,7 @@ class GEPGeneFactory:
                 child = self._generate_tree(max_depth, current_depth + 1, func_type)
                 children.append(child)
 
-            return GeneNode(
-                is_function=True,
-                function_type=func_type,
-                children=children
-            )
+            return GeneNode(is_function=True, function_type=func_type, children=children)
         else:
             # Generate terminal node
             return self._create_random_terminal(parent_function)
@@ -850,9 +833,17 @@ class GEPGeneFactory:
         For comparison and arithmetic functions, only use numeric terminals.
         """
         # Determine which terminals are valid for this parent
-        if parent_function in [FunctionType.GT, FunctionType.LT, FunctionType.EQ,
-                              FunctionType.ADD, FunctionType.SUB, FunctionType.MUL,
-                              FunctionType.DIV, FunctionType.MAX, FunctionType.MIN]:
+        if parent_function in [
+            FunctionType.GT,
+            FunctionType.LT,
+            FunctionType.EQ,
+            FunctionType.ADD,
+            FunctionType.SUB,
+            FunctionType.MUL,
+            FunctionType.DIV,
+            FunctionType.MAX,
+            FunctionType.MIN,
+        ]:
             # Only use numeric terminals for comparisons and arithmetic
             terminal_type = random.choice(self.NUMERIC_TERMINALS)
         else:
@@ -864,11 +855,7 @@ class GEPGeneFactory:
             # Generate random threshold value (0.0-1.0)
             value = random.random()
 
-        return GeneNode(
-            is_function=False,
-            terminal_type=terminal_type,
-            value=value
-        )
+        return GeneNode(is_function=False, terminal_type=terminal_type, value=value)
 
     def create_random_chromosome(self, num_genes: Optional[int] = None) -> GEPChromosome:
         """
@@ -887,15 +874,11 @@ class GEPGeneFactory:
 
         linking_func = random.choice([FunctionType.AND, FunctionType.OR])
 
-        return GEPChromosome(
-            genes=genes,
-            linking_function=linking_func,
-            max_genes=self.max_genes
-        )
+        return GEPChromosome(genes=genes, linking_function=linking_func, max_genes=self.max_genes)
 
-    def create_homogeneous_chromosome(self,
-                                     num_genes: int,
-                                     gene_template: GEPGene) -> GEPChromosome:
+    def create_homogeneous_chromosome(
+        self, num_genes: int, gene_template: GEPGene
+    ) -> GEPChromosome:
         """
         Create a chromosome with copies of the same gene.
 
@@ -909,15 +892,14 @@ class GEPGeneFactory:
         genes = [gene_template.clone() for _ in range(num_genes)]
 
         return GEPChromosome(
-            genes=genes,
-            linking_function=FunctionType.AND,
-            max_genes=self.max_genes
+            genes=genes, linking_function=FunctionType.AND, max_genes=self.max_genes
         )
 
 
 # ============================================================================
 # Fitness Evaluation
 # ============================================================================
+
 
 class GEPFitnessEvaluator:
     """
@@ -932,10 +914,9 @@ class GEPFitnessEvaluator:
     def __init__(self):
         pass
 
-    def evaluate_gene(self,
-                      gene: GEPGene,
-                      context: dict[str, Any],
-                      expected_result: Any = None) -> float:
+    def evaluate_gene(
+        self, gene: GEPGene, context: dict[str, Any], expected_result: Any = None
+    ) -> float:
         """
         Evaluate a single gene's fitness on a task context.
 
@@ -973,10 +954,12 @@ class GEPFitnessEvaluator:
             logger.warning(f"Gene evaluation error: {e}")
             return 0.0
 
-    def evaluate_chromosome(self,
-                           chromosome: GEPChromosome,
-                           contexts: list[dict[str, Any]],
-                           expected_results: Optional[list[Any]] = None) -> float:
+    def evaluate_chromosome(
+        self,
+        chromosome: GEPChromosome,
+        contexts: list[dict[str, Any]],
+        expected_results: Optional[list[Any]] = None,
+    ) -> float:
         """
         Evaluate a chromosome across multiple task contexts.
 
@@ -1013,9 +996,7 @@ class GEPFitnessEvaluator:
 
         return avg_fitness
 
-    def select_best(self,
-                   chromosomes: list[GEPChromosome],
-                   count: int = 1) -> list[GEPChromosome]:
+    def select_best(self, chromosomes: list[GEPChromosome], count: int = 1) -> list[GEPChromosome]:
         """
         Select top N chromosomes by fitness.
 
@@ -1034,14 +1015,16 @@ class GEPFitnessEvaluator:
 # Serialization Utilities
 # ============================================================================
 
+
 def gene_to_dict(gene: GEPGene) -> dict:
     """Serialize a gene to dictionary."""
     return {
         "id": gene.id,
         "fitness": gene.fitness,
         "max_depth": gene.max_depth,
-        "root": _node_to_dict(gene.root)
+        "root": _node_to_dict(gene.root),
     }
+
 
 def dict_to_gene(data: dict) -> GEPGene:
     """Deserialize a gene from dictionary."""
@@ -1049,8 +1032,9 @@ def dict_to_gene(data: dict) -> GEPGene:
         id=data["id"],
         fitness=data.get("fitness", 0.0),
         max_depth=data.get("max_depth", 10),
-        root=_dict_to_node(data["root"])
+        root=_dict_to_node(data["root"]),
     )
+
 
 def _node_to_dict(node: GeneNode) -> dict:
     """Serialize a node to dictionary."""
@@ -1059,8 +1043,9 @@ def _node_to_dict(node: GeneNode) -> dict:
         "function_type": node.function_type.value if node.function_type else None,
         "terminal_type": node.terminal_type.value if node.terminal_type else None,
         "value": node.value,
-        "children": [_node_to_dict(child) for child in node.children]
+        "children": [_node_to_dict(child) for child in node.children],
     }
+
 
 def _dict_to_node(data: dict) -> GeneNode:
     """Deserialize a node from dictionary."""
@@ -1069,8 +1054,9 @@ def _dict_to_node(data: dict) -> GeneNode:
         function_type=FunctionType(data["function_type"]) if data.get("function_type") else None,
         terminal_type=TerminalType(data["terminal_type"]) if data.get("terminal_type") else None,
         value=data.get("value"),
-        children=[_dict_to_node(child) for child in data.get("children", [])]
+        children=[_dict_to_node(child) for child in data.get("children", [])],
     )
+
 
 def chromosome_to_dict(chrom: GEPChromosome) -> dict:
     """Serialize a chromosome to dictionary."""
@@ -1079,8 +1065,9 @@ def chromosome_to_dict(chrom: GEPChromosome) -> dict:
         "fitness": chrom.fitness,
         "linking_function": chrom.linking_function.value,
         "max_genes": chrom.max_genes,
-        "genes": [gene_to_dict(g) for g in chrom.genes]
+        "genes": [gene_to_dict(g) for g in chrom.genes],
     }
+
 
 def dict_to_chromosome(data: dict) -> GEPChromosome:
     """Deserialize a chromosome from dictionary."""
@@ -1089,5 +1076,5 @@ def dict_to_chromosome(data: dict) -> GEPChromosome:
         fitness=data.get("fitness", 0.0),
         linking_function=FunctionType(data["linking_function"]),
         max_genes=data.get("max_genes", 5),
-        genes=[dict_to_gene(g) for g in data["genes"]]
+        genes=[dict_to_gene(g) for g in data["genes"]],
     )

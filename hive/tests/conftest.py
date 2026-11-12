@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """测试用工具函数和 fixtures"""
 
-import pytest
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Generator
 from unittest.mock import Mock, patch
 
-from hive.core.dna import BeeDNA, DNA
+import pytest
+
 from hive.config.settings import settings
+from hive.core.dna import DNA, BeeDNA
 
 
 @pytest.fixture
@@ -110,6 +111,7 @@ def temp_project_dir(temp_dir: Path) -> Path:
 def mock_queue():
     """模拟 multiprocessing.Queue"""
     from unittest.mock import MagicMock
+
     queue = MagicMock()
     queue.put = MagicMock()
     return queue

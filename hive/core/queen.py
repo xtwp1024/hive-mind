@@ -10,11 +10,11 @@ import logging
 import multiprocessing
 import os
 import queue
-from typing import Any, List, Dict, Optional
+from typing import Any, Dict, List, Optional
 
+from hive.core.deployer import SwarmDeployer
 from hive.core.dna import BeeDNA
 from hive.core.interfaces import QueenInterface, Task, TaskResult
-from hive.core.deployer import SwarmDeployer
 from hive.core.service_locator import BeeServiceLocator
 from hive.utils.logger import get_logger
 
@@ -30,7 +30,7 @@ class QueenBee(QueenInterface):
     注意：QueenBee 使用进程感知单例模式，确保每个进程只有一个女王蜂实例。
     """
 
-    _instance: Optional['QueenBee'] = None
+    _instance: Optional["QueenBee"] = None
     _instance_pid: int = 0
 
     def __new__(cls, result_queue: multiprocessing.Queue):
@@ -45,7 +45,7 @@ class QueenBee(QueenInterface):
         return instance
 
     def __init__(self, result_queue: multiprocessing.Queue):
-        if hasattr(self, '_initialized') and self._initialized:
+        if hasattr(self, "_initialized") and self._initialized:
             return
         self._initialized = True
 
@@ -56,11 +56,12 @@ class QueenBee(QueenInterface):
         self.dna_queue = multiprocessing.Queue()
 
         # 运行时统计 —— 让 get_colony_status 返回真实数字
-        self._honey_collected: int = 0   # 累计被 consume_honey 收割的 payload 数
+        self._honey_collected: int = 0  # 累计被 consume_honey 收割的 payload 数
         self._cycle: int = 0
 
         # 将她核心依赖挂入解耦池，由于 WorkerManager 是紧耦合在队列上的，我们这里将它暂作核心件注册
         from hive.core.worker_manager import WorkerManager
+
         wm = WorkerManager(result_queue)
         BeeServiceLocator.register_service("WorkerManager", wm)
 
@@ -114,6 +115,7 @@ class QueenBee(QueenInterface):
         honey_processor = BeeServiceLocator.get_service("HoneyProcessor")
         if not honey_processor:
             from hive.core.honey_processor import HoneyProcessor
+
             honey_processor = HoneyProcessor()
             BeeServiceLocator.register_service("HoneyProcessor", honey_processor)
 
@@ -131,7 +133,9 @@ class QueenBee(QueenInterface):
         # ⬇⬇⬇ 关键：把收割数量计入累计花蜜 ⬇⬇⬇
         self._honey_collected += len(payloads)
 
-        logger.info(f"==== 👑 女王蜂开始收割战果 (共有 {len(payloads)} 滴花蜜, 累计 {self._honey_collected}) ====")
+        logger.info(
+            f"==== 👑 女王蜂开始收割战果 (共有 {len(payloads)} 滴花蜜, 累计 {self._honey_collected}) ===="
+        )
         offspring = honey_processor.process_batch(payloads)
 
         # 路由逻辑：遍历原始 payloads，处理特殊信号（SPAWNED / MapReduce）
@@ -145,7 +149,9 @@ class QueenBee(QueenInterface):
                 req = payload.get("spawn_request", {})
                 child_meta = req.get("child_dna_metadata", {})
                 target_species = req.get("target_species", "Standard")
-                logger.info(f"🧬 [HiVA] 侦测到工蜂 {worker_id} 的超维裂殖动作！正在繁育其子代任务...")
+                logger.info(
+                    f"🧬 [HiVA] 侦测到工蜂 {worker_id} 的超维裂殖动作！正在繁育其子代任务..."
+                )
                 child_dna = BeeDNA(
                     species=target_species,
                     target_name=req.get("sub_task", "UNKNOWN EXTRAPOLATION"),
@@ -154,19 +160,27 @@ class QueenBee(QueenInterface):
                 worker_manager.spawn_worker(child_dna)
                 continue
 
-            meta = payload.get("dna", {}).get("metadata", {}) if isinstance(payload.get("dna"), dict) else {}
+            meta = (
+                payload.get("dna", {}).get("metadata", {})
+                if isinstance(payload.get("dna"), dict)
+                else {}
+            )
             if "mr_job_id" in meta:
                 mr_id = meta["mr_job_id"]
                 mr_dispatcher = BeeServiceLocator.get_service("MapReduceDispatcher")
                 if not mr_dispatcher:
                     from hive.core.mapreduce import MapReduceDispatcher
+
                     mr_dispatcher = MapReduceDispatcher(self)
                     BeeServiceLocator.register_service("MapReduceDispatcher", mr_dispatcher)
                 reduce_result = mr_dispatcher.handle_map_result(mr_id, payload)
                 if reduce_result:
                     if reduce_result.get("action_type") == "consensus":
                         from hive.core.consensus import ConsensusEngine
-                        verdict = ConsensusEngine.process_node_payloads(reduce_result.get("raw_results", []))
+
+                        verdict = ConsensusEngine.process_node_payloads(
+                            reduce_result.get("raw_results", [])
+                        )
                         logger.info(f"⚖️ 共识法庭最后裁决: {verdict['status']}")
                     else:
                         logger.info(f"🎉 大兵团战役 MR-{mr_id} 高阶报告已合魂生成！")
@@ -178,6 +192,7 @@ class QueenBee(QueenInterface):
             ev_engine = BeeServiceLocator.get_service("EvolutionEngine")
             if not ev_engine:
                 from hive.core.evolution_engine import EvolutionEngine
+
                 ev_engine = EvolutionEngine()
                 BeeServiceLocator.register_service("EvolutionEngine", ev_engine)
             spawned = 0
@@ -204,6 +219,7 @@ class QueenBee(QueenInterface):
         ev_engine = BeeServiceLocator.get_service("EvolutionEngine")
         if not ev_engine:
             from hive.core.evolution_engine import EvolutionEngine
+
             ev_engine = EvolutionEngine()
             BeeServiceLocator.register_service("EvolutionEngine", ev_engine)
         return ev_engine.evolve_batch(results)
@@ -211,6 +227,7 @@ class QueenBee(QueenInterface):
     def trigger_immune_response(self, bad_honey: dict[str, Any]) -> None:
         """触发免疫响应"""
         from hive.core.service_locator import BeeServiceLocator
+
         hp = BeeServiceLocator.get_service("HoneyProcessor")
         if hp:
             hp.trigger_immune_response(bad_honey)
@@ -219,7 +236,9 @@ class QueenBee(QueenInterface):
         """协调部长执行任务"""
         logger.info(f"👑 [{self.name}] 收到全局任务: {task.type}")
         if task.type == "workflow":
-            return TaskResult(task_id=task.id, success=True, result={"status": "Dispatcher Handled"})
+            return TaskResult(
+                task_id=task.id, success=True, result={"status": "Dispatcher Handled"}
+            )
         return TaskResult(task_id=task.id, success=True, result={"status": "Acknowledged"})
 
     def evolve_species(self) -> bool:
@@ -234,7 +253,7 @@ class QueenBee(QueenInterface):
             "deployer": self.deployer.get_status(),
             "worker_manager": wm.get_status() if wm else {},
             "evolution": {},
-            "processor": {}
+            "processor": {},
         }
 
     def get_evolution_status(self) -> dict[str, Any]:

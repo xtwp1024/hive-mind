@@ -9,8 +9,8 @@ import asyncio
 import logging
 from typing import Any
 
-from hive.core.dna import BeeDNA
 from hive.core.dispatcher import HiveDispatcher, TaskNode
+from hive.core.dna import BeeDNA
 
 logger = logging.getLogger("Hive.Deployer")
 
@@ -40,7 +40,9 @@ class SwarmDeployer:
             return []
 
         if not self.dispatcher.actors:
-            logger.warning("[Deployer] 无已注册 Actor，异步部署将静默失败，请先调用 register_actor()")
+            logger.warning(
+                "[Deployer] 无已注册 Actor，异步部署将静默失败，请先调用 register_actor()"
+            )
             return []
 
         logger.info(f"[Deployer] 异步调度 {len(dna_list)} 个任务...")
@@ -70,9 +72,9 @@ class SwarmDeployer:
             params={
                 "dna_dict": dna.__dict__,
                 "target_url": dna.target_url,
-                "target_name": dna.target_name
+                "target_name": dna.target_name,
             },
-            required_capabilities=caps
+            required_capabilities=caps,
         )
 
         task_node.required_capabilities.append(dna.role or "worker")
@@ -89,5 +91,5 @@ class SwarmDeployer:
         """获取分发器状态"""
         return {
             "deployed_count": self.deployed_count,
-            "registered_actors": len(self.dispatcher.actors)
+            "registered_actors": len(self.dispatcher.actors),
         }

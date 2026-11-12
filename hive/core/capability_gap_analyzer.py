@@ -13,17 +13,17 @@ Phase 3: 自主进化能力
 5. 趋势分析 - 识别能力随时间的变化趋势
 """
 
+import json
 import logging
+import statistics
 import threading
 import time
-import json
-import statistics
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from collections import defaultdict, Counter
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("Hive.CapabilityGapAnalyzer")
 
@@ -239,7 +239,9 @@ class CapabilityGapAnalyzer:
             while len(self._records) > self._max_records:
                 self._records.pop(0)
 
-            logger.debug(f"📊 [CapabilityGapAnalyzer] 记录任务: {record.task_id} ({record.bee_type})")
+            logger.debug(
+                f"📊 [CapabilityGapAnalyzer] 记录任务: {record.task_id} ({record.bee_type})"
+            )
 
     def record_task_simple(
         self,
@@ -259,7 +261,7 @@ class CapabilityGapAnalyzer:
             metadata = {}
         if expected_duration is not None:
             metadata["expected_duration"] = expected_duration
-            
+
         record = TaskExecutionRecord(
             task_id=task_id,
             bee_id=bee_id,
@@ -292,7 +294,9 @@ class CapabilityGapAnalyzer:
         Returns:
             GapAnalysisReport - 完整的缺口分析报告
         """
-        logger.info(f"🔍 [CapabilityGapAnalyzer] 开始分析最近 {analysis_window_hours} 小时的任务数据")
+        logger.info(
+            f"🔍 [CapabilityGapAnalyzer] 开始分析最近 {analysis_window_hours} 小时的任务数据"
+        )
 
         records = self.get_records(hours=analysis_window_hours)
 
@@ -366,9 +370,7 @@ class CapabilityGapAnalyzer:
             success_rate = success_count / len(tasks)
 
             if success_rate < self.SUCCESS_RATE_THRESHOLDS[GapSeverity.LOW]:
-                capabilities_used = Counter(
-                    t.capability_used or "unknown" for t in tasks
-                )
+                capabilities_used = Counter(t.capability_used or "unknown" for t in tasks)
                 primary_capability = capabilities_used.most_common(1)[0][0]
 
                 gap = CapabilityGap(
@@ -413,9 +415,9 @@ class CapabilityGapAnalyzer:
                     if existing:
                         existing.affected_tasks_count += 1
                         existing.avg_duration = (
-                            (existing.avg_duration * (existing.affected_tasks_count - 1) + task.duration)
-                            / existing.affected_tasks_count
-                        )
+                            existing.avg_duration * (existing.affected_tasks_count - 1)
+                            + task.duration
+                        ) / existing.affected_tasks_count
                     else:
                         gap = CapabilityGap(
                             gap_id=gap_id,
@@ -469,7 +471,9 @@ class CapabilityGapAnalyzer:
 
         return gaps
 
-    def _analyze_capability_mismatch(self, records: List[TaskExecutionRecord]) -> List[CapabilityGap]:
+    def _analyze_capability_mismatch(
+        self, records: List[TaskExecutionRecord]
+    ) -> List[CapabilityGap]:
         """分析能力不匹配"""
         gaps = []
 
@@ -510,7 +514,9 @@ class CapabilityGapAnalyzer:
 
         return gaps
 
-    def _cluster_errors(self, failed_tasks: List[TaskExecutionRecord]) -> Dict[str, List[TaskExecutionRecord]]:
+    def _cluster_errors(
+        self, failed_tasks: List[TaskExecutionRecord]
+    ) -> Dict[str, List[TaskExecutionRecord]]:
         """聚类错误消息"""
         clusters = defaultdict(list)
 
@@ -524,10 +530,10 @@ class CapabilityGapAnalyzer:
         """提取错误签名"""
         import re
 
-        error_msg = re.sub(r'\b[A-Fa-f0-9]{8,}\b', 'HEX', error_msg)
-        error_msg = re.sub(r'\b\d+\.\d+\.\d+\.\d+\b', 'IP', error_msg)
-        error_msg = re.sub(r'\b\w+@\w+\.\w+\b', 'EMAIL', error_msg)
-        error_msg = re.sub(r'\b\d+\b', 'NUM', error_msg)
+        error_msg = re.sub(r"\b[A-Fa-f0-9]{8,}\b", "HEX", error_msg)
+        error_msg = re.sub(r"\b\d+\.\d+\.\d+\.\d+\b", "IP", error_msg)
+        error_msg = re.sub(r"\b\w+@\w+\.\w+\b", "EMAIL", error_msg)
+        error_msg = re.sub(r"\b\d+\b", "NUM", error_msg)
 
         keywords = []
         for word in error_msg.split():
@@ -584,17 +590,12 @@ class CapabilityGapAnalyzer:
             if key in merged:
                 existing = merged[key]
                 existing.affected_tasks_count += gap.affected_tasks_count
-                existing.success_rate = (
-                    existing.success_rate * 0.7 + gap.success_rate * 0.3
-                )
+                existing.success_rate = existing.success_rate * 0.7 + gap.success_rate * 0.3
                 existing.avg_duration = (
-                    (existing.avg_duration * existing.affected_tasks_count +
-                     gap.avg_duration * gap.affected_tasks_count) /
-                    (existing.affected_tasks_count + gap.affected_tasks_count)
-                )
-                existing.error_patterns = list(
-                    set(existing.error_patterns + gap.error_patterns)
-                )
+                    existing.avg_duration * existing.affected_tasks_count
+                    + gap.avg_duration * gap.affected_tasks_count
+                ) / (existing.affected_tasks_count + gap.affected_tasks_count)
+                existing.error_patterns = list(set(existing.error_patterns + gap.error_patterns))
             else:
                 merged[key] = gap
 
@@ -650,17 +651,14 @@ class CapabilityGapAnalyzer:
         }
 
         total_capability_tasks = sum(
-            1 for r in records
-            if (r.capability_used == gap.capability_name or
-                r.task_category == gap.task_category)
+            1
+            for r in records
+            if (r.capability_used == gap.capability_name or r.task_category == gap.task_category)
         )
 
         impact_score = gap.affected_tasks_count / max(total_capability_tasks, 1)
 
-        gap.business_impact_score = (
-            severity_weights[gap.severity] * 0.6 +
-            impact_score * 0.4
-        )
+        gap.business_impact_score = severity_weights[gap.severity] * 0.6 + impact_score * 0.4
 
         gap.remediation_priority = gap.business_impact_score
 
@@ -669,33 +667,41 @@ class CapabilityGapAnalyzer:
         suggestions = []
 
         if gap.gap_type == GapType.SUCCESS_RATE:
-            suggestions.extend([
-                f"增强 {gap.capability_name} 能力的训练数据",
-                f"审查 {gap.task_category} 任务的处理逻辑",
-                f"增加错误处理和重试机制",
-            ])
+            suggestions.extend(
+                [
+                    f"增强 {gap.capability_name} 能力的训练数据",
+                    f"审查 {gap.task_category} 任务的处理逻辑",
+                    f"增加错误处理和重试机制",
+                ]
+            )
 
         elif gap.gap_type == GapType.EFFICIENCY:
-            suggestions.extend([
-                f"优化 {gap.capability_name} 相关算法",
-                f"考虑缓存或批量处理",
-                f"增加并行处理能力",
-            ])
+            suggestions.extend(
+                [
+                    f"优化 {gap.capability_name} 相关算法",
+                    f"考虑缓存或批量处理",
+                    f"增加并行处理能力",
+                ]
+            )
 
         elif gap.gap_type == GapType.ERROR_PATTERN:
             for pattern in gap.error_patterns:
                 suggestions.append(f"针对错误模式 '{pattern}' 添加专门处理")
-            suggestions.extend([
-                "增加详细的错误日志以便调试",
-                "考虑添加输入验证",
-            ])
+            suggestions.extend(
+                [
+                    "增加详细的错误日志以便调试",
+                    "考虑添加输入验证",
+                ]
+            )
 
         elif gap.gap_type == GapType.CAPABILITY_MISMATCH:
-            suggestions.extend([
-                f"考虑创建专门处理 {gap.task_category} 的新蜂种",
-                f"重新评估任务分配策略",
-                f"为现有蜂种增加交叉训练",
-            ])
+            suggestions.extend(
+                [
+                    f"考虑创建专门处理 {gap.task_category} 的新蜂种",
+                    f"重新评估任务分配策略",
+                    f"为现有蜂种增加交叉训练",
+                ]
+            )
 
         gap.suggested_remediation = suggestions
         gap.estimated_improvement = self._estimate_improvement(gap)
@@ -740,26 +746,26 @@ class CapabilityGapAnalyzer:
 
         plan = []
         for i, gap in enumerate(sorted_gaps[:10]):
-            plan.append({
-                "priority_rank": i + 1,
-                "gap_id": gap.gap_id,
-                "gap_type": gap.gap_type.value,
-                "severity": gap.severity.value,
-                "capability": gap.capability_name,
-                "task_category": gap.task_category,
-                "affected_tasks": gap.affected_tasks_count,
-                "success_rate": gap.success_rate,
-                "remediation_priority": gap.remediation_priority,
-                "suggested_actions": gap.suggested_remediation,
-                "estimated_improvement": gap.estimated_improvement,
-            })
+            plan.append(
+                {
+                    "priority_rank": i + 1,
+                    "gap_id": gap.gap_id,
+                    "gap_type": gap.gap_type.value,
+                    "severity": gap.severity.value,
+                    "capability": gap.capability_name,
+                    "task_category": gap.task_category,
+                    "affected_tasks": gap.affected_tasks_count,
+                    "success_rate": gap.success_rate,
+                    "remediation_priority": gap.remediation_priority,
+                    "suggested_actions": gap.suggested_remediation,
+                    "estimated_improvement": gap.estimated_improvement,
+                }
+            )
 
         return plan
 
     def _generate_evolutionary_insights(
-        self,
-        gaps: List[CapabilityGap],
-        records: List[TaskExecutionRecord]
+        self, gaps: List[CapabilityGap], records: List[TaskExecutionRecord]
     ) -> Dict[str, Any]:
         """生成进化洞察（供 AutoSpeciesGenerator 使用）"""
         insights = {
@@ -772,26 +778,35 @@ class CapabilityGapAnalyzer:
 
         for gap in gaps:
             if gap.gap_type == GapType.CAPABILITY_MISMATCH:
-                insights["needs_new_species"].append({
-                    "task_category": gap.task_category,
-                    "capability_needed": gap.capability_name,
-                    "severity": gap.severity.value,
-                    "success_rate": gap.success_rate,
-                })
+                insights["needs_new_species"].append(
+                    {
+                        "task_category": gap.task_category,
+                        "capability_needed": gap.capability_name,
+                        "severity": gap.severity.value,
+                        "success_rate": gap.success_rate,
+                    }
+                )
 
-            if gap.gap_type == GapType.SUCCESS_RATE and gap.severity in [GapSeverity.CRITICAL, GapSeverity.HIGH]:
-                insights["needs_dna_adaptation"].append({
-                    "capability": gap.capability_name,
-                    "current_success_rate": gap.success_rate,
-                    "target_improvement": gap.estimated_improvement,
-                })
+            if gap.gap_type == GapType.SUCCESS_RATE and gap.severity in [
+                GapSeverity.CRITICAL,
+                GapSeverity.HIGH,
+            ]:
+                insights["needs_dna_adaptation"].append(
+                    {
+                        "capability": gap.capability_name,
+                        "current_success_rate": gap.success_rate,
+                        "target_improvement": gap.estimated_improvement,
+                    }
+                )
 
             if gap.gap_type == GapType.EFFICIENCY:
-                insights["needs_task_reassignment"].append({
-                    "bee_type": gap.task_category,
-                    "capability": gap.capability_name,
-                    "efficiency_ratio": gap.efficiency_ratio,
-                })
+                insights["needs_task_reassignment"].append(
+                    {
+                        "bee_type": gap.task_category,
+                        "capability": gap.capability_name,
+                        "efficiency_ratio": gap.efficiency_ratio,
+                    }
+                )
 
         by_category = defaultdict(list)
         for r in records:
@@ -807,11 +822,13 @@ class CapabilityGapAnalyzer:
 
         for gap in gaps:
             if gap.severity in [GapSeverity.CRITICAL, GapSeverity.HIGH]:
-                insights["recommended_mutation_targets"].append({
-                    "capability": gap.capability_name,
-                    "gap_type": gap.gap_type.value,
-                    "priority": gap.remediation_priority,
-                })
+                insights["recommended_mutation_targets"].append(
+                    {
+                        "capability": gap.capability_name,
+                        "gap_type": gap.gap_type.value,
+                        "priority": gap.remediation_priority,
+                    }
+                )
 
         return insights
 
@@ -848,7 +865,7 @@ class CapabilityGapAnalyzer:
         reports = sorted(
             self._persistence_path.glob("report_*.json"),
             key=lambda p: p.stat().st_mtime,
-            reverse=True
+            reverse=True,
         )
         if not reports:
             return None
@@ -915,20 +932,26 @@ class CapabilityGapAnalyzer:
         }
 
         for adaptation in insights.get("needs_dna_adaptation", []):
-            result["guided_mutations"].append({
-                "capability": adaptation["capability"],
-                "target_improvement": adaptation["target_improvement"],
-                "mutation_strategy": "increase_capability_weight",
-            })
+            result["guided_mutations"].append(
+                {
+                    "capability": adaptation["capability"],
+                    "target_improvement": adaptation["target_improvement"],
+                    "mutation_strategy": "increase_capability_weight",
+                }
+            )
 
         for new_species in insights.get("needs_new_species", []):
-            result["recommended_species"].append({
-                "task_category": new_species["task_category"],
-                "capability_focus": new_species["capability_needed"],
-                "justification": f"现有蜂种成功率仅 {new_species['success_rate']:.2%}",
-            })
+            result["recommended_species"].append(
+                {
+                    "task_category": new_species["task_category"],
+                    "capability_focus": new_species["capability_needed"],
+                    "justification": f"现有蜂种成功率仅 {new_species['success_rate']:.2%}",
+                }
+            )
 
-        logger.info(f"🔍 [CapabilityGapAnalyzer] 已向进化系统提供指导: {len(result['guided_mutations'])} 个突变目标, {len(result['recommended_species'])} 个新蜂种建议")
+        logger.info(
+            f"🔍 [CapabilityGapAnalyzer] 已向进化系统提供指导: {len(result['guided_mutations'])} 个突变目标, {len(result['recommended_species'])} 个新蜂种建议"
+        )
 
         return result
 

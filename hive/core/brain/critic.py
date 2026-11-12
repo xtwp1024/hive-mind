@@ -131,8 +131,13 @@ class Critic:
 
     # 安全关键词
     SAFETY_CRITICAL = {
-        "rm -rf", "delete.*all", "drop table", "truncate",
-        "format", "fdisk", "mkfs",
+        "rm -rf",
+        "delete.*all",
+        "drop table",
+        "truncate",
+        "format",
+        "fdisk",
+        "mkfs",
     }
 
     # 评分权重（可配置）
@@ -194,7 +199,9 @@ class Critic:
         issues.extend(anomalies)
 
         # 5. 生成改进建议
-        improvements = await self.suggest_improvements(quality_score, efficiency_score, safety_score, issues)
+        improvements = await self.suggest_improvements(
+            quality_score, efficiency_score, safety_score, issues
+        )
 
         # 计算综合评分（使用可配置权重）
         score = (
@@ -311,25 +318,29 @@ class Critic:
         base_id = f"issue_{int(time.time() * 1000) % 10000}"
 
         if not result.get("success", True):
-            issues.append(Issue(
-                id=f"{base_id}_1",
-                type="quality",
-                description="任务执行失败",
-                severity=Severity.ERROR,
-                root_cause=result.get("error", "Unknown"),
-                suggestions=["分析失败原因", "检查前置条件", "考虑降级方案"],
-                confidence=0.9,
-            ))
+            issues.append(
+                Issue(
+                    id=f"{base_id}_1",
+                    type="quality",
+                    description="任务执行失败",
+                    severity=Severity.ERROR,
+                    root_cause=result.get("error", "Unknown"),
+                    suggestions=["分析失败原因", "检查前置条件", "考虑降级方案"],
+                    confidence=0.9,
+                )
+            )
 
         if result.get("partial", False):
-            issues.append(Issue(
-                id=f"{base_id}_2",
-                type="quality",
-                description="任务部分成功",
-                severity=Severity.WARNING,
-                suggestions=["分析未完成部分", "重试或跳过失败部分"],
-                confidence=0.8,
-            ))
+            issues.append(
+                Issue(
+                    id=f"{base_id}_2",
+                    type="quality",
+                    description="任务部分成功",
+                    severity=Severity.WARNING,
+                    suggestions=["分析未完成部分", "重试或跳过失败部分"],
+                    confidence=0.8,
+                )
+            )
 
         return issues
 
@@ -341,27 +352,31 @@ class Critic:
         duration = result.get("duration", 0)
 
         if duration > self.DURATION_THRESHOLDS["slow"]:
-            issues.append(Issue(
-                id=f"{base_id}_1",
-                type="performance",
-                description=f"执行时间过长 ({duration:.0f}s)",
-                severity=Severity.WARNING,
-                root_cause="可能是任务复杂度高或资源不足",
-                suggestions=["考虑任务分解", "增加并行度", "优化算法"],
-                confidence=0.8,
-            ))
+            issues.append(
+                Issue(
+                    id=f"{base_id}_1",
+                    type="performance",
+                    description=f"执行时间过长 ({duration:.0f}s)",
+                    severity=Severity.WARNING,
+                    root_cause="可能是任务复杂度高或资源不足",
+                    suggestions=["考虑任务分解", "增加并行度", "优化算法"],
+                    confidence=0.8,
+                )
+            )
 
         retries = result.get("retries", 0)
         if retries > 2:
-            issues.append(Issue(
-                id=f"{base_id}_2",
-                type="performance",
-                description=f"重试次数过多 ({retries})",
-                severity=Severity.WARNING,
-                root_cause="可能是网络不稳定或资源竞争",
-                suggestions=["增加重试间隔", "检查依赖服务稳定性"],
-                confidence=0.75,
-            ))
+            issues.append(
+                Issue(
+                    id=f"{base_id}_2",
+                    type="performance",
+                    description=f"重试次数过多 ({retries})",
+                    severity=Severity.WARNING,
+                    root_cause="可能是网络不稳定或资源竞争",
+                    suggestions=["增加重试间隔", "检查依赖服务稳定性"],
+                    confidence=0.75,
+                )
+            )
 
         return issues
 
@@ -376,25 +391,29 @@ class Critic:
         # 危险操作
         for danger in self.SAFETY_CRITICAL:
             if danger in description:
-                issues.append(Issue(
-                    id=f"{base_id}_safety_1",
-                    type="safety",
-                    description=f"检测到危险操作: {danger}",
-                    severity=Severity.CRITICAL,
-                    suggestions=["确认操作必要性", "使用更安全的替代方案", "增加确认步骤"],
-                    confidence=0.95,
-                ))
+                issues.append(
+                    Issue(
+                        id=f"{base_id}_safety_1",
+                        type="safety",
+                        description=f"检测到危险操作: {danger}",
+                        severity=Severity.CRITICAL,
+                        suggestions=["确认操作必要性", "使用更安全的替代方案", "增加确认步骤"],
+                        confidence=0.95,
+                    )
+                )
 
         # 权限问题
         if "permission" in error or "权限" in error:
-            issues.append(Issue(
-                id=f"{base_id}_safety_2",
-                type="safety",
-                description="权限不足",
-                severity=Severity.ERROR,
-                suggestions=["检查执行用户权限", "使用适当的权限级别", "降级到只读操作"],
-                confidence=0.9,
-            ))
+            issues.append(
+                Issue(
+                    id=f"{base_id}_safety_2",
+                    type="safety",
+                    description="权限不足",
+                    severity=Severity.ERROR,
+                    suggestions=["检查执行用户权限", "使用适当的权限级别", "降级到只读操作"],
+                    confidence=0.9,
+                )
+            )
 
         return issues
 
@@ -409,27 +428,31 @@ class Critic:
             similar_count = sum(1 for i in self._issue_history[-10:] if error in i.description)
 
             if similar_count >= 3:
-                issues.append(Issue(
-                    id=f"{base_id}_anomaly_1",
-                    type="reliability",
-                    description=f"同样的错误反复出现 ({similar_count + 1}次)",
-                    severity=Severity.WARNING,
-                    root_cause="可能是系统性问题",
-                    suggestions=["深入分析根因", "检查依赖组件", "建立监控告警"],
-                    confidence=0.85,
-                ))
+                issues.append(
+                    Issue(
+                        id=f"{base_id}_anomaly_1",
+                        type="reliability",
+                        description=f"同样的错误反复出现 ({similar_count + 1}次)",
+                        severity=Severity.WARNING,
+                        root_cause="可能是系统性问题",
+                        suggestions=["深入分析根因", "检查依赖组件", "建立监控告警"],
+                        confidence=0.85,
+                    )
+                )
 
         # 检查资源泄漏迹象
         memory = result.get("memory_delta", 0)
         if memory > 500:  # 内存增长超过500MB
-            issues.append(Issue(
-                id=f"{base_id}_anomaly_2",
-                type="reliability",
-                description=f"疑似内存泄漏 (增长 {memory:.0f}MB)",
-                severity=Severity.WARNING,
-                suggestions=["检查对象引用", "使用弱引用", "添加内存监控"],
-                confidence=0.7,
-            ))
+            issues.append(
+                Issue(
+                    id=f"{base_id}_anomaly_2",
+                    type="reliability",
+                    description=f"疑似内存泄漏 (增长 {memory:.0f}MB)",
+                    severity=Severity.WARNING,
+                    suggestions=["检查对象引用", "使用弱引用", "添加内存监控"],
+                    confidence=0.7,
+                )
+            )
 
         return issues
 
@@ -500,9 +523,9 @@ class Critic:
 
         # 检查是否过度批评
         if len(self._issue_history) > 10:
-            critical_ratio = sum(
-                1 for i in self._issue_history[-10:] if i.severity == Severity.CRITICAL
-            ) / 10
+            critical_ratio = (
+                sum(1 for i in self._issue_history[-10:] if i.severity == Severity.CRITICAL) / 10
+            )
 
             if critical_ratio > 0.5:
                 assessment["potential_bias"] = "可能过度批评"

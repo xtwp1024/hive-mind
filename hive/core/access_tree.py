@@ -9,19 +9,20 @@ AccessTree - 工蜂分层权限树
 - OWNER > READ_WRITE > READ_ONLY 三级严格序
 """
 
-import threading
 import logging
-from enum import IntEnum
+import threading
 from dataclasses import dataclass, field
+from enum import IntEnum
 
 logger = logging.getLogger("Hive.AccessTree")
 
 
 class PermissionType(IntEnum):
     """权限等级（对标 Hive2Hive PermissionType，数值越大权限越高）"""
-    READ_ONLY  = 1
+
+    READ_ONLY = 1
     READ_WRITE = 2
-    OWNER      = 3
+    OWNER = 3
 
     def __str__(self) -> str:
         return self.name
@@ -29,14 +30,16 @@ class PermissionType(IntEnum):
 
 class AccessDeniedError(Exception):
     """权限不足异常（对标 Hive2Hive non-allowed operation）"""
+
     pass
 
 
 @dataclass
 class ACLEntry:
     """单条访问控制记录"""
+
     agent_id: str
-    perm:     PermissionType
+    perm: PermissionType
     granted_by: str = ""
 
 
@@ -55,7 +58,9 @@ class AccessTree:
 
     # ────────────────────────────────── 授权/撤权 ──
 
-    def grant(self, path: str, agent_id: str, perm: PermissionType, granted_by: str = "system") -> None:
+    def grant(
+        self, path: str, agent_id: str, perm: PermissionType, granted_by: str = "system"
+    ) -> None:
         """
         授权（对标 fileManager.share(folder, userId, PermissionType.WRITE)）。
         OWNER 身份才能向他人授予权限的权限。
@@ -63,9 +68,9 @@ class AccessTree:
         path = self._normalize(path)
         with self._lock:
             self._acl.setdefault(path, {})[agent_id] = ACLEntry(
-                agent_id   = agent_id,
-                perm       = perm,
-                granted_by = granted_by,
+                agent_id=agent_id,
+                perm=perm,
+                granted_by=granted_by,
             )
         logger.info(f"[AccessTree] ✅ grant({path!r}, {agent_id}, {perm})")
 
@@ -95,8 +100,7 @@ class AccessTree:
         if not self.check(path, agent_id, required):
             eff = self._effective_perm(path, agent_id)
             raise AccessDeniedError(
-                f"[{agent_id}] 在路径 {path!r} 需要 {required}，"
-                f"实际拥有 {eff or '无权限'}"
+                f"[{agent_id}] 在路径 {path!r} 需要 {required}，" f"实际拥有 {eff or '无权限'}"
             )
 
     def effective_permission(self, path: str, agent_id: str) -> PermissionType | None:
@@ -115,7 +119,7 @@ class AccessTree:
         """
         path = self._normalize(path)
         highest = None
-        parts   = path.split("/")
+        parts = path.split("/")
 
         with self._lock:
             for depth in range(len(parts), 0, -1):

@@ -21,16 +21,16 @@ Phase 3: 自主进化能力
 """
 
 import logging
+import statistics
 import threading
 import time
-import statistics
+from collections import defaultdict, deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Set
-from collections import defaultdict, deque
-from copy import deepcopy
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger("Hive.ResourceAllocator")
 
@@ -175,10 +175,7 @@ class ConsumerProfile:
             "current_priority": self.current_priority().value,
             "task_count": self.task_count,
             "success_rate": self.success_rate(),
-            "resource_quotas": {
-                rt.value: q.to_dict()
-                for rt, q in self.resource_quotas.items()
-            },
+            "resource_quotas": {rt.value: q.to_dict() for rt, q in self.resource_quotas.items()},
             "created_at": self.created_at,
             "last_active": self.last_active,
             "tags": self.tags,
@@ -291,9 +288,7 @@ class DynamicResourceAllocator:
 
         self._running = True
         self._monitor_thread = threading.Thread(
-            target=self._monitor_loop,
-            daemon=True,
-            name="resource_monitor"
+            target=self._monitor_loop, daemon=True, name="resource_monitor"
         )
         self._monitor_thread.start()
 
@@ -471,19 +466,17 @@ class DynamicResourceAllocator:
                             ],
                         )
 
-            system_available = (
-                self._system_resources.get(resource_type, float('inf'))
-                - self._system_usage.get(resource_type, 0.0)
-            )
+            system_available = self._system_resources.get(
+                resource_type, float("inf")
+            ) - self._system_usage.get(resource_type, 0.0)
 
             if system_available < amount:
                 if effective_priority in [AllocationPriority.CRITICAL, AllocationPriority.HIGH]:
                     preempted = self._try_preempt(resource_type, amount - system_available)
                     if preempted:
-                        system_available = (
-                            self._system_resources.get(resource_type, float('inf'))
-                            - self._system_usage.get(resource_type, 0.0)
-                        )
+                        system_available = self._system_resources.get(
+                            resource_type, float("inf")
+                        ) - self._system_usage.get(resource_type, 0.0)
 
                 if system_available < amount:
                     return AllocationDecision(
@@ -600,7 +593,8 @@ class DynamicResourceAllocator:
     def _estimate_wait_time(self, resource_type: ResourceType, amount: float) -> float:
         """估计等待时间"""
         recent = [
-            r for r in self._allocation_history
+            r
+            for r in self._allocation_history
             if r.resource_type == resource_type and r.released_at
         ]
 
@@ -608,9 +602,7 @@ class DynamicResourceAllocator:
             return 30.0
 
         avg_duration = statistics.mean(
-            (r.released_at - r.granted_at)
-            for r in recent[-20:]
-            if r.released_at and r.granted_at
+            (r.released_at - r.granted_at) for r in recent[-20:] if r.released_at and r.granted_at
         )
 
         return avg_duration * 2
@@ -633,8 +625,7 @@ class DynamicResourceAllocator:
                 quota.current_usage = max(0.0, quota.current_usage - record.amount)
 
         self._system_usage[record.resource_type] = max(
-            0.0,
-            self._system_usage.get(record.resource_type, 0.0) - record.amount
+            0.0, self._system_usage.get(record.resource_type, 0.0) - record.amount
         )
 
         record.released_at = time.time()
@@ -707,9 +698,7 @@ class DynamicResourceAllocator:
                     target_quota = system_total * fitness_ratio * 0.8
 
                     alpha = 0.1
-                    quota.hard_limit = (
-                        quota.hard_limit * (1 - alpha) + target_quota * alpha
-                    )
+                    quota.hard_limit = quota.hard_limit * (1 - alpha) + target_quota * alpha
                     quota.soft_limit = quota.hard_limit * 0.8
 
             logger.debug(
@@ -723,8 +712,7 @@ class DynamicResourceAllocator:
                 "timestamp": time.time(),
                 "total_consumers": len(self._consumers),
                 "active_allocations": sum(
-                    1 for r in self._allocations.values()
-                    if r.released_at is None
+                    1 for r in self._allocations.values() if r.released_at is None
                 ),
                 "adjustment_count": self._adjustment_count,
                 "system_resources": {
@@ -757,8 +745,7 @@ class DynamicResourceAllocator:
                 return None
 
             consumer_allocations = [
-                r for r in self._allocations.values()
-                if r.consumer_id == consumer_id
+                r for r in self._allocations.values() if r.consumer_id == consumer_id
             ]
 
             return {
@@ -766,8 +753,7 @@ class DynamicResourceAllocator:
                 "allocation_stats": {
                     "total_requests": len(consumer_allocations),
                     "active_allocations": sum(
-                        1 for r in consumer_allocations
-                        if r.released_at is None
+                        1 for r in consumer_allocations if r.released_at is None
                     ),
                 },
             }

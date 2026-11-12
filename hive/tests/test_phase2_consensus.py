@@ -11,19 +11,20 @@
 7. get_consensus_engine 便捷函数
 """
 
-import pytest
-import time
 import asyncio
+import time
 from datetime import datetime
 from enum import Enum
 
+import pytest
+
 from hive.core.consensus import (
     ConsensusEngine,
-    DecisionType,
-    VoteOption,
-    Vote,
     DecisionProposal,
     DecisionResult,
+    DecisionType,
+    Vote,
+    VoteOption,
     get_consensus_engine,
 )
 
@@ -83,7 +84,7 @@ class TestVoteDataClass:
             voter_id="bee_001",
             option=VoteOption.APPROVE,
         )
-        
+
         assert vote.voter_id == "bee_001"
         assert vote.option == VoteOption.APPROVE
         assert vote.weight == 1.0
@@ -98,7 +99,7 @@ class TestVoteDataClass:
             weight=1.5,
             justification="这个提案有安全风险",
         )
-        
+
         assert vote.voter_id == "bee_002"
         assert vote.option == VoteOption.REJECT
         assert vote.weight == 1.5
@@ -117,13 +118,13 @@ class TestDecisionProposal:
             description="这是一个测试提案",
             proposal_type="test_proposal",
         )
-        
+
         assert proposal.proposal_id == "proposal_001"
         assert proposal.proposer_id == "queen_bee"
         assert proposal.title == "测试提案"
         assert proposal.description == "这是一个测试提案"
         assert proposal.proposal_type == "test_proposal"
-        
+
         # 默认值
         assert proposal.decision_type == DecisionType.MAJORITY
         assert proposal.quorum == 0.5
@@ -145,7 +146,7 @@ class TestDecisionProposal:
             expires_at=time.time() + 3600,
             metadata={"priority": "high"},
         )
-        
+
         assert proposal.proposal_type == "evolve_species"
         assert proposal.decision_type == DecisionType.SUPER_MAJORITY
         assert proposal.quorum == 0.7
@@ -164,7 +165,7 @@ class TestDecisionProposal:
             time_limit=300.0,  # 5 分钟
         )
         assert proposal.is_expired() == False
-        
+
         # 已过期（通过 expires_at）
         proposal2 = DecisionProposal(
             proposal_id="p2",
@@ -175,7 +176,7 @@ class TestDecisionProposal:
             expires_at=time.time() - 100,  # 100 秒前过期
         )
         assert proposal2.is_expired() == True
-        
+
         # 已过期（通过 time_limit）
         proposal3 = DecisionProposal(
             proposal_id="p3",
@@ -205,7 +206,7 @@ class TestDecisionResult:
             elapsed_time=45.5,
             metadata={"proposal_type": "test"},
         )
-        
+
         assert result.proposal_id == "proposal_001"
         assert result.approved == True
         assert result.vote_summary["approve"] == 5
@@ -228,7 +229,7 @@ class TestDecisionResult:
             quorum_reached=True,
             elapsed_time=120.0,
         )
-        
+
         assert result.approved == False
         assert result.final_option == VoteOption.REJECT
 
@@ -239,7 +240,7 @@ class TestConsensusEngine:
     def test_engine_initialization(self):
         """测试引擎初始化"""
         engine = ConsensusEngine()
-        
+
         assert isinstance(engine.active_proposals, dict)
         assert isinstance(engine.votes, dict)
         assert isinstance(engine.decision_history, list)
@@ -249,19 +250,19 @@ class TestConsensusEngine:
     def test_cast_vote_nonexistent_proposal(self):
         """测试给不存在的提案投票"""
         engine = ConsensusEngine()
-        
+
         result = engine.cast_vote(
             proposal_id="nonexistent",
             voter_id="bee_1",
             option=VoteOption.APPROVE,
         )
-        
+
         assert result == False
 
     def test_cast_vote(self):
         """测试投票"""
         engine = ConsensusEngine()
-        
+
         # 先创建一个提案
         proposal = DecisionProposal(
             proposal_id="test_proposal",
@@ -270,9 +271,9 @@ class TestConsensusEngine:
             description="测试",
             proposal_type="test",
         )
-        
+
         engine.active_proposals["test_proposal"] = proposal
-        
+
         # 投票
         result = engine.cast_vote(
             proposal_id="test_proposal",
@@ -280,11 +281,11 @@ class TestConsensusEngine:
             option=VoteOption.APPROVE,
             justification="我支持这个提案",
         )
-        
+
         assert result == True
         assert "test_proposal" in engine.votes
         assert "bee_1" in engine.votes["test_proposal"]
-        
+
         vote = engine.votes["test_proposal"]["bee_1"]
         assert vote.voter_id == "bee_1"
         assert vote.option == VoteOption.APPROVE
@@ -294,7 +295,7 @@ class TestConsensusEngine:
     def test_cast_vote_multiple(self):
         """测试多个投票"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="multi_vote_test",
             proposer_id="queen",
@@ -302,9 +303,9 @@ class TestConsensusEngine:
             description="测试",
             proposal_type="test",
         )
-        
+
         engine.active_proposals["multi_vote_test"] = proposal
-        
+
         # 多个蜜蜂投票
         votes = [
             ("bee_1", VoteOption.APPROVE, "支持"),
@@ -312,7 +313,7 @@ class TestConsensusEngine:
             ("bee_3", VoteOption.REJECT, "反对"),
             ("bee_4", VoteOption.ABSTAIN, "弃权"),
         ]
-        
+
         for voter_id, option, just in votes:
             engine.cast_vote(
                 proposal_id="multi_vote_test",
@@ -320,20 +321,20 @@ class TestConsensusEngine:
                 option=option,
                 justification=just,
             )
-        
+
         assert len(engine.votes["multi_vote_test"]) == 4
 
     def test_get_vote_status_nonexistent(self):
         """测试获取不存在提案的投票状态"""
         engine = ConsensusEngine()
-        
+
         status = engine.get_vote_status("nonexistent")
         assert status == {"error": "proposal_not_found"}
 
     def test_get_vote_status(self):
         """测试获取投票状态"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="status_test",
             proposer_id="queen",
@@ -342,15 +343,15 @@ class TestConsensusEngine:
             proposal_type="test",
             quorum=0.5,
         )
-        
+
         engine.active_proposals["status_test"] = proposal
-        
+
         # 投 2 票
         engine.cast_vote("status_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("status_test", "bee_2", VoteOption.REJECT)
-        
+
         status = engine.get_vote_status("status_test")
-        
+
         assert status["proposal_id"] == "status_test"
         assert status["proposal"]["title"] == "状态测试"
         assert status["vote_counts"]["approve"] == 1
@@ -363,14 +364,14 @@ class TestConsensusEngine:
     def test_default_weight_calculator(self):
         """测试默认权重计算器"""
         engine = ConsensusEngine()
-        
+
         assert engine._default_weight_calculator("any_bee") == 1.0
         assert engine._default_weight_calculator("another_bee") == 1.0
 
     def test_custom_weight_calculator(self):
         """测试自定义权重计算器"""
         engine = ConsensusEngine()
-        
+
         # 自定义：bee_1 权重 2.0，bee_2 权重 0.5，其他 1.0
         def custom_weight(voter_id: str) -> float:
             if voter_id == "bee_1":
@@ -378,9 +379,9 @@ class TestConsensusEngine:
             elif voter_id == "bee_2":
                 return 0.5
             return 1.0
-        
+
         engine.weight_calculator = custom_weight
-        
+
         proposal = DecisionProposal(
             proposal_id="weight_test",
             proposer_id="queen",
@@ -388,14 +389,14 @@ class TestConsensusEngine:
             description="测试",
             proposal_type="test",
         )
-        
+
         engine.active_proposals["weight_test"] = proposal
-        
+
         # 投票
         engine.cast_vote("weight_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("weight_test", "bee_2", VoteOption.REJECT)
         engine.cast_vote("weight_test", "bee_3", VoteOption.REJECT)
-        
+
         # 检查权重
         votes = engine.votes["weight_test"]
         assert votes["bee_1"].weight == 2.0
@@ -405,10 +406,10 @@ class TestConsensusEngine:
     def test_get_active_proposals(self):
         """测试获取活跃提案"""
         engine = ConsensusEngine()
-        
+
         # 初始为空
         assert engine.get_active_proposals() == []
-        
+
         # 添加提案
         proposal = DecisionProposal(
             proposal_id="active_test",
@@ -417,9 +418,9 @@ class TestConsensusEngine:
             description="测试",
             proposal_type="test",
         )
-        
+
         engine.active_proposals["active_test"] = proposal
-        
+
         active = engine.get_active_proposals()
         assert len(active) == 1
         assert active[0].proposal_id == "active_test"
@@ -427,10 +428,10 @@ class TestConsensusEngine:
     def test_get_decision_history(self):
         """测试获取决策历史"""
         engine = ConsensusEngine()
-        
+
         # 初始为空
         assert engine.get_decision_history() == []
-        
+
         # 添加历史记录
         result = DecisionResult(
             proposal_id="history_test",
@@ -442,9 +443,9 @@ class TestConsensusEngine:
             quorum_reached=True,
             elapsed_time=30.0,
         )
-        
+
         engine.decision_history.append(result)
-        
+
         history = engine.get_decision_history()
         assert len(history) == 1
         assert history[0].proposal_id == "history_test"
@@ -452,14 +453,14 @@ class TestConsensusEngine:
     def test_cancel_proposal_nonexistent(self):
         """测试取消不存在的提案"""
         engine = ConsensusEngine()
-        
+
         result = engine.cancel_proposal("nonexistent")
         assert result == False
 
     def test_cancel_proposal(self):
         """测试取消提案"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="cancel_test",
             proposer_id="queen",
@@ -467,17 +468,17 @@ class TestConsensusEngine:
             description="测试",
             proposal_type="test",
         )
-        
+
         engine.active_proposals["cancel_test"] = proposal
         engine.votes["cancel_test"] = {}  # 空投票
-        
+
         # 取消
         result = engine.cancel_proposal("cancel_test")
-        
+
         assert result == True
         assert "cancel_test" not in engine.active_proposals
         assert "cancel_test" not in engine.votes
-        
+
         # 检查历史记录
         history = engine.get_decision_history()
         assert len(history) == 1
@@ -492,7 +493,7 @@ class TestConsensusEngineVotingRules:
     def test_majority_approval(self):
         """测试简单多数批准"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="majority_test",
             proposer_id="queen",
@@ -501,25 +502,25 @@ class TestConsensusEngineVotingRules:
             proposal_type="test",
             decision_type=DecisionType.MAJORITY,
         )
-        
+
         engine.active_proposals["majority_test"] = proposal
-        
+
         # 5 个投票者，3 个批准（多数）
         engine.cast_vote("majority_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("majority_test", "bee_2", VoteOption.APPROVE)
         engine.cast_vote("majority_test", "bee_3", VoteOption.APPROVE)
         engine.cast_vote("majority_test", "bee_4", VoteOption.REJECT)
         engine.cast_vote("majority_test", "bee_5", VoteOption.REJECT)
-        
+
         votes = engine.votes["majority_test"]
-        
+
         # 测试内部方法
         result = engine._try_early_decision(
             proposal=proposal,
             votes=votes,
             total_eligible=5,
         )
-        
+
         # 3 批准 > 2 拒绝，应该通过
         assert result is not None
         assert result.approved == True
@@ -528,7 +529,7 @@ class TestConsensusEngineVotingRules:
     def test_majority_rejection(self):
         """测试简单多数拒绝"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="majority_reject_test",
             proposer_id="queen",
@@ -537,24 +538,24 @@ class TestConsensusEngineVotingRules:
             proposal_type="test",
             decision_type=DecisionType.MAJORITY,
         )
-        
+
         engine.active_proposals["majority_reject_test"] = proposal
-        
+
         # 5 个投票者，2 个批准，3 个拒绝
         engine.cast_vote("majority_reject_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("majority_reject_test", "bee_2", VoteOption.APPROVE)
         engine.cast_vote("majority_reject_test", "bee_3", VoteOption.REJECT)
         engine.cast_vote("majority_reject_test", "bee_4", VoteOption.REJECT)
         engine.cast_vote("majority_reject_test", "bee_5", VoteOption.REJECT)
-        
+
         votes = engine.votes["majority_reject_test"]
-        
+
         result = engine._try_early_decision(
             proposal=proposal,
             votes=votes,
             total_eligible=5,
         )
-        
+
         assert result is not None
         assert result.approved == False
         assert result.final_option == VoteOption.REJECT
@@ -562,7 +563,7 @@ class TestConsensusEngineVotingRules:
     def test_unanimous_approval(self):
         """测试全票通过"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="unanimous_test",
             proposer_id="queen",
@@ -571,29 +572,29 @@ class TestConsensusEngineVotingRules:
             proposal_type="test",
             decision_type=DecisionType.UNANIMOUS,
         )
-        
+
         engine.active_proposals["unanimous_test"] = proposal
-        
+
         # 3 个投票者，全部批准
         engine.cast_vote("unanimous_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("unanimous_test", "bee_2", VoteOption.APPROVE)
         engine.cast_vote("unanimous_test", "bee_3", VoteOption.APPROVE)
-        
+
         votes = engine.votes["unanimous_test"]
-        
+
         result = engine._try_early_decision(
             proposal=proposal,
             votes=votes,
             total_eligible=3,
         )
-        
+
         assert result is not None
         assert result.approved == True
 
     def test_unanimous_fails_with_dissent(self):
         """测试有异议时全票不通过"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="unanimous_fail_test",
             proposer_id="queen",
@@ -602,29 +603,29 @@ class TestConsensusEngineVotingRules:
             proposal_type="test",
             decision_type=DecisionType.UNANIMOUS,
         )
-        
+
         engine.active_proposals["unanimous_fail_test"] = proposal
-        
+
         # 3 个投票者，1 个拒绝
         engine.cast_vote("unanimous_fail_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("unanimous_fail_test", "bee_2", VoteOption.REJECT)
         engine.cast_vote("unanimous_fail_test", "bee_3", VoteOption.APPROVE)
-        
+
         votes = engine.votes["unanimous_fail_test"]
-        
+
         result = engine._try_early_decision(
             proposal=proposal,
             votes=votes,
             total_eligible=3,
         )
-        
+
         # 全票不通过时，_try_early_decision 应该返回 None（无法提前决策）
         assert result is None
 
     def test_super_majority_passes(self):
         """测试超多数通过 (>= 2/3)"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="super_majority_test",
             proposer_id="queen",
@@ -633,9 +634,9 @@ class TestConsensusEngineVotingRules:
             proposal_type="test",
             decision_type=DecisionType.SUPER_MAJORITY,
         )
-        
+
         engine.active_proposals["super_majority_test"] = proposal
-        
+
         # 6 个投票者，4 个批准 (4/6 = 2/3，刚好通过)
         engine.cast_vote("super_majority_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("super_majority_test", "bee_2", VoteOption.APPROVE)
@@ -643,15 +644,15 @@ class TestConsensusEngineVotingRules:
         engine.cast_vote("super_majority_test", "bee_4", VoteOption.APPROVE)
         engine.cast_vote("super_majority_test", "bee_5", VoteOption.REJECT)
         engine.cast_vote("super_majority_test", "bee_6", VoteOption.REJECT)
-        
+
         votes = engine.votes["super_majority_test"]
-        
+
         result = engine._try_early_decision(
             proposal=proposal,
             votes=votes,
             total_eligible=6,
         )
-        
+
         # 4 批准 / (4 批准 + 2 拒绝) = 4/6 = 2/3，应该通过
         assert result is not None
         assert result.approved == True
@@ -659,7 +660,7 @@ class TestConsensusEngineVotingRules:
     def test_super_majority_fails(self):
         """测试超多数不通过"""
         engine = ConsensusEngine()
-        
+
         proposal = DecisionProposal(
             proposal_id="super_majority_fail_test",
             proposer_id="queen",
@@ -668,9 +669,9 @@ class TestConsensusEngineVotingRules:
             proposal_type="test",
             decision_type=DecisionType.SUPER_MAJORITY,
         )
-        
+
         engine.active_proposals["super_majority_fail_test"] = proposal
-        
+
         # 6 个投票者，3 个批准 (3/6 = 0.5 < 2/3)
         engine.cast_vote("super_majority_fail_test", "bee_1", VoteOption.APPROVE)
         engine.cast_vote("super_majority_fail_test", "bee_2", VoteOption.APPROVE)
@@ -678,15 +679,15 @@ class TestConsensusEngineVotingRules:
         engine.cast_vote("super_majority_fail_test", "bee_4", VoteOption.REJECT)
         engine.cast_vote("super_majority_fail_test", "bee_5", VoteOption.REJECT)
         engine.cast_vote("super_majority_fail_test", "bee_6", VoteOption.REJECT)
-        
+
         votes = engine.votes["super_majority_fail_test"]
-        
+
         result = engine._try_early_decision(
             proposal=proposal,
             votes=votes,
             total_eligible=6,
         )
-        
+
         # 3 批准 / (3 批准 + 3 拒绝) = 0.5 < 2/3，不应该通过
         # 注意：_try_early_decision 可能返回 None，因为无法确定
         if result:
@@ -695,18 +696,18 @@ class TestConsensusEngineVotingRules:
     def test_weighted_voting(self):
         """测试加权投票"""
         engine = ConsensusEngine()
-        
+
         # 自定义权重
         def custom_weight(voter_id: str) -> float:
             weights = {
-                "bee_senior": 3.0,    # 资深蜜蜂权重高
-                "bee_mid": 2.0,       # 中级蜜蜂
-                "bee_junior": 1.0,    # 初级蜜蜂
+                "bee_senior": 3.0,  # 资深蜜蜂权重高
+                "bee_mid": 2.0,  # 中级蜜蜂
+                "bee_junior": 1.0,  # 初级蜜蜂
             }
             return weights.get(voter_id, 1.0)
-        
+
         engine.weight_calculator = custom_weight
-        
+
         proposal = DecisionProposal(
             proposal_id="weighted_test",
             proposer_id="queen",
@@ -715,9 +716,9 @@ class TestConsensusEngineVotingRules:
             proposal_type="test",
             decision_type=DecisionType.WEIGHTED,
         )
-        
+
         engine.active_proposals["weighted_test"] = proposal
-        
+
         # 场景：2 个初级批准，1 个资深拒绝
         # 批准权重: 1 + 1 = 2
         # 拒绝权重: 3
@@ -725,15 +726,15 @@ class TestConsensusEngineVotingRules:
         engine.cast_vote("weighted_test", "bee_junior_1", VoteOption.APPROVE)
         engine.cast_vote("weighted_test", "bee_junior_2", VoteOption.APPROVE)
         engine.cast_vote("weighted_test", "bee_senior", VoteOption.REJECT)
-        
+
         votes = engine.votes["weighted_test"]
-        
+
         result = engine._try_early_decision(
             proposal=proposal,
             votes=votes,
             total_eligible=3,
         )
-        
+
         # 拒绝权重 3 > 批准权重 2，应该拒绝
         assert result is not None
         assert result.approved == False
@@ -745,22 +746,22 @@ class TestGetConsensusEngine:
     def test_get_consensus_engine_returns_instance(self):
         """测试返回实例"""
         engine = get_consensus_engine()
-        
+
         assert isinstance(engine, ConsensusEngine)
 
     def test_get_consensus_engine_singleton(self):
         """测试单例模式"""
         engine1 = get_consensus_engine()
         engine2 = get_consensus_engine()
-        
+
         assert engine1 is engine2
 
     def test_get_consensus_engine_with_bus(self):
         """测试带通信总线"""
         mock_bus = "mock_bus"  # 模拟总线
-        
+
         engine = get_consensus_engine(communication_bus=mock_bus)
-        
+
         assert engine.communication_bus == mock_bus
 
 
@@ -770,7 +771,7 @@ class TestConsensusIntegration:
     def test_full_voting_flow(self):
         """测试完整的投票流程"""
         engine = ConsensusEngine()
-        
+
         # 1. 创建提案
         proposal = DecisionProposal(
             proposal_id="full_flow_test",
@@ -782,14 +783,14 @@ class TestConsensusIntegration:
             quorum=0.5,
             time_limit=120.0,
         )
-        
+
         engine.active_proposals["full_flow_test"] = proposal
-        
+
         # 2. 获取初始状态
         initial_status = engine.get_vote_status("full_flow_test")
         assert initial_status["total_votes"] == 0
         assert initial_status["quorum_reached"] == False
-        
+
         # 3. 多个蜜蜂投票
         votes = [
             ("engineer_bee", VoteOption.APPROVE, "安全审计很重要，支持"),
@@ -797,7 +798,7 @@ class TestConsensusIntegration:
             ("architect_bee", VoteOption.APPROVE, "架构上合理"),
             ("coder_bee", VoteOption.REJECT, "现有蜜蜂已经能处理安全问题"),
         ]
-        
+
         for voter_id, option, just in votes:
             engine.cast_vote(
                 proposal_id="full_flow_test",
@@ -805,15 +806,15 @@ class TestConsensusIntegration:
                 option=option,
                 justification=just,
             )
-        
+
         # 4. 获取投票状态
         status = engine.get_vote_status("full_flow_test")
-        
+
         assert status["total_votes"] == 4
         assert status["vote_counts"]["approve"] == 3
         assert status["vote_counts"]["reject"] == 1
         assert status["quorum_reached"] == True
-        
+
         # 5. 尝试提前决策
         votes_dict = engine.votes["full_flow_test"]
         result = engine._try_early_decision(
@@ -821,7 +822,7 @@ class TestConsensusIntegration:
             votes=votes_dict,
             total_eligible=4,
         )
-        
+
         # 3 批准 > 1 拒绝，应该通过
         assert result is not None
         assert result.approved == True

@@ -27,7 +27,7 @@ def _sanitize_filename(name: str) -> str:
         A safe filename string
     """
     # Remove any characters that are not alphanumeric, underscore, hyphen, or dot
-    sanitized = re.sub(r'[^\w\-.]', '_', name)
+    sanitized = re.sub(r"[^\w\-.]", "_", name)
     # Limit length to prevent overly long filenames
     return sanitized[:100]
 
@@ -47,6 +47,7 @@ def archive_failure(death_cert: Dict[str, Any]) -> bool:
 
     try:
         from hive.config.settings import get_settings
+
         settings = get_settings()
 
         archive_dir = settings.BASE_DIR / "hive" / "immune_memory"
@@ -57,7 +58,7 @@ def archive_failure(death_cert: Dict[str, Any]) -> bool:
         safe_target = _sanitize_filename(target_name)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         archive_file = archive_dir / f"immune_{safe_target}_{timestamp}.json"
-        
+
         archive_data = {
             "timestamp": datetime.now().isoformat(),
             "target_name": target_name,
@@ -66,13 +67,13 @@ def archive_failure(death_cert: Dict[str, Any]) -> bool:
             "dna_snapshot": death_cert.get("dna_snapshot", {}),
             "bee_type": death_cert.get("bee_type", "unknown"),
         }
-        
-        with open(archive_file, 'w', encoding='utf-8') as f:
+
+        with open(archive_file, "w", encoding="utf-8") as f:
             json.dump(archive_data, f, indent=2, ensure_ascii=False)
-        
+
         logger.debug(f"[ImmuneArchive] 归档失败记录: {archive_file}")
         return True
-        
+
     except Exception as e:
         logger.error(f"[ImmuneArchive] 归档失败: {e}")
         return False
@@ -81,37 +82,40 @@ def archive_failure(death_cert: Dict[str, Any]) -> bool:
 def get_immune_warnings(target_name: str) -> list:
     """
     获取目标的免疫警告
-    
+
     Args:
         target_name: 目标名称
-        
+
     Returns:
         警告列表
     """
     warnings = []
-    
+
     try:
         from hive.config.settings import get_settings
+
         settings = get_settings()
-        
+
         archive_dir = settings.BASE_DIR / "hive" / "immune_memory"
         if not archive_dir.exists():
             return warnings
-        
+
         for archive_file in archive_dir.glob(f"immune_{target_name}_*.json"):
             try:
-                with open(archive_file, 'r', encoding='utf-8') as f:
+                with open(archive_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                warnings.append({
-                    "error_type": data.get("error_type", "unknown"),
-                    "error_message": data.get("error_message", "")[:100],
-                    "timestamp": data.get("timestamp", ""),
-                })
+                warnings.append(
+                    {
+                        "error_type": data.get("error_type", "unknown"),
+                        "error_message": data.get("error_message", "")[:100],
+                        "timestamp": data.get("timestamp", ""),
+                    }
+                )
             except (json.JSONDecodeError, IOError):
                 continue
-        
+
         return warnings[-5:]
-        
+
     except Exception as e:
         logger.debug(f"[ImmuneArchive] 获取免疫警告失败: {e}")
         return warnings

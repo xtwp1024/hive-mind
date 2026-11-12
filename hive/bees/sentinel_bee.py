@@ -6,78 +6,167 @@ Scans codebase for toxic patterns, security risks, and vulnerabilities.
 Consolidates SentinelBee and CyberSentinelBee.
 """
 
-import re
 import json
 import logging
-from typing import List, Dict, Any
-from pathlib import Path
+import re
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
 
 from hive.bees.base_bee import BaseBee
-from hive.core.dna import BeeDNA
 from hive.config.settings import get_settings
-from hive.core.swarm_communication import get_swarm_communication, MessageType, SwarmMessage
+from hive.core.dna import BeeDNA
+from hive.core.swarm_communication import MessageType, SwarmMessage, get_swarm_communication
 
 logger = logging.getLogger("Hive.Sentinel")
+
 
 class SentinelBee(BaseBee):
     """
     Sentinel Bee - Unified Security Scanner.
     Detects: Code Injection, Command Injection, Weak Crypto, Hardcoded Secrets, etc.
     """
-    
+
     def __init__(self, dna: BeeDNA, id: str, result_queue: Any):
         super().__init__(dna, id, result_queue)
         self.settings = get_settings()
         self.report_dir = self.settings.REPORT_DIR / "sentinel"
         self.report_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Consolidate patterns from Sentinel and CyberSentinel
         self.toxic_patterns = {
-            'code_injection': [
-                { 'pattern': r'\beval\s*\(', 'severity': 'HIGH', 'description': 'Usage of eval() can execute arbitrary code.' },
-                { 'pattern': r'\bexec\s*\(', 'severity': 'HIGH', 'description': 'Usage of exec() can execute arbitrary code.' },
-                { 'pattern': r'\bcompile\s*\(', 'severity': 'MEDIUM', 'description': 'Dynamic compilation can be risky.' },
-                { 'pattern': r'\b__import__\s*\(', 'severity': 'HIGH', 'description': 'Dynamic import can be risky.' },
+            "code_injection": [
+                {
+                    "pattern": r"\beval\s*\(",
+                    "severity": "HIGH",
+                    "description": "Usage of eval() can execute arbitrary code.",
+                },
+                {
+                    "pattern": r"\bexec\s*\(",
+                    "severity": "HIGH",
+                    "description": "Usage of exec() can execute arbitrary code.",
+                },
+                {
+                    "pattern": r"\bcompile\s*\(",
+                    "severity": "MEDIUM",
+                    "description": "Dynamic compilation can be risky.",
+                },
+                {
+                    "pattern": r"\b__import__\s*\(",
+                    "severity": "HIGH",
+                    "description": "Dynamic import can be risky.",
+                },
             ],
-            'command_injection': [
-                { 'pattern': r'\bos\.system\s*\(', 'severity': 'HIGH', 'description': 'Executing system commands is risky.' },
-                { 'pattern': r'\bos\.popen\s*\(', 'severity': 'HIGH', 'description': 'Executing system commands is risky.' },
-                { 'pattern': r'\bsubprocess\.(call|run|Popen)\s*\([^)]*shell\s*=\s*True', 'severity': 'HIGH', 'description': 'Shell=True enables command injection.' },
+            "command_injection": [
+                {
+                    "pattern": r"\bos\.system\s*\(",
+                    "severity": "HIGH",
+                    "description": "Executing system commands is risky.",
+                },
+                {
+                    "pattern": r"\bos\.popen\s*\(",
+                    "severity": "HIGH",
+                    "description": "Executing system commands is risky.",
+                },
+                {
+                    "pattern": r"\bsubprocess\.(call|run|Popen)\s*\([^)]*shell\s*=\s*True",
+                    "severity": "HIGH",
+                    "description": "Shell=True enables command injection.",
+                },
             ],
-            'deserialization': [
-                { 'pattern': r'\bpickle\.load(s)?\s*\(', 'severity': 'HIGH', 'description': 'Unsafe deserialization (pickle).' },
-                { 'pattern': r'\bmarshal\.load(s)?\s*\(', 'severity': 'HIGH', 'description': 'Unsafe deserialization (marshal).' },
-                { 'pattern': r'\byaml\.load\s*\(', 'severity': 'MEDIUM', 'description': 'Unsafe YAML loading (use safe_load).' },
+            "deserialization": [
+                {
+                    "pattern": r"\bpickle\.load(s)?\s*\(",
+                    "severity": "HIGH",
+                    "description": "Unsafe deserialization (pickle).",
+                },
+                {
+                    "pattern": r"\bmarshal\.load(s)?\s*\(",
+                    "severity": "HIGH",
+                    "description": "Unsafe deserialization (marshal).",
+                },
+                {
+                    "pattern": r"\byaml\.load\s*\(",
+                    "severity": "MEDIUM",
+                    "description": "Unsafe YAML loading (use safe_load).",
+                },
             ],
-            'secrets': [
-                { 'pattern': r'password\s*=\s*["\']([^"\']+)["\']', 'severity': 'HIGH', 'description': 'Possible hardcoded password.' },
-                { 'pattern': r'api_key\s*=\s*["\']([^"\']+)["\']', 'severity': 'HIGH', 'description': 'Possible hardcoded API key.' },
-                { 'pattern': r'secret\s*=\s*["\']([^"\']+)["\']', 'severity': 'HIGH', 'description': 'Possible hardcoded secret.' },
-                { 'pattern': r'token\s*=\s*["\']([^"\']+)["\']', 'severity': 'HIGH', 'description': 'Possible hardcoded token.' },
+            "secrets": [
+                {
+                    "pattern": r'password\s*=\s*["\']([^"\']+)["\']',
+                    "severity": "HIGH",
+                    "description": "Possible hardcoded password.",
+                },
+                {
+                    "pattern": r'api_key\s*=\s*["\']([^"\']+)["\']',
+                    "severity": "HIGH",
+                    "description": "Possible hardcoded API key.",
+                },
+                {
+                    "pattern": r'secret\s*=\s*["\']([^"\']+)["\']',
+                    "severity": "HIGH",
+                    "description": "Possible hardcoded secret.",
+                },
+                {
+                    "pattern": r'token\s*=\s*["\']([^"\']+)["\']',
+                    "severity": "HIGH",
+                    "description": "Possible hardcoded token.",
+                },
             ],
-            'weak_crypto': [
-                { 'pattern': r'\bmd5\s*\(', 'severity': 'MEDIUM', 'description': 'MD5 is weak. Use SHA256.' },
-                { 'pattern': r'\bsha1\s*\(', 'severity': 'MEDIUM', 'description': 'SHA1 is weak. Use SHA256.' },
-                { 'pattern': r'\bDES\s*\(', 'severity': 'HIGH', 'description': 'DES is deprecated.' },
+            "weak_crypto": [
+                {
+                    "pattern": r"\bmd5\s*\(",
+                    "severity": "MEDIUM",
+                    "description": "MD5 is weak. Use SHA256.",
+                },
+                {
+                    "pattern": r"\bsha1\s*\(",
+                    "severity": "MEDIUM",
+                    "description": "SHA1 is weak. Use SHA256.",
+                },
+                {"pattern": r"\bDES\s*\(", "severity": "HIGH", "description": "DES is deprecated."},
             ],
-            'sql_injection': [
-                { 'pattern': r'["\'].*?["\']\s*\+\s*["\'].*?["\']\s*\.\s*format', 'severity': 'MEDIUM', 'description': 'Potential SQL injection via format.' },
-                { 'pattern': r'execute\s*\(\s*f["\']', 'severity': 'HIGH', 'description': 'Potential SQL injection via f-string.' },
+            "sql_injection": [
+                {
+                    "pattern": r'["\'].*?["\']\s*\+\s*["\'].*?["\']\s*\.\s*format',
+                    "severity": "MEDIUM",
+                    "description": "Potential SQL injection via format.",
+                },
+                {
+                    "pattern": r'execute\s*\(\s*f["\']',
+                    "severity": "HIGH",
+                    "description": "Potential SQL injection via f-string.",
+                },
             ],
-            'network': [
-                { 'pattern': r'http://', 'severity': 'MEDIUM', 'description': 'Unencrypted HTTP Usage.' },
-                { 'pattern': r'0\.0\.0\.0', 'severity': 'LOW', 'description': 'Binding to all interfaces.' },
+            "network": [
+                {
+                    "pattern": r"http://",
+                    "severity": "MEDIUM",
+                    "description": "Unencrypted HTTP Usage.",
+                },
+                {
+                    "pattern": r"0\.0\.0\.0",
+                    "severity": "LOW",
+                    "description": "Binding to all interfaces.",
+                },
             ],
-            'debug': [
-                { 'pattern': r'\bprint\s*\(', 'severity': 'LOW', 'description': 'Leftover debug print.' },
-                { 'pattern': r'\bpdb\.set_trace', 'severity': 'LOW', 'description': 'Debugger breakdown.' },
+            "debug": [
+                {
+                    "pattern": r"\bprint\s*\(",
+                    "severity": "LOW",
+                    "description": "Leftover debug print.",
+                },
+                {
+                    "pattern": r"\bpdb\.set_trace",
+                    "severity": "LOW",
+                    "description": "Debugger breakdown.",
+                },
             ],
         }
-        
+
         self.scan_results = {
             "issues": [],
-            "stats": {"high": 0, "medium": 0, "low": 0, "files_scanned": 0}
+            "stats": {"high": 0, "medium": 0, "low": 0, "files_scanned": 0},
         }
 
         # Phase 2: 接入蜂群通信系统
@@ -122,7 +211,7 @@ class SentinelBee(BaseBee):
                         "status": "success",
                         "stats": scan_result["stats"],
                         "issues": scan_result["issues"][:10],  # 最多10个问题
-                    }
+                    },
                 },
                 priority=7,
             )
@@ -139,7 +228,7 @@ class SentinelBee(BaseBee):
                 content={
                     "topic": "security_scan_result",
                     "task_id": task_id,
-                    "result": {"status": "error", "message": str(e)}
+                    "result": {"status": "error", "message": str(e)},
                 },
                 priority=7,
             )
@@ -148,22 +237,20 @@ class SentinelBee(BaseBee):
     def specialized_task(self, target_path: Path):
         """Execute security scan."""
         logger.info(f"🛡️ SentinelBee Scanning: {self.dna.target_name}")
-        
+
         try:
             self.scan_results = self._scan_codebase(target_path)
-            
+
             # Generate Report
             self._generate_report(target_path)
-            
+
             stats = self.scan_results["stats"]
-            logger.info(f"✅ Scan Complete: {stats['files_scanned']} files. Issues: H{stats['high']} M{stats['medium']} L{stats['low']}")
-            
-            return {
-                "status": "success",
-                "stats": stats,
-                "report_location": str(self.report_dir)
-            }
-            
+            logger.info(
+                f"✅ Scan Complete: {stats['files_scanned']} files. Issues: H{stats['high']} M{stats['medium']} L{stats['low']}"
+            )
+
+            return {"status": "success", "stats": stats, "report_location": str(self.report_dir)}
+
         except Exception as e:
             logger.error(f"❌ Scan Failed: {e}", exc_info=True)
             return {"status": "error", "error": str(e)}
@@ -172,13 +259,30 @@ class SentinelBee(BaseBee):
         """Scan all relevant files."""
         issues = []
         files_count = 0
-        extensions = {'.py', '.js', '.ts', '.go', '.java', '.c', '.cpp', '.php', '.rb', '.sh', '.yaml', '.json', '.xml'}
-        exclude_dirs = {'.git', '__pycache__', 'node_modules', 'venv', '.env', 'dist', 'build'}
+        extensions = {
+            ".py",
+            ".js",
+            ".ts",
+            ".go",
+            ".java",
+            ".c",
+            ".cpp",
+            ".php",
+            ".rb",
+            ".sh",
+            ".yaml",
+            ".json",
+            ".xml",
+        }
+        exclude_dirs = {".git", "__pycache__", "node_modules", "venv", ".env", "dist", "build"}
 
-        for file_path in target_path.rglob('*'):
-            if not file_path.is_file(): continue
-            if any(p in exclude_dirs for p in file_path.parts): continue
-            if file_path.suffix not in extensions: continue
+        for file_path in target_path.rglob("*"):
+            if not file_path.is_file():
+                continue
+            if any(p in exclude_dirs for p in file_path.parts):
+                continue
+            if file_path.suffix not in extensions:
+                continue
 
             files_count += 1
             file_issues = self._scan_file(file_path, target_path)
@@ -186,37 +290,39 @@ class SentinelBee(BaseBee):
 
         # Calculate stats
         stats = {
-            "high": len([i for i in issues if i['severity'] == 'HIGH']),
-            "medium": len([i for i in issues if i['severity'] == 'MEDIUM']),
-            "low": len([i for i in issues if i['severity'] == 'LOW']),
+            "high": len([i for i in issues if i["severity"] == "HIGH"]),
+            "medium": len([i for i in issues if i["severity"] == "MEDIUM"]),
+            "low": len([i for i in issues if i["severity"] == "LOW"]),
             "files_scanned": files_count,
-            "total_issues": len(issues)
+            "total_issues": len(issues),
         }
-        
+
         return {"issues": issues, "stats": stats}
 
     def _scan_file(self, file_path: Path, root_path: Path) -> List[Dict]:
         """Scan a single file."""
         found = []
         try:
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
             lines = content.splitlines()
-            
+
             for line_idx, line in enumerate(lines):
                 for cat, patterns in self.toxic_patterns.items():
                     for pat in patterns:
-                        if re.search(pat['pattern'], line):
-                            found.append({
-                                "file": str(file_path.relative_to(root_path)),
-                                "line": line_idx + 1,
-                                "content": line.strip()[:100],
-                                "category": cat,
-                                "severity": pat['severity'],
-                                "description": pat['description']
-                            })
+                        if re.search(pat["pattern"], line):
+                            found.append(
+                                {
+                                    "file": str(file_path.relative_to(root_path)),
+                                    "line": line_idx + 1,
+                                    "content": line.strip()[:100],
+                                    "category": cat,
+                                    "severity": pat["severity"],
+                                    "description": pat["description"],
+                                }
+                            )
         except Exception as e:
             logger.debug(f"Could not read {file_path}: {e}")
-            
+
         return found
 
     def _generate_report(self, target_path: Path):
@@ -227,26 +333,26 @@ class SentinelBee(BaseBee):
             "bee_id": self.id,
             "stats": self.scan_results["stats"],
             "issues": self.scan_results["issues"],
-            "recommendations": self._generate_recommendations()
+            "recommendations": self._generate_recommendations(),
         }
-        
+
         filename = f"{self.dna.target_name.replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(self.report_dir / filename, 'w', encoding='utf-8') as f:
+        with open(self.report_dir / filename, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
 
     def _generate_recommendations(self) -> List[str]:
         """Generate friendly advice."""
         stats = self.scan_results["stats"]
         recs = []
-        
+
         if stats["high"] > 0:
             recs.append("CRITICAL: High severity issues found. Manual review required immediately.")
             recs.append("Check for remote code execution (RCE) vulnerabilities (eval/exec).")
-            
+
         if stats["medium"] > 0:
             recs.append("Review use of weak cryptography and sql injection risks.")
-            
-        if any(i['category'] == 'secrets' for i in self.scan_results["issues"]):
+
+        if any(i["category"] == "secrets" for i in self.scan_results["issues"]):
             recs.append("Rotate any potentially exposed API keys or secrets detected.")
-            
+
         return recs

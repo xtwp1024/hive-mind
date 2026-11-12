@@ -18,17 +18,26 @@ Phase 3: 自主进化能力
 """
 
 import logging
+import random
+import statistics
 import threading
 import time
 import uuid
-import random
-import statistics
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from copy import deepcopy
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    # 以下类只用于类型注解；运行时仍由各函数按需延迟导入，避免拉长启动链
+    from hive.core.capability_gap_analyzer import CapabilityGapAnalyzer, GapAnalysisReport
+    from hive.core.species_blueprint import (
+        BlueprintRegistry,
+        BlueprintValidationResult,
+        SpeciesBlueprint,
+    )
 
 logger = logging.getLogger("Hive.AutoSpeciesGenerator")
 
@@ -152,10 +161,7 @@ class BlueprintOptimizer:
         best_individual = deepcopy(base_blueprint)
 
         for gen in range(self.generations):
-            fitness_scores = [
-                self._evaluate_individual(ind, evaluator)
-                for ind in population
-            ]
+            fitness_scores = [self._evaluate_individual(ind, evaluator) for ind in population]
 
             current_best_idx = fitness_scores.index(max(fitness_scores))
             current_best_fitness = fitness_scores[current_best_idx]
@@ -173,9 +179,7 @@ class BlueprintOptimizer:
                 logger.info(f"🧬 [BlueprintOptimizer] 适应度已达到阈值，提前结束优化")
                 break
 
-        logger.info(
-            f"🧬 [BlueprintOptimizer] 优化完成, 最佳适应度: {best_fitness:.4f}"
-        )
+        logger.info(f"🧬 [BlueprintOptimizer] 优化完成, 最佳适应度: {best_fitness:.4f}")
 
         return best_individual
 
@@ -189,11 +193,7 @@ class BlueprintOptimizer:
 
         return population
 
-    def _evaluate_individual(
-        self,
-        individual: "SpeciesBlueprint",
-        evaluator
-    ) -> float:
+    def _evaluate_individual(self, individual: "SpeciesBlueprint", evaluator) -> float:
         """评估个体适应度"""
         cache_key = f"{individual.blueprint_id}_{hash(str(individual.to_dict()))}"
 
@@ -206,17 +206,13 @@ class BlueprintOptimizer:
         return fitness
 
     def _evolve_population(
-        self,
-        population: List["SpeciesBlueprint"],
-        fitness_scores: List[float]
+        self, population: List["SpeciesBlueprint"], fitness_scores: List[float]
     ) -> List["SpeciesBlueprint"]:
         """进化种群"""
         new_population = []
 
         sorted_indices = sorted(
-            range(len(fitness_scores)),
-            key=lambda i: fitness_scores[i],
-            reverse=True
+            range(len(fitness_scores)), key=lambda i: fitness_scores[i], reverse=True
         )
 
         elite_count = max(2, int(self.population_size * 0.1))
@@ -243,9 +239,7 @@ class BlueprintOptimizer:
         return new_population
 
     def _select_parent(
-        self,
-        population: List["SpeciesBlueprint"],
-        fitness_scores: List[float]
+        self, population: List["SpeciesBlueprint"], fitness_scores: List[float]
     ) -> "SpeciesBlueprint":
         """选择父代（锦标赛选择）"""
         tournament_size = 3
@@ -298,9 +292,11 @@ class AutoSpeciesGenerator:
         """获取蓝图注册表"""
         try:
             from hive.core.species_blueprint import get_blueprint_registry
+
             return get_blueprint_registry()
         except ImportError:
             from hive.core.species_blueprint import BlueprintRegistry
+
             return BlueprintRegistry()
 
     def generate_from_gap_analysis(
@@ -322,9 +318,7 @@ class AutoSpeciesGenerator:
         Returns:
             GenerationResult - 生成结果
         """
-        logger.info(
-            f"🧬 [AutoSpeciesGenerator] 基于缺口分析生成新蜂种, 策略: {strategy.value}"
-        )
+        logger.info(f"🧬 [AutoSpeciesGenerator] 基于缺口分析生成新蜂种, 策略: {strategy.value}")
 
         result = GenerationResult(
             generation_id=f"gen_{int(time.time())}_{uuid.uuid4().hex[:6]}",
@@ -350,9 +344,7 @@ class AutoSpeciesGenerator:
         result.metadata["evolution_targets"] = [t.to_dict() for t in evolution_targets]
 
         candidate_blueprints = self._generate_candidates(
-            evolution_targets,
-            strategy,
-            max_blueprints * 2
+            evolution_targets, strategy, max_blueprints * 2
         )
 
         result.candidate_blueprints = [
@@ -390,20 +382,14 @@ class AutoSpeciesGenerator:
 
         return result
 
-    def _extract_evolution_targets(
-        self,
-        report: "GapAnalysisReport"
-    ) -> List[EvolutionTarget]:
+    def _extract_evolution_targets(self, report: "GapAnalysisReport") -> List[EvolutionTarget]:
         """从缺口报告提取进化目标"""
         targets = []
 
         all_gaps = report.critical_gaps + report.high_gaps
 
         for gap in all_gaps:
-            target_success_rate = min(
-                0.95,
-                gap.success_rate + gap.estimated_improvement
-            )
+            target_success_rate = min(0.95, gap.success_rate + gap.estimated_improvement)
 
             target = EvolutionTarget(
                 target_id=f"target_{uuid.uuid4().hex[:8]}",
@@ -426,17 +412,14 @@ class AutoSpeciesGenerator:
         return targets
 
     def _generate_candidates(
-        self,
-        targets: List[EvolutionTarget],
-        strategy: GenerationStrategy,
-        count: int
+        self, targets: List[EvolutionTarget], strategy: GenerationStrategy, count: int
     ) -> List["SpeciesBlueprint"]:
         """生成候选蓝图"""
         candidates = []
 
         existing_blueprints = self._registry.get_all()
 
-        for target in targets[:max(1, count // 2)]:
+        for target in targets[: max(1, count // 2)]:
             if strategy in [GenerationStrategy.MUTATION, GenerationStrategy.HYBRID]:
                 mutated = self._generate_by_mutation(target, existing_blueprints)
                 if mutated:
@@ -459,23 +442,21 @@ class AutoSpeciesGenerator:
         return candidates[:count]
 
     def _generate_by_mutation(
-        self,
-        target: EvolutionTarget,
-        existing_blueprints: List["SpeciesBlueprint"]
+        self, target: EvolutionTarget, existing_blueprints: List["SpeciesBlueprint"]
     ) -> Optional["SpeciesBlueprint"]:
         """通过变异生成"""
-        similar = [
-            bp for bp in existing_blueprints
-            if target.capability_name in bp.capabilities
-        ]
+        similar = [bp for bp in existing_blueprints if target.capability_name in bp.capabilities]
 
         if not similar:
             return None
 
         similar.sort(
-            key=lambda bp: bp.capabilities.get(target.capability_name, target).target_value
-            if target.capability_name in bp.capabilities else 0,
-            reverse=True
+            key=lambda bp: (
+                bp.capabilities.get(target.capability_name, target).target_value
+                if target.capability_name in bp.capabilities
+                else 0
+            ),
+            reverse=True,
         )
 
         base = similar[0]
@@ -492,28 +473,24 @@ class AutoSpeciesGenerator:
             mutated.capabilities[target.capability_name].priority = "primary"
 
         mutated.add_task_affinity(
-            task_category=target.task_category,
-            affinity_score=0.8,
-            is_exclusive=False
+            task_category=target.task_category, affinity_score=0.8, is_exclusive=False
         )
 
         return mutated
 
     def _generate_by_crossover(
-        self,
-        target: EvolutionTarget,
-        existing_blueprints: List["SpeciesBlueprint"]
+        self, target: EvolutionTarget, existing_blueprints: List["SpeciesBlueprint"]
     ) -> List["SpeciesBlueprint"]:
         """通过交叉生成"""
         candidates = []
 
         with_capability = [
-            bp for bp in existing_blueprints
-            if target.capability_name in bp.capabilities
+            bp for bp in existing_blueprints if target.capability_name in bp.capabilities
         ]
 
         for_task = [
-            bp for bp in existing_blueprints
+            bp
+            for bp in existing_blueprints
             if any(a.task_category == target.task_category for a in bp.task_affinities)
         ]
 
@@ -526,7 +503,9 @@ class AutoSpeciesGenerator:
                 child.description = f"交叉后代，优化 {target.capability_name} 能力"
 
                 if target.capability_name in child.capabilities:
-                    child.capabilities[target.capability_name].target_value = target.target_success_rate
+                    child.capabilities[target.capability_name].target_value = (
+                        target.target_success_rate
+                    )
 
                 candidates.append(child)
 
@@ -544,7 +523,7 @@ class AutoSpeciesGenerator:
 
     def _generate_novel(self, target: EvolutionTarget) -> "SpeciesBlueprint":
         """生成全新蓝图"""
-        from hive.core.species_blueprint import SpeciesBlueprint, CapabilityPriority
+        from hive.core.species_blueprint import CapabilityPriority, SpeciesBlueprint
 
         blueprint = SpeciesBlueprint(
             blueprint_id=f"novel_{uuid.uuid4().hex[:8]}",
@@ -605,8 +584,7 @@ class AutoSpeciesGenerator:
         return blueprint
 
     def _create_blueprint_from_target(
-        self,
-        target: Optional[EvolutionTarget]
+        self, target: Optional[EvolutionTarget]
     ) -> "SpeciesBlueprint":
         """从目标创建蓝图"""
         if target:
@@ -622,9 +600,7 @@ class AutoSpeciesGenerator:
         )
 
     def _estimate_blueprint_fitness(
-        self,
-        blueprint: "SpeciesBlueprint",
-        targets: List[EvolutionTarget]
+        self, blueprint: "SpeciesBlueprint", targets: List[EvolutionTarget]
     ) -> float:
         """估计蓝图适应度"""
         fitness = 0.5
@@ -634,8 +610,7 @@ class AutoSpeciesGenerator:
                 spec = blueprint.capabilities[target.capability_name]
 
                 target_achievement = min(
-                    1.0,
-                    spec.target_value / max(target.target_success_rate, 0.01)
+                    1.0, spec.target_value / max(target.target_success_rate, 0.01)
                 )
 
                 priority_bonus = 1.0
@@ -652,8 +627,7 @@ class AutoSpeciesGenerator:
             for affinity in blueprint.task_affinities:
                 if affinity.task_category == target.task_category:
                     task_match_score = max(
-                        task_match_score,
-                        affinity.affinity_score * target.priority
+                        task_match_score, affinity.affinity_score * target.priority
                     )
 
         fitness += task_match_score * 0.2
@@ -678,9 +652,7 @@ class AutoSpeciesGenerator:
         return self._optimizer.optimize(blueprint, objectives, evaluator)
 
     def _evaluate_for_objectives(
-        self,
-        blueprint: "SpeciesBlueprint",
-        objectives: List[OptimizationObjective]
+        self, blueprint: "SpeciesBlueprint", objectives: List[OptimizationObjective]
     ) -> float:
         """按目标评估蓝图"""
         scores = []

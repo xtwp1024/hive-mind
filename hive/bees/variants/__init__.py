@@ -25,6 +25,7 @@ from .primeminer_bee import PrimeMinerBee
 from .primeminerlibrarian_bee import PrimeMinerLibrarianBee
 from .primeseeker_bee import PrimeSeekerBee
 from .prism_bee import PrismBee
+from .ralph_bee import RalphBee
 from .renamer_bee import RenamerBee
 from .searcher_bee import SearcherBee
 from .texter_bee import TexterBee
@@ -33,36 +34,35 @@ from .validator_bee import ValidatorBee
 from .vortex_bee import VortexBee
 from .vortexprimearchitect_bee import VortexPrimeArchitectBee
 from .watcher_bee import WatcherBee
-from .ralph_bee import RalphBee
 
 __all__ = [
-    'CipherBee',
-    'ConfigBee',
-    'CopierBee',
-    'CounterBee',
-    'CyberMinerBee',
-    'CyberMinerMinerAntibodyBee',
-    'CyberSentinelMinerBee',
-    'EchoBee',
-    'LibrarianBee',
-    'LoggerBee',
-    'MergerBee',
-    'MinerAntibodyBee',
-    'OracleBee',
-    'PingerBee',
-    'PrimeAntibodyBee',
-    'PrimeArchitectBee',
-    'PrimeMinerBee',
-    'PrimeMinerLibrarianBee',
-    'PrimeSeekerBee',
-    'PrismBee',
-    'RalphBee',
-    'RenamerBee',
-    'SearcherBee',
-    'TexterBee',
-    'UltraCipherBee',
-    'ValidatorBee',
-    'VortexBee',
-    'VortexPrimeArchitectBee',
-    'WatcherBee',
+    "CipherBee",
+    "ConfigBee",
+    "CopierBee",
+    "CounterBee",
+    "CyberMinerBee",
+    "CyberMinerMinerAntibodyBee",
+    "CyberSentinelMinerBee",
+    "EchoBee",
+    "LibrarianBee",
+    "LoggerBee",
+    "MergerBee",
+    "MinerAntibodyBee",
+    "OracleBee",
+    "PingerBee",
+    "PrimeAntibodyBee",
+    "PrimeArchitectBee",
+    "PrimeMinerBee",
+    "PrimeMinerLibrarianBee",
+    "PrimeSeekerBee",
+    "PrismBee",
+    "RalphBee",
+    "RenamerBee",
+    "SearcherBee",
+    "TexterBee",
+    "UltraCipherBee",
+    "ValidatorBee",
+    "VortexBee",
+    "VortexPrimeArchitectBee",
+    "WatcherBee",
 ]

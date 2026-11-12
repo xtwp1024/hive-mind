@@ -7,8 +7,9 @@
 2. Hive KnowledgeBase (内存存储)
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from datetime import datetime
@@ -22,23 +23,23 @@ def store_to_knowledge_base():
     print("存储知识到 Hive KnowledgeBase")
     print("=" * 60)
     print()
-    
+
     # 导入 KnowledgeBase
     from hive.core.knowledge_base import KnowledgeBase
-    
+
     # 创建知识库实例
     kb = KnowledgeBase()
     kb.set_generation(1)  # 设置世代
-    
+
     print("[1/5] 初始化 KnowledgeBase...")
     print(f"    知识库状态: {kb}")
     print()
-    
+
     # ============ 存储知识 ============
-    
+
     print("[2/5] 存储今天的开发记录...")
     print()
-    
+
     # 1. MemoryStore 持久化
     knowledge_1 = """
 ## MemoryStore 持久化增强
@@ -62,13 +63,10 @@ def store_to_knowledge_base():
 5/5 测试通过
 """
     kb.add_knowledge(
-        content=knowledge_1,
-        importance=0.95,
-        source_atom_id="development-2026-04-22",
-        vectors=[]
+        content=knowledge_1, importance=0.95, source_atom_id="development-2026-04-22", vectors=[]
     )
     print("    [OK] MemoryStore 持久化知识已存储")
-    
+
     # 2. 代码审查
     knowledge_2 = """
 ## 代码审查结果
@@ -99,13 +97,10 @@ def store_to_knowledge_base():
 所有核心模块代码质量良好，可以正常使用。
 """
     kb.add_knowledge(
-        content=knowledge_2,
-        importance=0.9,
-        source_atom_id="review-2026-04-22",
-        vectors=[]
+        content=knowledge_2, importance=0.9, source_atom_id="review-2026-04-22", vectors=[]
     )
     print("    [OK] 代码审查知识已存储")
-    
+
     # 3. 完整测试
     knowledge_3 = """
 ## 完整测试结果
@@ -152,13 +147,10 @@ def store_to_knowledge_base():
 - FailoverManager - 故障转移管理器
 """
     kb.add_knowledge(
-        content=knowledge_3,
-        importance=0.95,
-        source_atom_id="testing-2026-04-22",
-        vectors=[]
+        content=knowledge_3, importance=0.95, source_atom_id="testing-2026-04-22", vectors=[]
     )
     print("    [OK] 完整测试知识已存储")
-    
+
     # 4. 多节点集成测试
     knowledge_4 = """
 ## 多节点集成测试结果
@@ -198,13 +190,10 @@ def store_to_knowledge_base():
 HiveFederation 多节点通信功能完全正常！
 """
     kb.add_knowledge(
-        content=knowledge_4,
-        importance=0.9,
-        source_atom_id="integration-2026-04-22",
-        vectors=[]
+        content=knowledge_4, importance=0.9, source_atom_id="integration-2026-04-22", vectors=[]
     )
     print("    [OK] 多节点集成测试知识已存储")
-    
+
     # 5. 五阶段进化路线图
     knowledge_5 = """
 ## 五阶段进化路线图
@@ -245,19 +234,16 @@ HiveFederation 多节点通信功能完全正常！
 - MemoryStore - 记忆存储 (已增强)
 """
     kb.add_knowledge(
-        content=knowledge_5,
-        importance=1.0,
-        source_atom_id="roadmap-2026-04-22",
-        vectors=[]
+        content=knowledge_5, importance=1.0, source_atom_id="roadmap-2026-04-22", vectors=[]
     )
     print("    [OK] 五阶段路线图知识已存储")
     print()
-    
+
     # ============ 验证存储 ============
-    
+
     print("[3/5] 验证知识存储...")
     print()
-    
+
     # 获取统计信息
     stats = kb.get_stats()
     print(f"    知识库统计:")
@@ -266,11 +252,11 @@ HiveFederation 多节点通信功能完全正常！
     print(f"      平均重要性: {stats['average_importance']:.4f}")
     print(f"      当前世代: {stats['generation']}")
     print()
-    
+
     # 查询最重要的知识
     print("[4/5] 查询最重要的知识...")
     print()
-    
+
     top_knowledge = kb.query(limit=5)
     for i, entry in enumerate(top_knowledge, 1):
         print(f"    [{i}] ID: {entry.id}")
@@ -278,9 +264,9 @@ HiveFederation 多节点通信功能完全正常！
         print(f"        来源: {entry.source_atom_id}")
         print(f"        内容预览: {entry.content[:100]}...")
         print()
-    
+
     # ============ 输出汇总 ============
-    
+
     print("[5/5] 输出汇总...")
     print()
     print("=" * 60)
@@ -302,7 +288,7 @@ HiveFederation 多节点通信功能完全正常！
     print(f"      - 知识条目数: {stats['total_knowledge']}")
     print(f"      - 总重要性: {stats['total_importance']:.2f}")
     print()
-    
+
     # 返回知识库实例，供外部使用
     return kb
 
@@ -316,7 +302,7 @@ def query_knowledge_demo(kb):
     print("知识库查询演示")
     print("=" * 60)
     print()
-    
+
     # 按关键词查询
     print("🔍 按关键词查询 ('持久化'):")
     results = kb.query(keywords="持久化", limit=3)
@@ -324,7 +310,7 @@ def query_knowledge_demo(kb):
         print(f"  [{i}] {entry.source_atom_id}")
         print(f"      重要性: {entry.importance}")
     print()
-    
+
     # 按另一个关键词查询
     print("🔍 按关键词查询 ('测试'):")
     results = kb.query(keywords="测试", limit=3)
@@ -332,27 +318,28 @@ def query_knowledge_demo(kb):
         print(f"  [{i}] {entry.source_atom_id}")
         print(f"      重要性: {entry.importance}")
     print()
-    
+
     print("✅ 查询演示完成！")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         # 存储知识
         kb = store_to_knowledge_base()
-        
+
         # 演示查询
         query_knowledge_demo(kb)
-        
+
         print()
         print("=" * 60)
         print("所有任务完成！")
         print("=" * 60)
         sys.exit(0)
-        
+
     except Exception as e:
         print()
         print(f"❌ 错误: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

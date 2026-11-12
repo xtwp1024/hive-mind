@@ -230,17 +230,21 @@ def test_method_body_is_projected_to_current_contract(rid):
         assert token not in body, f"#{rid} 残留旧契约字面量 {token!r}"
 
 
-def test_triage_ledger_marks_ten_fixed_and_one_open():
-    """分诊台账是唯一真源：10 条转 fixed，唯一 open 是需行为决策的 #18。"""
+def test_triage_ledger_marks_ten_fixed_and_open_cleared_in_r12():
+    """分诊台账是唯一真源：R11 的 10 条仍 fixed；R12 修完 #18 后 open 归零。"""
     triage = _load_triage()
     rows = {r[0]: r for r in triage.LEDGER}
     assert "已修(R11)" in triage.DISPOSITIONS
+    assert "已修(R12)" in triage.DISPOSITIONS
     for rid in FIXED_IDS:
         assert rows[rid][5] == "fixed", f"#{rid} 未标 fixed"
         assert rows[rid][4] == "已修(R11)", f"#{rid} 去向不是已修(R11)"
+    # R11 时 #18 是唯一 open（需行为决策）；R12 经用户拍板后转为 已修(R12)
+    assert rows[BEHAVIOR_DECISION_ID][5] == "fixed"
+    assert rows[BEHAVIOR_DECISION_ID][4] == "已修(R12)"
     open_ids = sorted(r[0] for r in triage.LEDGER if r[5] == "open")
-    assert open_ids == [BEHAVIOR_DECISION_ID], open_ids
-    assert triage.EXPECTED_OPEN == len(open_ids) == 1
+    assert open_ids == [], open_ids
+    assert triage.EXPECTED_OPEN == len(open_ids) == 0
     assert triage.check_ledger() == [], "台账静态自证不应有问题"
 
 

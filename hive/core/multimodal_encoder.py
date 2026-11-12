@@ -42,24 +42,25 @@ Phase 4: 多模态扩展
 ```
 """
 
+import base64
+import json
 import logging
 import threading
 import time
-import base64
-import json
+from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Union
-from collections import defaultdict
-from copy import deepcopy
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("Hive.MultimodalEncoder")
 
 
 class ModalityType(Enum):
     """模态类型"""
+
     TEXT = "text"
     IMAGE = "image"
     AUDIO = "audio"
@@ -70,6 +71,7 @@ class ModalityType(Enum):
 
 class EncoderType(Enum):
     """编码器类型"""
+
     BERT = "bert"
     GPT = "gpt"
     CLIP = "clip"
@@ -211,6 +213,7 @@ class TextEncoder:
         if self._brain is None:
             try:
                 from hive.utils.brain_interface import get_brain
+
                 self._brain = get_brain()
                 logger.info("📝 [TextEncoder] BrainInterface 已加载")
             except ImportError:
@@ -222,6 +225,7 @@ class TextEncoder:
         if self._ollama is None:
             try:
                 from hive.utils.ollama_interface import get_ollama
+
                 self._ollama = get_ollama()
                 if self._ollama and self._ollama.is_available():
                     logger.info("📝 [TextEncoder] Ollama 已加载")
@@ -261,7 +265,7 @@ class TextEncoder:
                 modality_type=ModalityType.TEXT,
             )
 
-        text = text[:max_tokens * 4] if max_tokens else text
+        text = text[: max_tokens * 4] if max_tokens else text
 
         brain = self._get_brain()
         ollama = self._get_ollama()
@@ -270,14 +274,14 @@ class TextEncoder:
         encoder_used = None
         raw_response = None
 
-        if brain and hasattr(brain, 'get_embeddings'):
+        if brain and hasattr(brain, "get_embeddings"):
             try:
                 raw_response = brain.get_embeddings(text, model=model)
                 if raw_response:
                     if isinstance(raw_response, list):
                         embedding = raw_response
                     elif isinstance(raw_response, dict):
-                        embedding = raw_response.get('embedding', raw_response.get('data', {}))
+                        embedding = raw_response.get("embedding", raw_response.get("data", {}))
                     encoder_used = EncoderType.BRAIN_INTERFACE
             except Exception as e:
                 logger.warning(f"📝 [TextEncoder] BrainInterface 编码失败: {e}")
@@ -290,7 +294,7 @@ class TextEncoder:
                     if isinstance(raw_response, list):
                         embedding = raw_response
                     elif isinstance(raw_response, dict):
-                        embedding = raw_response.get('embedding', [])
+                        embedding = raw_response.get("embedding", [])
                     encoder_used = EncoderType.OLLAMA
             except Exception as e:
                 logger.warning(f"📝 [TextEncoder] Ollama 编码失败: {e}")
@@ -301,25 +305,25 @@ class TextEncoder:
 
             logger.warning("📝 [TextEncoder] 使用 fallback 伪嵌入")
 
-            hasher = hashlib.sha256(text.encode('utf-8'))
+            hasher = hashlib.sha256(text.encode("utf-8"))
             hash_bytes = hasher.digest()
 
             embedding = []
             for i in range(0, len(hash_bytes), 4):
-                chunk = hash_bytes[i:i+4]
+                chunk = hash_bytes[i : i + 4]
                 if len(chunk) < 4:
-                    chunk = chunk + b'\x00' * (4 - len(chunk))
-                value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                    chunk = chunk + b"\x00" * (4 - len(chunk))
+                value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
                 embedding.append(value * 2 - 1)
 
             while len(embedding) < 64:
-                hasher.update(b'salt')
+                hasher.update(b"salt")
                 hash_bytes = hasher.digest()
                 for i in range(0, len(hash_bytes), 4):
-                    chunk = hash_bytes[i:i+4]
+                    chunk = hash_bytes[i : i + 4]
                     if len(chunk) < 4:
-                        chunk = chunk + b'\x00' * (4 - len(chunk))
-                    value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                        chunk = chunk + b"\x00" * (4 - len(chunk))
+                    value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
                     embedding.append(value * 2 - 1)
                     if len(embedding) >= 64:
                         break
@@ -330,6 +334,7 @@ class TextEncoder:
         processing_time = (time.time() - start_time) * 1000
 
         import math
+
         norm = math.sqrt(sum(x * x for x in embedding))
         if norm > 0:
             normalized = [x / norm for x in embedding]
@@ -373,6 +378,38 @@ class TextEncoder:
         return results
 
 
+def _is_path_like_image_input(image_input: Union[str, Path]) -> bool:
+    """判定输入属于「文件路径」还是「base64 图像数据」（R12 / 分诊 #18）。
+
+    ImageEncoder 同时接受文件路径与 base64 数据。旧实现只用 Path(x).exists()
+    判定路径，不存在的文件路径字符串会落进 else 分支被当作 base64 原样处理，
+    最终返回 success=True —— 这是分诊 #18 登记的真缺陷。判定口径：
+      * pathlib.Path 恒为路径；
+      * ``data:...;base64,`` 前缀恒为数据；
+      * 带「.扩展名」后缀的字符串视为路径（base64 字符集不含 '.'，故不会误伤数据）；
+      * 含路径分隔符且不是合法 base64 的字符串视为路径（避免误伤含 '/' 的 base64）；
+      * 其余输入保持原有的数据语义。
+    已知边界：既无扩展名、又恰好是合法 base64 的路径字符串（如
+    ``a/path/without/extension``）无法与数据区分，保留旧的数据语义。
+    """
+    if isinstance(image_input, Path):
+        return True
+    if not isinstance(image_input, str):
+        return False
+    value = image_input.strip()
+    if value.startswith("data:"):
+        return False
+    _, sep, suffix = value.rpartition(".")
+    if sep and 1 <= len(suffix) <= 8 and suffix.isalnum():
+        return True
+    if "/" in value or "\\" in value:
+        try:
+            base64.b64decode(value, validate=True)
+        except Exception:
+            return True
+    return False
+
+
 class ImageEncoder:
     """
     图像编码器
@@ -396,6 +433,7 @@ class ImageEncoder:
         if self._brain is None:
             try:
                 from hive.utils.brain_interface import get_brain
+
                 self._brain = get_brain()
                 logger.info("🖼️ [ImageEncoder] BrainInterface 已加载")
             except ImportError:
@@ -407,6 +445,7 @@ class ImageEncoder:
         if self._ollama is None:
             try:
                 from hive.utils.ollama_interface import get_ollama
+
                 self._ollama = get_ollama()
                 if self._ollama and self._ollama.is_available():
                     logger.info("🖼️ [ImageEncoder] Ollama 已加载")
@@ -423,8 +462,8 @@ class ImageEncoder:
             if not path.exists():
                 return None
 
-            with open(path, 'rb') as f:
-                return base64.b64encode(f.read()).decode('utf-8')
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
         except Exception as e:
             logger.warning(f"🖼️ [ImageEncoder] 图像转换失败: {e}")
             return None
@@ -455,9 +494,21 @@ class ImageEncoder:
         image_base64 = None
         image_path = None
 
-        if isinstance(image_input, Path) or (isinstance(image_input, str) and len(image_input) < 500 and Path(image_input).exists()):
+        if _is_path_like_image_input(image_input):
+            # 与 AudioEncoder.encode() 的 path.exists() 前置校验对齐：
+            # 路径语义的输入不存在时显式失败，不能落到 else 分支被当作 base64 静默成功。
             is_path = True
             image_path = str(image_input)
+            try:
+                path_exists = Path(image_path).exists()
+            except OSError:
+                path_exists = False
+            if not path_exists:
+                return EncodingResult(
+                    success=False,
+                    message=f"Image file not found: {image_path}",
+                    modality_type=ModalityType.IMAGE,
+                )
             image_base64 = self._image_to_base64(image_path)
             if not image_base64:
                 return EncodingResult(
@@ -475,7 +526,7 @@ class ImageEncoder:
         encoder_used = None
         raw_response = None
 
-        if brain and hasattr(brain, 'consult_vision'):
+        if brain and hasattr(brain, "consult_vision"):
             try:
                 if is_path and image_path:
                     raw_response = brain.consult_vision(
@@ -519,25 +570,25 @@ class ImageEncoder:
         import hashlib
         import math
 
-        hasher = hashlib.sha256(analysis_result.encode('utf-8'))
+        hasher = hashlib.sha256(analysis_result.encode("utf-8"))
         hash_bytes = hasher.digest()
 
         embedding = []
         for i in range(0, min(len(hash_bytes), 64), 4):
-            chunk = hash_bytes[i:i+4]
+            chunk = hash_bytes[i : i + 4]
             if len(chunk) < 4:
-                chunk = chunk + b'\x00' * (4 - len(chunk))
-            value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                chunk = chunk + b"\x00" * (4 - len(chunk))
+            value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
             embedding.append(value * 2 - 1)
 
         while len(embedding) < 64:
-            hasher.update(b'salt')
+            hasher.update(b"salt")
             hash_bytes = hasher.digest()
             for i in range(0, len(hash_bytes), 4):
-                chunk = hash_bytes[i:i+4]
+                chunk = hash_bytes[i : i + 4]
                 if len(chunk) < 4:
-                    chunk = chunk + b'\x00' * (4 - len(chunk))
-                value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                    chunk = chunk + b"\x00" * (4 - len(chunk))
+                value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
                 embedding.append(value * 2 - 1)
                 if len(embedding) >= 64:
                     break
@@ -619,8 +670,9 @@ class ImageEncoder:
 
         try:
             import re
+
             text = result.embedding.raw_input if result.embedding else ""
-            json_match = re.search(r'\{.*\}', text, re.DOTALL) if text else None
+            json_match = re.search(r"\{.*\}", text, re.DOTALL) if text else None
 
             if json_match:
                 parsed = json.loads(json_match.group())
@@ -700,6 +752,7 @@ class AudioEncoder:
         if self._brain is None:
             try:
                 from hive.utils.brain_interface import get_brain
+
                 self._brain = get_brain()
                 logger.info("🎙️ [AudioEncoder] BrainInterface 已加载")
             except ImportError:
@@ -711,6 +764,7 @@ class AudioEncoder:
         if self._ollama is None:
             try:
                 from hive.utils.ollama_interface import get_ollama
+
                 self._ollama = get_ollama()
                 if self._ollama and self._ollama.is_available():
                     logger.info("🎙️ [AudioEncoder] Ollama 已加载")
@@ -758,7 +812,7 @@ class AudioEncoder:
         encoder_used = None
         raw_response = None
 
-        if brain and hasattr(brain, 'transcribe_audio'):
+        if brain and hasattr(brain, "transcribe_audio"):
             try:
                 raw_response = brain.transcribe_audio(
                     audio_path=audio_path,
@@ -781,25 +835,25 @@ class AudioEncoder:
         import hashlib
         import math
 
-        hasher = hashlib.sha256(transcription.encode('utf-8'))
+        hasher = hashlib.sha256(transcription.encode("utf-8"))
         hash_bytes = hasher.digest()
 
         embedding = []
         for i in range(0, min(len(hash_bytes), 64), 4):
-            chunk = hash_bytes[i:i+4]
+            chunk = hash_bytes[i : i + 4]
             if len(chunk) < 4:
-                chunk = chunk + b'\x00' * (4 - len(chunk))
-            value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                chunk = chunk + b"\x00" * (4 - len(chunk))
+            value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
             embedding.append(value * 2 - 1)
 
         while len(embedding) < 64:
-            hasher.update(b'salt')
+            hasher.update(b"salt")
             hash_bytes = hasher.digest()
             for i in range(0, len(hash_bytes), 4):
-                chunk = hash_bytes[i:i+4]
+                chunk = hash_bytes[i : i + 4]
                 if len(chunk) < 4:
-                    chunk = chunk + b'\x00' * (4 - len(chunk))
-                value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                    chunk = chunk + b"\x00" * (4 - len(chunk))
+                value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
                 embedding.append(value * 2 - 1)
                 if len(embedding) >= 64:
                     break
@@ -925,9 +979,7 @@ class MultimodalEncoder:
 
         self._lock = threading.Lock()
 
-        logger.info(
-            f"🔮 [MultimodalEncoder] 初始化，统一维度: {unified_dim}"
-        )
+        logger.info(f"🔮 [MultimodalEncoder] 初始化，统一维度: {unified_dim}")
 
     def detect_modality(
         self,
@@ -967,10 +1019,10 @@ class MultimodalEncoder:
             if path.exists():
                 suffix = path.suffix.lower()
 
-                text_extensions = {'.txt', '.md', '.json', '.csv', '.xml', '.html'}
-                image_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'}
-                audio_extensions = {'.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'}
-                video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.webm'}
+                text_extensions = {".txt", ".md", ".json", ".csv", ".xml", ".html"}
+                image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"}
+                audio_extensions = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"}
+                video_extensions = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 
                 if suffix in text_extensions:
                     return ModalityType.TEXT
@@ -1105,8 +1157,8 @@ class MultimodalEncoder:
         Returns:
             ModalityEmbedding - 融合后的嵌入
         """
-        import uuid
         import math
+        import uuid
 
         if not embeddings:
             raise ValueError("No embeddings to fuse")
@@ -1164,6 +1216,7 @@ class MultimodalEncoder:
         source_ids = [e.embedding_id for e in embeddings]
 
         import statistics
+
         total_time = sum(e.processing_time_ms for e in embeddings)
 
         result = ModalityEmbedding(

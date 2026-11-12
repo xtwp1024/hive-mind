@@ -10,10 +10,11 @@ API 格式: OpenAI-compatible (http://localhost:11434/v1/chat/completions)
 """
 
 import logging
-import requests
 import time
-from typing import Dict, Any, Optional, List
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import requests
 
 logger = logging.getLogger("Hive.Ollama")
 
@@ -67,10 +68,7 @@ class OllamaInterface:
             True 如果服务正在运行
         """
         try:
-            response = self._session.get(
-                f"{self.base_url}/api/tags",
-                timeout=5
-            )
+            response = self._session.get(f"{self.base_url}/api/tags", timeout=5)
             return response.status_code == 200
         except Exception:
             return False
@@ -86,14 +84,15 @@ class OllamaInterface:
             模型名称列表
         """
         now = time.time()
-        if not force_refresh and self._models_cache and (now - self._models_cache_time) < self._models_cache_ttl:
+        if (
+            not force_refresh
+            and self._models_cache
+            and (now - self._models_cache_time) < self._models_cache_ttl
+        ):
             return self._models_cache
 
         try:
-            response = self._session.get(
-                f"{self.base_url}/api/tags",
-                timeout=10
-            )
+            response = self._session.get(f"{self.base_url}/api/tags", timeout=10)
             if response.status_code == 200:
                 models = [m["name"] for m in response.json().get("models", [])]
                 self._models_cache = models
@@ -121,16 +120,14 @@ class OllamaInterface:
         try:
             # Ollama 拉取是流式响应，我们用一个较长的超时
             with self._session.post(
-                f"{self.base_url}/api/pull",
-                json={"name": model},
-                stream=True,
-                timeout=timeout
+                f"{self.base_url}/api/pull", json={"name": model}, stream=True, timeout=timeout
             ) as response:
                 if response.status_code == 200:
                     # 流式读取（简单实现：等待完成）
                     for line in response.iter_lines():
                         if line:
                             import json
+
                             try:
                                 data = json.loads(line)
                                 status = data.get("status", "")
@@ -158,7 +155,7 @@ class OllamaInterface:
         model: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        **kwargs
+        **kwargs,
     ) -> Optional[str]:
         """
         向 Ollama 模型咨询（OpenAI-compatible 格式）
@@ -199,16 +196,14 @@ class OllamaInterface:
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
-            **kwargs
+            **kwargs,
         }
 
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 response = self._session.post(
-                    f"{self.base_url}/v1/chat/completions",
-                    json=payload,
-                    timeout=self.timeout
+                    f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout
                 )
 
                 if response.status_code == 200:
@@ -223,17 +218,21 @@ class OllamaInterface:
                     return None
 
                 elif response.status_code == 500:
-                    logger.warning(f"🤖 [Ollama] 服务端错误 (500)，重试 {attempt + 1}/{max_retries}")
-                    time.sleep(2 ** attempt)
+                    logger.warning(
+                        f"🤖 [Ollama] 服务端错误 (500)，重试 {attempt + 1}/{max_retries}"
+                    )
+                    time.sleep(2**attempt)
                     continue
 
                 else:
-                    logger.error(f"🤖 [Ollama] 请求失败: {response.status_code} - {response.text[:200]}")
+                    logger.error(
+                        f"🤖 [Ollama] 请求失败: {response.status_code} - {response.text[:200]}"
+                    )
                     return None
 
             except requests.exceptions.Timeout:
                 logger.warning(f"🤖 [Ollama] 请求超时，重试 {attempt + 1}/{max_retries}")
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
             except Exception as e:
                 logger.error(f"🤖 [Ollama] 请求异常: {e}")
                 if attempt == max_retries - 1:
@@ -249,7 +248,7 @@ class OllamaInterface:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        **kwargs
+        **kwargs,
     ) -> Optional[str]:
         """
         使用 /api/generate 端点（非 chat 格式）
@@ -264,7 +263,7 @@ class OllamaInterface:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "system": system_prompt,
-            **kwargs
+            **kwargs,
         }
 
         # 支持 images 参数 (Ollama 多模态模型如 llava)
@@ -274,9 +273,7 @@ class OllamaInterface:
 
         try:
             response = self._session.post(
-                f"{self.base_url}/api/generate",
-                json=payload,
-                timeout=self.timeout
+                f"{self.base_url}/api/generate", json=payload, timeout=self.timeout
             )
 
             if response.status_code == 200:
@@ -306,7 +303,7 @@ class OllamaInterface:
             response = self._session.post(
                 f"{self.base_url}/v1/embeddings",
                 json={"model": effective_model, "input": text},
-                timeout=30
+                timeout=30,
             )
 
             if response.status_code == 200:
@@ -333,9 +330,7 @@ class OllamaInterface:
 
         try:
             response = self._session.get(
-                f"{self.base_url}/api/show",
-                params={"name": effective_model},
-                timeout=10
+                f"{self.base_url}/api/show", params={"name": effective_model}, timeout=10
             )
 
             if response.status_code == 200:
@@ -366,13 +361,10 @@ class OllamaInterface:
 
 # 全局单例
 _ollama_instance: Optional[OllamaInterface] = None
-_ollama_lock = __import__('threading').Lock()
+_ollama_lock = __import__("threading").Lock()
 
 
-def get_ollama(
-    base_url: Optional[str] = None,
-    model: Optional[str] = None
-) -> OllamaInterface:
+def get_ollama(base_url: Optional[str] = None, model: Optional[str] = None) -> OllamaInterface:
     """
     获取 Ollama 接口单例（线程安全）
 
@@ -392,6 +384,7 @@ def is_ollama_running() -> bool:
     """快速检查 Ollama 是否在运行"""
     try:
         import requests
+
         response = requests.get(f"{OllamaInterface.DEFAULT_BASE_URL}/api/tags", timeout=3)
         return response.status_code == 200
     except Exception:

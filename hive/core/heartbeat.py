@@ -8,11 +8,14 @@ HiveHeartbeat - 主动唤醒守护线程
 每次心跳向 SkillBus 广播事件，由注册的技能处理函数响应。
 """
 
-import time
-import threading
 import logging
+import threading
+import time
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from hive.core.skill_bus import SkillBus
 
 logger = logging.getLogger("Hive.Heartbeat")
 
@@ -20,11 +23,12 @@ logger = logging.getLogger("Hive.Heartbeat")
 @dataclass
 class HeartbeatConfig:
     """单个心跳定时器配置（对标 nanobot cron/ 定时配置）"""
-    name:           str             # 心跳名称 e.g. "morning_brief"
-    topic:          str             # 广播的 SkillBus topic e.g. "system:heartbeat"
-    interval_sec:   float           # 触发间隔（秒）
-    payload:        dict = field(default_factory=dict)  # 附带数据
-    enabled:        bool = True
+
+    name: str  # 心跳名称 e.g. "morning_brief"
+    topic: str  # 广播的 SkillBus topic e.g. "system:heartbeat"
+    interval_sec: float  # 触发间隔（秒）
+    payload: dict = field(default_factory=dict)  # 附带数据
+    enabled: bool = True
 
 
 class HiveHeartbeat:
@@ -35,17 +39,19 @@ class HiveHeartbeat:
     """
 
     def __init__(self, bus: "SkillBus"):  # type: ignore
-        self._bus      = bus
+        self._bus = bus
         self._configs: list[HeartbeatConfig] = []
         self._threads: list[threading.Thread] = []
-        self._stop_ev  = threading.Event()
+        self._stop_ev = threading.Event()
 
     # ─────────────────────────────────────── 配置接口 ──
 
     def add_beat(self, config: HeartbeatConfig) -> None:
         """注册一个心跳计划（对标 nanobot cron.add）"""
         self._configs.append(config)
-        logger.info(f"[Heartbeat] ➕ 注册心跳: {config.name!r} → {config.topic} / 间隔 {config.interval_sec}s")
+        logger.info(
+            f"[Heartbeat] ➕ 注册心跳: {config.name!r} → {config.topic} / 间隔 {config.interval_sec}s"
+        )
 
     # ─────────────────────────────────────── 生命周期 ──
 
@@ -59,10 +65,10 @@ class HiveHeartbeat:
             if not cfg.enabled:
                 continue
             t = threading.Thread(
-                target  = self._beat_loop,
-                args    = (cfg,),
-                name    = f"Heartbeat-{cfg.name}",
-                daemon  = True,
+                target=self._beat_loop,
+                args=(cfg,),
+                name=f"Heartbeat-{cfg.name}",
+                daemon=True,
             )
             self._threads.append(t)
             t.start()
@@ -87,7 +93,7 @@ class HiveHeartbeat:
             payload = {
                 **cfg.payload,
                 "heartbeat_name": cfg.name,
-                "fired_at":       time.strftime("%H:%M:%S"),
+                "fired_at": time.strftime("%H:%M:%S"),
             }
             logger.info(f"[Heartbeat:{cfg.name}] 💓 心跳触发 → {cfg.topic}")
             try:

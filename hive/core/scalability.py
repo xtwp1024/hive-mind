@@ -51,9 +51,10 @@ logger = logging.getLogger("Hive.Scalability")
 
 # ===== 熔断器 =====
 
+
 class CircuitState(Enum):
-    CLOSED = "closed"    # 正常
-    OPEN = "open"        # 熔断
+    CLOSED = "closed"  # 正常
+    OPEN = "open"  # 熔断
     HALF_OPEN = "half_open"  # 半开
 
 
@@ -64,10 +65,11 @@ class CircuitBreaker:
 
     防止级联故障。当错误率超过阈值时断开，一段时间后尝试恢复。
     """
+
     name: str
-    failure_threshold: int = 5       # 触发熔断的连续失败次数
-    recovery_timeout: float = 30.0   # 恢复尝试间隔 (秒)
-    half_open_max_calls: int = 3     # 半开状态允许的调用次数
+    failure_threshold: int = 5  # 触发熔断的连续失败次数
+    recovery_timeout: float = 30.0  # 恢复尝试间隔 (秒)
+    half_open_max_calls: int = 3  # 半开状态允许的调用次数
 
     _state: CircuitState = field(default=CircuitState.CLOSED, init=False)
     _failure_count: int = field(default=0, init=False)
@@ -120,7 +122,9 @@ class CircuitBreaker:
             self._last_failure_time = time.time()
             if self._failure_count >= self.failure_threshold:
                 self._state = CircuitState.OPEN
-                logger.warning(f"⚡ [CircuitBreaker] {self.name} 熔断: OPEN (failures={self._failure_count})")
+                logger.warning(
+                    f"⚡ [CircuitBreaker] {self.name} 熔断: OPEN (failures={self._failure_count})"
+                )
 
 
 class CircuitOpenError(Exception):
@@ -129,6 +133,7 @@ class CircuitOpenError(Exception):
 
 # ===== 速率限制器 =====
 
+
 @dataclass
 class RateLimiter:
     """
@@ -136,8 +141,9 @@ class RateLimiter:
 
     限制单位时间内的调用次数，支持滑动窗口。
     """
+
     name: str
-    max_calls: int = 100       # 窗口内最大调用次数
+    max_calls: int = 100  # 窗口内最大调用次数
     window_seconds: float = 60.0  # 窗口大小 (秒)
 
     _calls: list = field(default_factory=list, init=False)
@@ -195,9 +201,11 @@ class RateLimiter:
 
 # ===== Worker 池 =====
 
+
 @dataclass
 class PooledWorker:
     """池化 worker 描述"""
+
     worker_id: str
     capabilities: list[str] = field(default_factory=list)
     current_load: float = 0.0  # 0.0=空闲, 1.0=满载
@@ -217,9 +225,9 @@ class WorkerPool:
         worker_manager,  # WorkerManager 实例
         min_size: int = 5,
         max_size: int = 100,
-        scale_up_threshold: float = 0.8,   # 负载 > 80% 时扩容
-        scale_down_threshold: float = 0.3, # 负载 < 30% 时缩容
-        scale_interval: float = 10.0,      # 扩缩容检查间隔
+        scale_up_threshold: float = 0.8,  # 负载 > 80% 时扩容
+        scale_down_threshold: float = 0.3,  # 负载 < 30% 时缩容
+        scale_interval: float = 10.0,  # 扩缩容检查间隔
     ):
         """
         初始化 Worker 池
@@ -257,9 +265,7 @@ class WorkerPool:
 
         # 启动自动扩缩容线程
         self._scale_thread = threading.Thread(
-            target=self._scale_loop,
-            daemon=True,
-            name="workerpool-scale"
+            target=self._scale_loop, daemon=True, name="workerpool-scale"
         )
         self._scale_thread.start()
         logger.info(f"🏭 [WorkerPool] 已启动")
@@ -305,8 +311,7 @@ class WorkerPool:
             if avg_load > self.scale_up_threshold and current_size < self.max_size:
                 # 扩容
                 scale_up = min(
-                    max(1, current_size // 4),  # 至少扩1，最多扩25%
-                    self.max_size - current_size
+                    max(1, current_size // 4), self.max_size - current_size  # 至少扩1，最多扩25%
                 )
                 logger.info(f"🏭 [WorkerPool] 扩容: +{scale_up} (avg_load={avg_load:.2f})")
                 # 扩容逻辑由 WorkerManager 处理
@@ -314,10 +319,7 @@ class WorkerPool:
 
             elif avg_load < self.scale_down_threshold and current_size > self.min_size:
                 # 缩容
-                scale_down = min(
-                    max(1, current_size // 4),
-                    current_size - self.min_size
-                )
+                scale_down = min(max(1, current_size // 4), current_size - self.min_size)
                 # 只缩空闲的 workers
                 idle = [wid for wid, w in self._pool.items() if w.current_load < 0.1]
                 if idle:
@@ -355,7 +357,8 @@ class WorkerPool:
 
             if required_capabilities:
                 candidates = [
-                    w for w in candidates
+                    w
+                    for w in candidates
                     if w.is_alive and all(cap in w.capabilities for cap in required_capabilities)
                 ]
             else:
@@ -394,6 +397,7 @@ class WorkerPool:
 
 
 # ===== 横向扩展管理器 =====
+
 
 class ScalabilityManager:
     """
@@ -469,13 +473,7 @@ class ScalabilityManager:
                 self._circuit_breakers[name] = CircuitBreaker(name=name)
             return self._circuit_breakers[name]
 
-    def call_protected(
-        self,
-        circuit_name: str,
-        func: Callable,
-        *args,
-        **kwargs
-    ) -> Any:
+    def call_protected(self, circuit_name: str, func: Callable, *args, **kwargs) -> Any:
         """通过熔断器保护执行调用"""
         cb = self.get_circuit_breaker(circuit_name)
         return cb.call(func, *args, **kwargs)
@@ -483,10 +481,7 @@ class ScalabilityManager:
     # ===== 速率限制器 =====
 
     def get_rate_limiter(
-        self,
-        name: str,
-        max_calls: int = 100,
-        window: float = 60.0
+        self, name: str, max_calls: int = 100, window: float = 60.0
     ) -> RateLimiter:
         """获取或创建速率限制器"""
         with self._rl_lock:
@@ -499,10 +494,7 @@ class ScalabilityManager:
             return self._rate_limiters[name]
 
     def acquire_permit(
-        self,
-        limiter_name: str,
-        blocking: bool = True,
-        timeout: float = None
+        self, limiter_name: str, blocking: bool = True, timeout: float = None
     ) -> bool:
         """获取速率限制许可"""
         rl = self.get_rate_limiter(limiter_name)
@@ -536,7 +528,9 @@ class ScalabilityManager:
             active = [t for t in self._tasks.values() if t.get("status") == "running"]
             if len(active) >= self.max_concurrent_tasks:
                 # 等待或拒绝
-                logger.warning(f"🚀 [Scalability] 并发超限: {len(active)}/{self.max_concurrent_tasks}")
+                logger.warning(
+                    f"🚀 [Scalability] 并发超限: {len(active)}/{self.max_concurrent_tasks}"
+                )
 
             self._tasks[task_id] = {
                 "task": task,

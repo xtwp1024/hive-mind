@@ -28,17 +28,17 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from .attention_economy import AttentionBudget, AttentionEconomy
 from .cognitive_bus import CognitiveBus, Message, MessageType, get_or_create_cognitive_bus
-from .working_memory import WorkingMemory
-from .memory_hierarchy import MemoryHierarchy, Context, Experience
-from .perception import Perceiver, Perception, Intent
-from .goal_decomposer import GoalDecomposer, SubGoal
-from .planner import Planner, Plan, ExecutionStrategy
-from .reflector import Reflector, ReflectionResult, Insight
 from .critic import Critic, Evaluation, Issue
-from .strategy_selector import StrategySelector, Strategy, CognitiveMode
-from .self_monitor import SelfMonitor, CognitiveMetrics, HealthStatus
-from .attention_economy import AttentionEconomy, AttentionBudget
+from .goal_decomposer import GoalDecomposer, SubGoal
+from .memory_hierarchy import Context, Experience, MemoryHierarchy
+from .perception import Intent, Perceiver, Perception
+from .planner import ExecutionStrategy, Plan, Planner
+from .reflector import Insight, ReflectionResult, Reflector
+from .self_monitor import CognitiveMetrics, HealthStatus, SelfMonitor
+from .strategy_selector import CognitiveMode, Strategy, StrategySelector
+from .working_memory import WorkingMemory
 
 logger = logging.getLogger("Hive.Brain")
 
@@ -153,9 +153,7 @@ class HiveBrain:
         await self.bus.start()
 
         # 初始化工作记忆
-        self.working_memory = WorkingMemory(
-            max_items=self.config.working_memory_capacity
-        )
+        self.working_memory = WorkingMemory(max_items=self.config.working_memory_capacity)
 
         # 初始化记忆层次
         self.memory_hierarchy = MemoryHierarchy(
@@ -168,14 +166,10 @@ class HiveBrain:
         self.perceiver = Perceiver()
 
         # 初始化目标分解器
-        self.goal_decomposer = GoalDecomposer(
-            use_llm=self.config.llm_for_decomposition
-        )
+        self.goal_decomposer = GoalDecomposer(use_llm=self.config.llm_for_decomposition)
 
         # 初始化规划器
-        self.planner = Planner(
-            max_parallel=self.config.max_parallel_execution
-        )
+        self.planner = Planner(max_parallel=self.config.max_parallel_execution)
 
         # Phase 2: 初始化反思器
         if self.config.enable_reflection:
@@ -577,9 +571,9 @@ class HiveBrain:
                 attention = self._state.attention_load
                 memory = self._state.memory_pressure
                 # 置信度随注意力负载和记忆压力下降而降低
-                self._state.confidence = max(0.1, min(0.9,
-                    base_confidence * (1.0 - attention * 0.3) * (1.0 - memory * 0.2)
-                ))
+                self._state.confidence = max(
+                    0.1, min(0.9, base_confidence * (1.0 - attention * 0.3) * (1.0 - memory * 0.2))
+                )
 
     def _get_cognitive_state_snapshot(self) -> CognitiveState:
         """获取认知状态快照"""

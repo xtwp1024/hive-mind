@@ -9,12 +9,14 @@ TheHive SIRP (安全事件指挥与编排器)
 并强行召唤 WardenBee 进行裁决封锁，实现蜂群大军的自愈风控。
 """
 
-import time
 import logging
-from typing import Dict, List, Any
+import time
+from typing import Any, Dict, List
+
 from hive.core.service_locator import BeeServiceLocator
 
 logger = logging.getLogger("Hive.TheHiveSIRP")
+
 
 class TheHiveSIRP:
     MAX_ALERTS_POOL_SIZE = 10000  # 防止告警池无限增长
@@ -32,16 +34,20 @@ class TheHiveSIRP:
             "severity": severity,
             "type": alert_type,
             "source": bee_id,
-            "payload": payload
+            "payload": payload,
         }
         self.alerts_pool.append(alert)
 
         # 防止告警池无限增长，清理超过限制的旧告警
         if len(self.alerts_pool) > self.MAX_ALERTS_POOL_SIZE:
             # 按时间排序，保留最新的 50%
-            self.alerts_pool = sorted(self.alerts_pool, key=lambda x: x["timestamp"], reverse=True)[:self.MAX_ALERTS_POOL_SIZE // 2]
+            self.alerts_pool = sorted(self.alerts_pool, key=lambda x: x["timestamp"], reverse=True)[
+                : self.MAX_ALERTS_POOL_SIZE // 2
+            ]
 
-        logger.warning(f"⚠️ [SIRP Alert] 捕获来自工蜂 {bee_id} 的前线告警 ({alert_type}): {payload[:50]}...")
+        logger.warning(
+            f"⚠️ [SIRP Alert] 捕获来自工蜂 {bee_id} 的前线告警 ({alert_type}): {payload[:50]}..."
+        )
 
         # 随时进行聚合判决
         self._aggregate_and_escalate(alert_type)
@@ -51,29 +57,31 @@ class TheHiveSIRP:
         # 过滤近 5 分钟内的同类告警
         now = time.time()
         recent_similar_alerts = [
-            a for a in self.alerts_pool 
-            if a["type"] == target_type and (now - a["timestamp"]) < 300
+            a for a in self.alerts_pool if a["type"] == target_type and (now - a["timestamp"]) < 300
         ]
-        
+
         if len(recent_similar_alerts) >= self.escalation_threshold:
             self._open_case(target_type, recent_similar_alerts)
-            
+
             # 清理已被立案的旧告警以防重复报案
             self.alerts_pool = [a for a in self.alerts_pool if a not in recent_similar_alerts]
 
     def _open_case(self, incident_type: str, alerts: List[Dict]):
         """立案侦查！召唤法官 WardenBee 控制事态"""
-        logger.error(f"💥 [SIRP Case Opened] 事态升级！侦测到 {len(alerts)} 起相似袭击 [{incident_type}]！已自动立案交由狱长处理！")
-        
+        logger.error(
+            f"💥 [SIRP Case Opened] 事态升级！侦测到 {len(alerts)} 起相似袭击 [{incident_type}]！已自动立案交由狱长处理！"
+        )
+
         # 服务定位器发威：隔空呼叫典狱长风控组件
         wm = BeeServiceLocator.get_service("WorkerManager")
         if wm:
             from hive.core.dna import BeeDNA
+
             # 铸造一个针对此次风控事件专职的典狱长调查令
             case_dna = BeeDNA(
                 task=f"SIRP-CASE: 系统遭遇连续同构故障 [{incident_type}]，疑似被拦截或出现断崖。请进行降维求助或环境重启预案。",
                 metadata={"alerts": alerts, "priority": "CRITICAL"},
-                required_tools=[] # 理论上可以分配风控工具箱
+                required_tools=[],  # 理论上可以分配风控工具箱
             )
             wm.spawn_worker(case_dna)
             logger.info("🚔 [TheHive SIRP] 已向指挥槽发派 WardenBee 介入案卷处理!")

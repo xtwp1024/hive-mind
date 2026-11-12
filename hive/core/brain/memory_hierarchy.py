@@ -288,14 +288,16 @@ class MemoryHierarchy:
             if self._knowledge_base:
                 try:
                     kb_results = self._knowledge_base.query(query)
-                    context.semantic.extend([
-                        MemoryItem(
-                            id=f"kb_{i}",
-                            content=r,
-                            memory_type="semantic",
-                        )
-                        for i, r in enumerate(kb_results[:limit])
-                    ])
+                    context.semantic.extend(
+                        [
+                            MemoryItem(
+                                id=f"kb_{i}",
+                                content=r,
+                                memory_type="semantic",
+                            )
+                            for i, r in enumerate(kb_results[:limit])
+                        ]
+                    )
                 except Exception as e:
                     logger.warning(f"⚠️ Knowledge base query error: {e}")
 

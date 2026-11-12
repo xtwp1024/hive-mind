@@ -14,8 +14,8 @@ from pathlib import Path
 from hive.paths import (
     PROJECT_ROOT,
     resolve_events_file,
-    resolve_hive_home as _resolve_hive_home,
 )
+from hive.paths import resolve_hive_home as _resolve_hive_home
 
 _events_file: Path | None = None
 _lock = threading.Lock()

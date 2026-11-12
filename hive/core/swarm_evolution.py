@@ -22,24 +22,26 @@ Phase 3: 群体进化
     coordinator.start()
 """
 
+import json
 import logging
 import threading
 import time
-import json
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("Hive.SwarmEvolution")
 
 
 # ===== 适应度记录 =====
 
+
 @dataclass
 class BeeFitnessRecord:
     """单只蜂的适应度记录"""
+
     bee_id: str
     bee_type: str
     birth_time: float = field(default_factory=time.time)
@@ -87,9 +89,9 @@ class FitnessTracker:
     """
 
     # 适应度权重
-    WEIGHT_SUCCESS_RATE = 0.5    # 成功率权重
-    WEIGHT_EFFICIENCY = 0.3      # 效率（速度）权重
-    WEIGHT_STABILITY = 0.2        # 稳定性（低错误率）权重
+    WEIGHT_SUCCESS_RATE = 0.5  # 成功率权重
+    WEIGHT_EFFICIENCY = 0.3  # 效率（速度）权重
+    WEIGHT_STABILITY = 0.2  # 稳定性（低错误率）权重
 
     def __init__(self):
         self._records: Dict[str, BeeFitnessRecord] = {}
@@ -97,7 +99,9 @@ class FitnessTracker:
         self._history: List[Dict[str, Any]] = []
         self._max_history = 10000
 
-    def register_bee(self, bee_id: str, bee_type: str, generation: int = 0, chromosome_id: Optional[str] = None):
+    def register_bee(
+        self, bee_id: str, bee_type: str, generation: int = 0, chromosome_id: Optional[str] = None
+    ):
         """注册新蜂到追踪器"""
         with self._lock:
             if bee_id not in self._records:
@@ -157,9 +161,9 @@ class FitnessTracker:
         stability_score = 1.0 - min(1.0, record.error_count / max(record.task_count, 1))
 
         fitness = (
-            self.WEIGHT_SUCCESS_RATE * success_rate +
-            self.WEIGHT_EFFICIENCY * efficiency_score +
-            self.WEIGHT_STABILITY * stability_score
+            self.WEIGHT_SUCCESS_RATE * success_rate
+            + self.WEIGHT_EFFICIENCY * efficiency_score
+            + self.WEIGHT_STABILITY * stability_score
         )
         return min(1.0, max(0.0, fitness))
 
@@ -212,6 +216,7 @@ class FitnessTracker:
 
 # ===== 选择压力 =====
 
+
 @dataclass
 class SelectionPressure:
     """
@@ -219,14 +224,15 @@ class SelectionPressure:
 
     控制何时淘汰低适应度蜂，以及精英保留策略。
     """
-    min_fitness_threshold: float = 0.3    # 最低适应度阈值，低于此值直接淘汰
-    cull_interval: float = 300.0            # 淘汰检查间隔（秒）
-    min_tasks_before_cull: int = 3           # 至少执行多少任务后才开始考虑淘汰
-    max_age_seconds: float = 3600.0          # 最大存活时间（秒），超时强制淘汰
+
+    min_fitness_threshold: float = 0.3  # 最低适应度阈值，低于此值直接淘汰
+    cull_interval: float = 300.0  # 淘汰检查间隔（秒）
+    min_tasks_before_cull: int = 3  # 至少执行多少任务后才开始考虑淘汰
+    max_age_seconds: float = 3600.0  # 最大存活时间（秒），超时强制淘汰
 
     # 精英保留
-    elite_count: int = 3                    # 保留最优 N 只蜂不参与淘汰
-    elite_min_fitness: float = 0.7          # 精英最低适应度
+    elite_count: int = 3  # 保留最优 N 只蜂不参与淘汰
+    elite_min_fitness: float = 0.7  # 精英最低适应度
 
     def should_cull(self, record: BeeFitnessRecord, is_elite: bool = False) -> bool:
         """
@@ -277,6 +283,7 @@ class SelectionPressure:
 
 # ===== 蜂群进化协调器 =====
 
+
 class SwarmEvolutionCoordinator:
     """
     蜂群进化协调器
@@ -320,6 +327,7 @@ class SwarmEvolutionCoordinator:
         """懒加载 EvolutionEngine"""
         if self._evolution_engine is None:
             from hive.core.evolution_engine import EvolutionEngine
+
             self._evolution_engine = EvolutionEngine(
                 use_gep=True,
                 gep_population_size=self._gep_population_size,
@@ -334,7 +342,9 @@ class SwarmEvolutionCoordinator:
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(target=self._pressure_loop, daemon=True, name="swarm_evolution")
+        self._thread = threading.Thread(
+            target=self._pressure_loop, daemon=True, name="swarm_evolution"
+        )
         self._thread.start()
 
         # 注册到蜂群通信
@@ -352,7 +362,12 @@ class SwarmEvolutionCoordinator:
     def _register_to_swarm(self):
         """注册到蜂群通信系统"""
         try:
-            from hive.core.swarm_communication import get_swarm_communication, MessageType, SwarmMessage
+            from hive.core.swarm_communication import (
+                MessageType,
+                SwarmMessage,
+                get_swarm_communication,
+            )
+
             self._swarm = get_swarm_communication()
             self._swarm.register_bee("SwarmEvolutionCoordinator", self)
             self._swarm.subscribe(MessageType.KNOWLEDGE, self._on_swarm_message)
@@ -407,7 +422,8 @@ class SwarmEvolutionCoordinator:
         """发出淘汰警告（通过蜂群网络广播）"""
         if self._swarm:
             try:
-                from hive.core.swarm_communication import SwarmMessage, MessageType
+                from hive.core.swarm_communication import MessageType, SwarmMessage
+
                 msg = SwarmMessage(
                     id=f"cull_{record.bee_id}_{int(time.time())}",
                     type=MessageType.ALERT,
@@ -417,7 +433,11 @@ class SwarmEvolutionCoordinator:
                         "bee_id": record.bee_id,
                         "bee_type": record.bee_type,
                         "fitness": record.fitness,
-                        "reason": "fitness_too_low" if record.fitness < self._pressure.min_fitness_threshold else "age_timeout",
+                        "reason": (
+                            "fitness_too_low"
+                            if record.fitness < self._pressure.min_fitness_threshold
+                            else "age_timeout"
+                        ),
                     },
                     priority=9,
                 )
@@ -427,8 +447,9 @@ class SwarmEvolutionCoordinator:
 
     # ===== 对外接口 =====
 
-    def report_task_result(self, bee_id: str, success: bool, duration: float,
-                          error: Optional[str] = None):
+    def report_task_result(
+        self, bee_id: str, success: bool, duration: float, error: Optional[str] = None
+    ):
         """
         上报任务结果（WorkerBee 完成任务后调用此方法）
 
@@ -440,8 +461,9 @@ class SwarmEvolutionCoordinator:
         """
         self._tracker.update(bee_id, success, duration, error)
 
-    def register_bee(self, bee_id: str, bee_type: str, generation: int = 0,
-                    chromosome_id: Optional[str] = None):
+    def register_bee(
+        self, bee_id: str, bee_type: str, generation: int = 0, chromosome_id: Optional[str] = None
+    ):
         """注册新蜂"""
         self._tracker.register_bee(bee_id, bee_type, generation, chromosome_id)
 
@@ -485,7 +507,9 @@ class SwarmEvolutionCoordinator:
         }
 
         self._evolution_log.append(result)
-        logger.info(f"🧬 [SwarmEvolution] 进化 #{self._evolution_count}: best_fitness={result['best_fitness']:.4f}")
+        logger.info(
+            f"🧬 [SwarmEvolution] 进化 #{self._evolution_count}: best_fitness={result['best_fitness']:.4f}"
+        )
 
         return result
 
@@ -496,7 +520,9 @@ class SwarmEvolutionCoordinator:
             "evolution_count": self._evolution_count,
             "fitness_stats": self._tracker.get_stats(),
             "evolution_log_size": len(self._evolution_log),
-            "gep_status": self._get_evolution_engine().get_gep_status() if self._evolution_engine else {},
+            "gep_status": (
+                self._get_evolution_engine().get_gep_status() if self._evolution_engine else {}
+            ),
         }
 
 

@@ -21,9 +21,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .hive_brain import HiveBrain, ThinkResult
-from .planner import Plan, ExecutionStrategy
 from .cognitive_diversity import CognitiveSwarm, CollectiveResult
+from .hive_brain import HiveBrain, ThinkResult
+from .planner import ExecutionStrategy, Plan
 
 logger = logging.getLogger("Hive.Brain.QueenAdapter")
 
@@ -101,9 +101,7 @@ class QueenAdapter:
         )
         self._swarm: Optional[CognitiveSwarm] = None
         if self._collective_config.enable_collective_thinking:
-            self._swarm = CognitiveSwarm(
-                size=self._collective_config.swarm_size
-            )
+            self._swarm = CognitiveSwarm(size=self._collective_config.swarm_size)
 
         self._stats = {
             "thinks": 0,
@@ -153,15 +151,22 @@ class QueenAdapter:
             think_result.execution_results = execution_results
 
         # 3. 存储经验
-        success = all(
-            r.get("success", False) for r in think_result.execution_results if isinstance(r, dict)
-        ) if think_result.execution_results else think_result.success
+        success = (
+            all(
+                r.get("success", False)
+                for r in think_result.execution_results
+                if isinstance(r, dict)
+            )
+            if think_result.execution_results
+            else think_result.success
+        )
 
         await self.brain.store_experience(
             content=f"{input_text[:100]}... -> {'成功' if success else '失败'}",
             success=success,
             importance=0.7 if success else 0.9,
-            tags=["execution"] + ([think_result.perception.intent.value] if think_result.perception else []),
+            tags=["execution"]
+            + ([think_result.perception.intent.value] if think_result.perception else []),
         )
 
         if success:
@@ -197,28 +202,31 @@ class QueenAdapter:
             # 回退到第一个成功的结果
             think_result = next(
                 (r for r in collective_result.individual_results if r.success),
-                collective_result.individual_results[0]
+                collective_result.individual_results[0],
             )
 
         # 4. 如果有计划且有共识，执行
-        if think_result.plan and think_result.sub_goals and collective_result.has_consensus(
-            self._collective_config.consensus_threshold
+        if (
+            think_result.plan
+            and think_result.sub_goals
+            and collective_result.has_consensus(self._collective_config.consensus_threshold)
         ):
             execution_results = await self._execute_plan(think_result.plan)
             think_result.execution_results = execution_results
 
             # 5. 存储经验
-            success = all(
-                r.get("success", False) for r in execution_results if isinstance(r, dict)
-            ) if execution_results else think_result.success
+            success = (
+                all(r.get("success", False) for r in execution_results if isinstance(r, dict))
+                if execution_results
+                else think_result.success
+            )
 
             await self.brain.store_experience(
                 content=f"[COLLECTIVE] {input_text[:100]}... -> {'成功' if success else '失败'}",
                 success=success,
                 importance=0.8 if success else 0.9,
-                tags=["collective", "execution"] + (
-                    [think_result.perception.intent.value] if think_result.perception else []
-                ),
+                tags=["collective", "execution"]
+                + ([think_result.perception.intent.value] if think_result.perception else []),
             )
 
             if success:
@@ -260,9 +268,20 @@ class QueenAdapter:
 
         # 复杂任务关键词
         complex_keywords = [
-            "分析", "评估", "比较", "设计", "规划",
-            "复杂", "全面", "深入",
-            "analyze", "evaluate", "compare", "design", "plan", "complex",
+            "分析",
+            "评估",
+            "比较",
+            "设计",
+            "规划",
+            "复杂",
+            "全面",
+            "深入",
+            "analyze",
+            "evaluate",
+            "compare",
+            "design",
+            "plan",
+            "complex",
         ]
 
         complexity_score = sum(1 for kw in complex_keywords if kw in task_lower)
@@ -357,11 +376,13 @@ class QueenAdapter:
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                processed_results.append({
-                    "success": False,
-                    "error": str(result),
-                    "step_id": batch[i][0].sub_goal.id,
-                })
+                processed_results.append(
+                    {
+                        "success": False,
+                        "error": str(result),
+                        "step_id": batch[i][0].sub_goal.id,
+                    }
+                )
             else:
                 processed_results.append(result)
 
@@ -404,7 +425,7 @@ class QueenAdapter:
                 error = result.get("error", "Unknown error")
                 if retry_count < max_retries:
                     # 计算延迟时间（指数退避）
-                    delay = min(base_delay * (exp_base ** retry_count), max_delay)
+                    delay = min(base_delay * (exp_base**retry_count), max_delay)
                     logger.warning(
                         f"⚠️ Step failed, retrying in {delay:.1f}s "
                         f"(attempt {retry_count + 1}/{max_retries}): {error}"
@@ -434,7 +455,7 @@ class QueenAdapter:
             error_msg = str(e)
             if retry_count < max_retries:
                 # 计算延迟时间（指数退避）
-                delay = min(base_delay * (exp_base ** retry_count), max_delay)
+                delay = min(base_delay * (exp_base**retry_count), max_delay)
                 logger.warning(
                     f"⚠️ Step exception, retrying in {delay:.1f}s "
                     f"(attempt {retry_count + 1}/{max_retries}): {error_msg}"

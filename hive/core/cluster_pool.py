@@ -7,10 +7,10 @@ BeePool - 声明式工蜂热池
 只关心"我想要 N 只随时可用的工蜂"——Reconciler 负责维持这个现实。
 """
 
-import time
-import uuid
 import logging
 import threading
+import time
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -22,18 +22,20 @@ logger = logging.getLogger("Hive.BeePool")
 
 class BeeState(str, Enum):
     """工蜂生命周期状态（对标 openshift/hive ClusterDeployment 状态机）"""
+
     PROVISIONING = "provisioning"  # 孵化中（对标 Provisioning）
-    HIBERNATED   = "hibernated"    # 冬眠就绪，等待申领（对标 Hibernated）
-    RUNNING      = "running"       # 已被申领并激活（对标 Running/Claimed）
+    HIBERNATED = "hibernated"  # 冬眠就绪，等待申领（对标 Hibernated）
+    RUNNING = "running"  # 已被申领并激活（对标 Running/Claimed）
     DEPROVISIONING = "deprovisioning"  # 正在销毁（对标 Deprovisioning）
 
 
 @dataclass
 class PooledBee:
     """池中的一只工蜂条目（对标 ClusterDeployment）"""
-    bee_id:    str
-    dna:       BeeDNA
-    state:     BeeState = BeeState.PROVISIONING
+
+    bee_id: str
+    dna: BeeDNA
+    state: BeeState = BeeState.PROVISIONING
     sync_config: dict[str, Any] = field(default_factory=dict)
     claimed_at: float | None = None
     created_at: float = field(default_factory=time.time)
@@ -55,11 +57,13 @@ class BeePool:
     ):
         self.name = name
         self.species = species
-        self.desired_size = desired_size   # 期望总池大小（含冬眠）
-        self.running_count = running_count # 保持活跃（不冬眠）的最小数量
+        self.desired_size = desired_size  # 期望总池大小（含冬眠）
+        self.running_count = running_count  # 保持活跃（不冬眠）的最小数量
         self._pool: dict[str, PooledBee] = {}
         self._lock = threading.Lock()
-        logger.info(f"[BeePool:{self.name}] 已声明，目标池大小={desired_size}，常驻活跃={running_count}")
+        logger.info(
+            f"[BeePool:{self.name}] 已声明，目标池大小={desired_size}，常驻活跃={running_count}"
+        )
 
     # ---------------------------------------------------------- 内部操作 --
 
@@ -137,9 +141,9 @@ class BeePool:
             for state in BeeState:
                 counts[state.value] = sum(1 for b in self._pool.values() if b.state == state)
         return {
-            "pool_name":      self.name,
-            "desired_size":   self.desired_size,
-            "running_count":  self.running_count,
+            "pool_name": self.name,
+            "desired_size": self.desired_size,
+            "running_count": self.running_count,
             **counts,
         }
 

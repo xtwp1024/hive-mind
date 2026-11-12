@@ -16,18 +16,18 @@ Phase 3: 自主进化能力
 1. 设计 → 2. 验证 → 3. 孵化 → 4. 评估 → 5. 晋升/淘汰
 """
 
-import logging
-import uuid
-import time
 import json
-import threading
+import logging
 import random  # 单一真源：本模块所有 random.* 均解析到此；禁止在函数体内再次 import random
+import threading
+import time
+import uuid
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Set
-from copy import deepcopy
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger("Hive.SpeciesBlueprint")
 
@@ -313,8 +313,7 @@ class SpeciesBlueprint:
                     capability_scores[cap_name] = score
 
             primary_count = sum(
-                1 for s in self.capabilities.values()
-                if s.priority == CapabilityPriority.PRIMARY
+                1 for s in self.capabilities.values() if s.priority == CapabilityPriority.PRIMARY
             )
             if primary_count == 0:
                 warnings.append("没有定义主要能力 (PRIMARY priority)")
@@ -346,14 +345,15 @@ class SpeciesBlueprint:
 
         overall_score = 0.0
         if capability_scores:
-            total_weight = sum(
-                spec.weight for spec in self.capabilities.values()
-            )
+            total_weight = sum(spec.weight for spec in self.capabilities.values())
             if total_weight > 0:
-                overall_score = sum(
-                    capability_scores[name] * self.capabilities[name].weight
-                    for name in capability_scores
-                ) / total_weight
+                overall_score = (
+                    sum(
+                        capability_scores[name] * self.capabilities[name].weight
+                        for name in capability_scores
+                    )
+                    / total_weight
+                )
 
         result = BlueprintValidationResult(
             blueprint_id=self.blueprint_id,
@@ -445,9 +445,7 @@ class SpeciesBlueprint:
     def get_preferred_task_categories(self) -> List[str]:
         """获取偏好的任务类别"""
         sorted_affinities = sorted(
-            self.task_affinities,
-            key=lambda a: a.affinity_score,
-            reverse=True
+            self.task_affinities, key=lambda a: a.affinity_score, reverse=True
         )
         return [a.task_category for a in sorted_affinities]
 
@@ -481,7 +479,9 @@ class SpeciesBlueprint:
                     spec.weight = max(0.1, spec.weight + random.gauss(0, 0.2))
 
         if random.random() < mutation_rate * 0.5:
-            mutated.mutation_rate = max(0.01, min(0.5, mutated.mutation_rate + random.gauss(0, 0.05)))
+            mutated.mutation_rate = max(
+                0.01, min(0.5, mutated.mutation_rate + random.gauss(0, 0.05))
+            )
 
         if random.random() < mutation_rate * 0.5:
             mutated.learning_rate = max(0.1, min(0.9, mutated.learning_rate + random.gauss(0, 0.1)))
@@ -563,14 +563,22 @@ class SpeciesBlueprint:
         for key, affs in all_affinities.items():
             if len(affs) >= 2:
                 avg_score = (affs[0].affinity_score + affs[1].affinity_score) / 2
-                child1.task_affinities.append(TaskAffinity(
-                    task_category=key,
-                    affinity_score=avg_score if random.random() < 0.5 else affs[0].affinity_score
-                ))
-                child2.task_affinities.append(TaskAffinity(
-                    task_category=key,
-                    affinity_score=avg_score if random.random() < 0.5 else affs[1].affinity_score
-                ))
+                child1.task_affinities.append(
+                    TaskAffinity(
+                        task_category=key,
+                        affinity_score=(
+                            avg_score if random.random() < 0.5 else affs[0].affinity_score
+                        ),
+                    )
+                )
+                child2.task_affinities.append(
+                    TaskAffinity(
+                        task_category=key,
+                        affinity_score=(
+                            avg_score if random.random() < 0.5 else affs[1].affinity_score
+                        ),
+                    )
+                )
             else:
                 child1.task_affinities.append(deepcopy(affs[0]))
                 if random.random() < 0.5:
@@ -591,10 +599,7 @@ class SpeciesBlueprint:
             "origin": self.origin.value,
             "parent_blueprints": self.parent_blueprints,
             "generation": self.generation,
-            "capabilities": {
-                name: spec.to_dict()
-                for name, spec in self.capabilities.items()
-            },
+            "capabilities": {name: spec.to_dict() for name, spec in self.capabilities.items()},
             "task_affinities": [aff.to_dict() for aff in self.task_affinities],
             "base_species": self.base_species,
             "role": self.role,
@@ -704,13 +709,17 @@ class BlueprintRegistry:
         """注册蓝图"""
         with self._lock:
             if blueprint.blueprint_id in self._blueprints:
-                logger.warning(f"📋 [BlueprintRegistry] 蓝图 {blueprint.blueprint_id} 已存在，跳过注册")
+                logger.warning(
+                    f"📋 [BlueprintRegistry] 蓝图 {blueprint.blueprint_id} 已存在，跳过注册"
+                )
                 return False
 
             self._blueprints[blueprint.blueprint_id] = blueprint
             self._save_to_disk(blueprint)
 
-            logger.info(f"📋 [BlueprintRegistry] 注册蓝图: {blueprint.name} ({blueprint.blueprint_id})")
+            logger.info(
+                f"📋 [BlueprintRegistry] 注册蓝图: {blueprint.name} ({blueprint.blueprint_id})"
+            )
             return True
 
     def unregister(self, blueprint_id: str) -> bool:
@@ -741,26 +750,17 @@ class BlueprintRegistry:
     def get_by_status(self, status: BlueprintStatus) -> List[SpeciesBlueprint]:
         """按状态获取蓝图"""
         with self._lock:
-            return [
-                bp for bp in self._blueprints.values()
-                if bp.status == status
-            ]
+            return [bp for bp in self._blueprints.values() if bp.status == status]
 
     def get_by_tag(self, tag: str) -> List[SpeciesBlueprint]:
         """按标签获取蓝图"""
         with self._lock:
-            return [
-                bp for bp in self._blueprints.values()
-                if tag in bp.tags
-            ]
+            return [bp for bp in self._blueprints.values() if tag in bp.tags]
 
     def get_by_capability(self, capability_name: str) -> List[SpeciesBlueprint]:
         """按能力获取蓝图"""
         with self._lock:
-            return [
-                bp for bp in self._blueprints.values()
-                if capability_name in bp.capabilities
-            ]
+            return [bp for bp in self._blueprints.values() if capability_name in bp.capabilities]
 
     def get_for_task(self, task_category: str) -> List[SpeciesBlueprint]:
         """获取适合特定任务的蓝图"""

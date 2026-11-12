@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
-from dataclasses import dataclass, field, asdict
-from typing import Dict, Any, Optional
-import time
 import json
+import time
 import traceback
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any, Dict, Optional
+
 
 @dataclass
 class DeathCertificate:
     """
     死亡证明 (Death Certificate)
-    
+
     当工蜂崩溃时生成的诊断文件，包含完整的上下文信息，
     用于后续的自动修复 (Self-Healing) 和尸检 (Post-Mortem).
     """
+
     bee_id: str
     bee_type: str
     error_type: str
@@ -23,7 +25,7 @@ class DeathCertificate:
     target_name: str = "Unknown"
     dna_snapshot: Dict[str, Any] = field(default_factory=dict)
     environment_snapshot: Dict[str, Any] = field(default_factory=dict)
-    
+
     def save(self, morgue_dir: Path) -> Path:
         """
         将死亡证明归档到停尸房（原子写入，防止崩溃导致数据丢失）
@@ -34,8 +36,9 @@ class DeathCertificate:
         Returns:
             归档文件的路径
         """
-        import tempfile
         import os
+        import tempfile
+
         if not morgue_dir.exists():
             morgue_dir.mkdir(parents=True, exist_ok=True)
 
@@ -46,9 +49,9 @@ class DeathCertificate:
 
         try:
             # 先写入临时文件，然后原子重命名，防止进程崩溃导致证书丢失
-            dir_fd, tmp_path = tempfile.mkstemp(dir=morgue_dir, suffix='.json.tmp')
+            dir_fd, tmp_path = tempfile.mkstemp(dir=morgue_dir, suffix=".json.tmp")
             try:
-                with os.fdopen(dir_fd, 'w', encoding='utf-8') as f:
+                with os.fdopen(dir_fd, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)
                 # 原子重命名（在同一目录，无需权限问题）
                 os.replace(tmp_path, file_path)
@@ -65,10 +68,22 @@ class DeathCertificate:
             print(f"CRITICAL: Failed to write death certificate to {file_path}: {e}")
             return None
 
+
 _SENSITIVE_KEYWORDS = {
-    "key", "token", "secret", "password", "passwd", "api_key",
-    "openai", "anthropic", "gemini", "github", "auth", "credential",
+    "key",
+    "token",
+    "secret",
+    "password",
+    "passwd",
+    "api_key",
+    "openai",
+    "anthropic",
+    "gemini",
+    "github",
+    "auth",
+    "credential",
 }
+
 
 def _redact_dict(d: Dict[str, Any], max_depth: int = 10, _path: str = "") -> Dict[str, Any]:
     """过滤字典中的敏感字段，防止密钥写入诊断文件"""
@@ -86,10 +101,7 @@ def _redact_dict(d: Dict[str, Any], max_depth: int = 10, _path: str = "") -> Dic
     return result
 
 
-def create_death_certificate(
-    bee: Any,
-    exception: Exception
-) -> DeathCertificate:
+def create_death_certificate(bee: Any, exception: Exception) -> DeathCertificate:
     """
     为濒死的工蜂开具死亡证明
     """
@@ -98,22 +110,24 @@ def create_death_certificate(
     env_snapshot = {
         "cwd": str(Path.cwd()),
     }
-    
+
     # 尝试获取 DNA，做安全处理
     dna_data = {}
-    if hasattr(bee, 'dna') and bee.dna:
-        if hasattr(bee.dna, '__dict__'):
+    if hasattr(bee, "dna") and bee.dna:
+        if hasattr(bee.dna, "__dict__"):
             dna_data = _redact_dict(dict(bee.dna.__dict__))
         else:
             dna_data = str(bee.dna)
 
     return DeathCertificate(
-        bee_id=str(getattr(bee, 'id', 'unknown')),
+        bee_id=str(getattr(bee, "id", "unknown")),
         bee_type=bee.__class__.__name__,
         error_type=type(exception).__name__,
         error_message=str(exception),
         traceback_str=traceback.format_exc(),
-        target_name=str(getattr(bee.dna, 'target_name', 'unknown')) if hasattr(bee, 'dna') else "unknown",
+        target_name=(
+            str(getattr(bee.dna, "target_name", "unknown")) if hasattr(bee, "dna") else "unknown"
+        ),
         dna_snapshot=dna_data,
-        environment_snapshot=_redact_dict(env_snapshot)
+        environment_snapshot=_redact_dict(env_snapshot),
     )

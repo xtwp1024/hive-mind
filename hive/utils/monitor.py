@@ -6,9 +6,9 @@
 
 import os
 import platform
+import threading
 from dataclasses import dataclass
 from typing import Optional
-import threading
 
 import psutil
 

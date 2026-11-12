@@ -19,7 +19,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .hive_brain import HiveBrain, BrainConfig, ThinkResult
+from .hive_brain import BrainConfig, HiveBrain, ThinkResult
 
 logger = logging.getLogger("Hive.Brain.CognitiveDiversity")
 
@@ -312,9 +312,7 @@ class CognitiveSwarm:
                 processed_results.append(result)
 
         # 2. 投票产生共识
-        consensus, confidence, disagreement_points, voting_summary = self._vote(
-            processed_results
-        )
+        consensus, confidence, disagreement_points, voting_summary = self._vote(processed_results)
 
         # 3. 找出最佳大脑
         best_idx = self._find_best_brain(processed_results)
@@ -375,9 +373,7 @@ class CognitiveSwarm:
             disagreement_points.append(f"子目标数量差异大: {subgoal_counts}")
 
         # 检查计划步骤数量差异
-        plan_steps = [
-            len(r.plan.steps) if r.plan else 0 for r in successful_results
-        ]
+        plan_steps = [len(r.plan.steps) if r.plan else 0 for r in successful_results]
         if max(plan_steps) - min(plan_steps) > 3:
             disagreement_points.append(f"计划步骤数量差异大: {plan_steps}")
 
@@ -391,7 +387,9 @@ class CognitiveSwarm:
             "primary_intent": best_intent,
             "intent_votes": intent_votes,
             "avg_subgoal_count": sum(subgoal_counts) / len(subgoal_counts) if subgoal_counts else 0,
-            "consensus_quality": "high" if confidence > 0.7 else "medium" if confidence > 0.4 else "low",
+            "consensus_quality": (
+                "high" if confidence > 0.7 else "medium" if confidence > 0.4 else "low"
+            ),
         }
 
         return consensus, confidence, disagreement_points, intent_votes
@@ -455,9 +453,7 @@ class CognitiveSwarm:
         # 回退到第一个大脑
         return self.brains[0], self.personalities[0]
 
-    async def think_single(
-        self, task: str, personality_name: Optional[str] = None
-    ) -> ThinkResult:
+    async def think_single(self, task: str, personality_name: Optional[str] = None) -> ThinkResult:
         """
         使用单个大脑思考
 
@@ -502,7 +498,9 @@ class CognitiveSwarm:
             name=f"{base_personality.name}-adjusted",
             risk_tolerance=adjustment.get("risk_tolerance", base_personality.risk_tolerance),
             exploration_rate=adjustment.get("exploration_rate", base_personality.exploration_rate),
-            reflection_tendency=adjustment.get("reflection_tendency", base_personality.reflection_tendency),
+            reflection_tendency=adjustment.get(
+                "reflection_tendency", base_personality.reflection_tendency
+            ),
             patience=adjustment.get("patience", base_personality.patience),
             boldness=adjustment.get("boldness", base_personality.boldness),
         )

@@ -15,18 +15,23 @@ from typing import Any, Optional
 
 from hive.core.dna import BeeDNA
 
+logger = logging.getLogger("Hive.EvolutionEngine")
+
 # GEP imports - lazy loading to avoid hard dependency
 try:
     from hive.core.gep_gene import (
-        GEPGene, GEPChromosome, GEPGeneFactory, GEPFitnessEvaluator,
-        GEPOperators, FunctionType
+        FunctionType,
+        GEPChromosome,
+        GEPFitnessEvaluator,
+        GEPGene,
+        GEPGeneFactory,
+        GEPOperators,
     )
+
     GEP_AVAILABLE = True
 except ImportError:
     GEP_AVAILABLE = False
     logger.warning("GEP gene module not available - GEP evolution disabled")
-
-logger = logging.getLogger("Hive.EvolutionEngine")
 
 
 class EvolutionEngine:
@@ -40,13 +45,15 @@ class EvolutionEngine:
     MAX_GENERATION = 10
     MUTATION_ROLES = ["darwin", "miner", "seeker", "architect", "librarian", "sentinel"]
 
-    def __init__(self,
-                 max_generation: int = MAX_GENERATION,
-                 mutation_roles: list[str] | None = None,
-                 use_gep: bool = False,
-                 gep_population_size: int = 20,
-                 gep_max_genes: int = 5,
-                 gep_max_depth: int = 10):
+    def __init__(
+        self,
+        max_generation: int = MAX_GENERATION,
+        mutation_roles: list[str] | None = None,
+        use_gep: bool = False,
+        gep_population_size: int = 20,
+        gep_max_genes: int = 5,
+        gep_max_depth: int = 10,
+    ):
         self.max_generation = max_generation
         self.mutation_roles = mutation_roles or self.MUTATION_ROLES.copy()
         self.generation_count = 0
@@ -70,8 +77,7 @@ class EvolutionEngine:
         """Lazy initialization of GEP factory."""
         if self._gep_factory is None and GEP_AVAILABLE:
             self._gep_factory = GEPGeneFactory(
-                max_depth=self.gep_max_depth,
-                max_genes=self.gep_max_genes
+                max_depth=self.gep_max_depth, max_genes=self.gep_max_genes
             )
         return self._gep_factory
 
@@ -80,8 +86,7 @@ class EvolutionEngine:
         """Lazy initialization of GEP operators."""
         if self._gep_operators is None and GEP_AVAILABLE:
             self._gep_operators = GEPOperators(
-                max_gene_depth=self.gep_max_depth,
-                max_genes_per_chromosome=self.gep_max_genes
+                max_gene_depth=self.gep_max_depth, max_genes_per_chromosome=self.gep_max_genes
             )
         return self._gep_operators
 
@@ -124,6 +129,7 @@ class EvolutionEngine:
     def _generate_new_id(self, parent_id: str, generation: int) -> str:
         """生成新 ID（使用纳秒时间戳避免碰撞）"""
         import uuid
+
         short_hash = uuid.uuid4().hex[:6]
         # 使用纳秒时间戳后6位，避免同一秒内碰撞
         nano_part = str(time.time_ns())[-6:]
@@ -164,10 +170,12 @@ class EvolutionEngine:
     # GEP Gene Expression Programming Methods
     # =========================================================================
 
-    def reproduce_gep(self,
-                     parent_chromosome: Optional[GEPChromosome] = None,
-                     context: Optional[dict[str, Any]] = None,
-                     expected_result: Optional[Any] = None) -> Optional[GEPChromosome]:
+    def reproduce_gep(
+        self,
+        parent_chromosome: Optional[GEPChromosome] = None,
+        context: Optional[dict[str, Any]] = None,
+        expected_result: Optional[Any] = None,
+    ) -> Optional[GEPChromosome]:
         """
         GEP gene expression programming reproduction.
 
@@ -213,9 +221,11 @@ class EvolutionEngine:
             new_chromosome = GEPChromosome(
                 genes=mutated_genes,
                 linking_function=parent_chromosome.linking_function,
-                max_genes=parent_chromosome.max_genes
+                max_genes=parent_chromosome.max_genes,
             )
-            logger.info(f"[EvolutionEngine] GEP: Point mutation on chromosome {parent_chromosome.id}")
+            logger.info(
+                f"[EvolutionEngine] GEP: Point mutation on chromosome {parent_chromosome.id}"
+            )
 
         elif operation < 0.8:
             # Subtree crossover within chromosome
@@ -224,8 +234,7 @@ class EvolutionEngine:
                 gene2_idx = (gene1_idx + 1) % len(parent_chromosome.genes)
 
                 new_gene1, new_gene2 = self.gep_operators.subtree_crossover(
-                    parent_chromosome.genes[gene1_idx],
-                    parent_chromosome.genes[gene2_idx]
+                    parent_chromosome.genes[gene1_idx], parent_chromosome.genes[gene2_idx]
                 )
 
                 new_genes = list(parent_chromosome.genes)
@@ -235,28 +244,36 @@ class EvolutionEngine:
                 new_chromosome = GEPChromosome(
                     genes=new_genes,
                     linking_function=parent_chromosome.linking_function,
-                    max_genes=parent_chromosome.max_genes
+                    max_genes=parent_chromosome.max_genes,
                 )
-                logger.info(f"[EvolutionEngine] GEP: Subtree crossover on chromosome {parent_chromosome.id}")
+                logger.info(
+                    f"[EvolutionEngine] GEP: Subtree crossover on chromosome {parent_chromosome.id}"
+                )
             else:
                 # Fallback to point mutation
-                mutated_genes = [self.gep_operators.point_mutation(gene) for gene in parent_chromosome.genes]
+                mutated_genes = [
+                    self.gep_operators.point_mutation(gene) for gene in parent_chromosome.genes
+                ]
                 new_chromosome = GEPChromosome(
                     genes=mutated_genes,
                     linking_function=parent_chromosome.linking_function,
-                    max_genes=parent_chromosome.max_genes
+                    max_genes=parent_chromosome.max_genes,
                 )
 
         else:
             # Add new gene via gene crossover (requires population)
             if self._gep_population and len(self._gep_population) > 1:
                 # Select random partner
-                partner = random.choice([p for p in self._gep_population if p.id != parent_chromosome.id])
+                partner = random.choice(
+                    [p for p in self._gep_population if p.id != parent_chromosome.id]
+                )
                 new_chrom1, new_chrom2 = self.gep_operators.gene_crossover(
                     parent_chromosome, partner
                 )
                 new_chromosome = new_chrom1
-                logger.info(f"[EvolutionEngine] GEP: Gene crossover {parent_chromosome.id} x {partner.id}")
+                logger.info(
+                    f"[EvolutionEngine] GEP: Gene crossover {parent_chromosome.id} x {partner.id}"
+                )
             else:
                 # Fallback: add a new random gene
                 new_genes = list(parent_chromosome.genes)
@@ -265,7 +282,7 @@ class EvolutionEngine:
                     new_chromosome = GEPChromosome(
                         genes=new_genes,
                         linking_function=parent_chromosome.linking_function,
-                        max_genes=parent_chromosome.max_genes
+                        max_genes=parent_chromosome.max_genes,
                     )
                 else:
                     # Replace existing gene with random
@@ -274,7 +291,7 @@ class EvolutionEngine:
                     new_chromosome = GEPChromosome(
                         genes=new_genes,
                         linking_function=parent_chromosome.linking_function,
-                        max_genes=parent_chromosome.max_genes
+                        max_genes=parent_chromosome.max_genes,
                     )
 
         # Evaluate fitness if context provided
@@ -282,15 +299,17 @@ class EvolutionEngine:
             self.gep_evaluator.evaluate_chromosome(
                 new_chromosome,
                 [context],
-                [expected_result] if expected_result is not None else None
+                [expected_result] if expected_result is not None else None,
             )
 
         return new_chromosome
 
-    def evolve_gep_generation(self,
-                             contexts: Optional[list[dict[str, Any]]] = None,
-                             expected_results: Optional[list[Any]] = None,
-                             elite_count: int = 2) -> list[GEPChromosome]:
+    def evolve_gep_generation(
+        self,
+        contexts: Optional[list[dict[str, Any]]] = None,
+        expected_results: Optional[list[Any]] = None,
+        elite_count: int = 2,
+    ) -> list[GEPChromosome]:
         """
         Evolve a complete GEP generation.
 
@@ -311,11 +330,12 @@ class EvolutionEngine:
         if not self._gep_population:
             # Initialize population
             self._gep_population = [
-                self.gep_factory.create_random_chromosome()
-                for _ in range(self.gep_population_size)
+                self.gep_factory.create_random_chromosome() for _ in range(self.gep_population_size)
             ]
             self._gep_generation = 0
-            logger.info(f"[EvolutionEngine] GEP: Initialized population with {len(self._gep_population)} chromosomes")
+            logger.info(
+                f"[EvolutionEngine] GEP: Initialized population with {len(self._gep_population)} chromosomes"
+            )
 
         # Evaluate all chromosomes
         if contexts and self.gep_evaluator is not None:
@@ -346,14 +366,16 @@ class EvolutionEngine:
         self._gep_population = new_generation
         self._gep_generation += 1
 
-        logger.info(f"[EvolutionEngine] GEP: Generation {self._gep_generation} complete, "
-                   f"best fitness: {new_generation[0].fitness if new_generation else 0.0:.4f}")
+        logger.info(
+            f"[EvolutionEngine] GEP: Generation {self._gep_generation} complete, "
+            f"best fitness: {new_generation[0].fitness if new_generation else 0.0:.4f}"
+        )
 
         return new_generation
 
-    def _tournament_select(self,
-                          population: list[GEPChromosome],
-                          tournament_size: int = 3) -> GEPChromosome:
+    def _tournament_select(
+        self, population: list[GEPChromosome], tournament_size: int = 3
+    ) -> GEPChromosome:
         """
         Tournament selection for GEP chromosomes.
 
@@ -394,7 +416,8 @@ class EvolutionEngine:
             "gep_generation": self._gep_generation,
             "gep_population_size": len(self._gep_population),
             "gep_best_fitness": max((c.fitness for c in self._gep_population), default=0.0),
-            "gep_avg_fitness": sum(c.fitness for c in self._gep_population) / max(len(self._gep_population), 1),
+            "gep_avg_fitness": sum(c.fitness for c in self._gep_population)
+            / max(len(self._gep_population), 1),
         }
 
     def get_status(self) -> dict[str, Any]:
@@ -402,7 +425,7 @@ class EvolutionEngine:
         status = {
             "generation_count": self.generation_count,
             "reproduction_count": self.reproduction_count,
-            "max_generation": self.max_generation
+            "max_generation": self.max_generation,
         }
 
         # Include GEP status if enabled

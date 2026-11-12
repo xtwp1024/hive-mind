@@ -99,9 +99,7 @@ class Perception:
     sentiment: float = 0.0  # -1 (负面) to 1 (正面)
     urgency: float = 0.5  # 0 (不紧急) to 1 (紧急)
     has_goal: bool = False
-    suggested_layers: List[str] = field(
-        default_factory=lambda: ["working", "episodic", "semantic"]
-    )
+    suggested_layers: List[str] = field(default_factory=lambda: ["working", "episodic", "semantic"])
     confidence: float = 0.5  # 整体置信度
     processing_time_ms: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -241,16 +239,45 @@ class Perceiver:
 
     # 情感词
     POSITIVE_WORDS = {
-        "好", "不错", "优秀", "棒", "赞", "很好", "优秀", "完美",
-        "good", "great", "excellent", "nice", "perfect",
+        "好",
+        "不错",
+        "优秀",
+        "棒",
+        "赞",
+        "很好",
+        "优秀",
+        "完美",
+        "good",
+        "great",
+        "excellent",
+        "nice",
+        "perfect",
     }
     NEGATIVE_WORDS = {
-        "坏", "差", "糟糕", "烂", "有问题", "错误", "失败",
-        "bad", "poor", "terrible", "awful", "error", "fail",
+        "坏",
+        "差",
+        "糟糕",
+        "烂",
+        "有问题",
+        "错误",
+        "失败",
+        "bad",
+        "poor",
+        "terrible",
+        "awful",
+        "error",
+        "fail",
     }
     URGENT_WORDS = {
-        "紧急", "立即", "马上", "快", "急",
-        "urgent", "immediately", "asap", "critical",
+        "紧急",
+        "立即",
+        "马上",
+        "快",
+        "急",
+        "urgent",
+        "immediately",
+        "asap",
+        "critical",
     }
 
     def __init__(self, use_llm: bool = False):

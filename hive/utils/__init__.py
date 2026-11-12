@@ -5,9 +5,9 @@
 """
 
 from hive.utils.logger import get_logger, setup_logging
-from hive.utils.retry import retry, RetryConfig
-from hive.utils.monitor import ResourceMonitor
 from hive.utils.metrics import MetricsCollector
+from hive.utils.monitor import ResourceMonitor
+from hive.utils.retry import RetryConfig, retry
 
 __all__ = [
     "get_logger",

@@ -21,7 +21,7 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from hive.bees.base_bee import BaseBee
 from hive.core.dna import BeeDNA
@@ -46,7 +46,7 @@ class VisionBee(BaseBee):
         self._preferred_model = self.dna.metadata.get("vision_model", None)
         self._default_system = self.dna.metadata.get(
             "vision_system_prompt",
-            "你是一个专业的视觉分析专家，擅长分析截图、架构图、UI界面，输出简洁的结构化描述。"
+            "你是一个专业的视觉分析专家，擅长分析截图、架构图、UI界面，输出简洁的结构化描述。",
         )
 
         logger.info(f"🖼️ [Vision] VisionBee 已初始化，模型: {self._preferred_model or 'auto'}")
@@ -100,14 +100,14 @@ class VisionBee(BaseBee):
                 "image_path": image_path,
                 "task_type": task_type,
                 "model_used": model or "auto",
-                "bee_id": self.id
+                "bee_id": self.id,
             }
         else:
             return {
                 "status": "error",
                 "message": "Vision analysis failed",
                 "image_path": image_path,
-                "bee_id": self.id
+                "bee_id": self.id,
             }
 
     def _build_prompt(self, prompt: str, task_type: str) -> str:
@@ -149,10 +149,11 @@ class VisionBee(BaseBee):
         """调用 BrainInterface 的视觉推理能力"""
         try:
             from hive.utils.brain_interface import get_brain
+
             brain = get_brain()
 
             # 优先尝试 consult_vision 方法
-            if hasattr(brain, 'consult_vision'):
+            if hasattr(brain, "consult_vision"):
                 result = brain.consult_vision(
                     prompt=prompt,
                     image_path=image_path,
@@ -179,6 +180,7 @@ class VisionBee(BaseBee):
         """Ollama 多模态模型备选 (如 llava)"""
         try:
             from hive.utils.ollama_interface import get_ollama
+
             ollama = get_ollama()
             if not ollama or not ollama.is_available():
                 logger.warning(f"🖼️ [Vision] Ollama 不可用")
@@ -186,6 +188,7 @@ class VisionBee(BaseBee):
 
             # Ollama 多模态模型 (llava): 通过 consult 的 images 参数
             import base64
+
             with open(image_path, "rb") as f:
                 img_base64 = base64.b64encode(f.read()).decode("utf-8")
 
@@ -213,13 +216,17 @@ class VisionBee(BaseBee):
         Returns:
             分析结果字典
         """
-        return self.specialized_task({
-            "image_path": image_path,
-            "prompt": question,
-            "task_type": "screenshot",
-        })
+        return self.specialized_task(
+            {
+                "image_path": image_path,
+                "prompt": question,
+                "task_type": "screenshot",
+            }
+        )
 
-    def analyze_architecture(self, image_path: str, question: str = "提取组件和关系") -> Dict[str, Any]:
+    def analyze_architecture(
+        self, image_path: str, question: str = "提取组件和关系"
+    ) -> Dict[str, Any]:
         """
         分析架构图
 
@@ -230,11 +237,13 @@ class VisionBee(BaseBee):
         Returns:
             分析结果字典
         """
-        return self.specialized_task({
-            "image_path": image_path,
-            "prompt": question,
-            "task_type": "architecture",
-        })
+        return self.specialized_task(
+            {
+                "image_path": image_path,
+                "prompt": question,
+                "task_type": "architecture",
+            }
+        )
 
     def describe_image(self, image_path: str, focus: str = "") -> Dict[str, Any]:
         """
@@ -248,11 +257,13 @@ class VisionBee(BaseBee):
             分析结果字典
         """
         prompt = f"描述这张图片的详细内容。{focus}" if focus else "详细描述这张图片的内容。"
-        return self.specialized_task({
-            "image_path": image_path,
-            "prompt": prompt,
-            "task_type": "general",
-        })
+        return self.specialized_task(
+            {
+                "image_path": image_path,
+                "prompt": prompt,
+                "task_type": "general",
+            }
+        )
 
 
-__all__ = ['VisionBee']
+__all__ = ["VisionBee"]

@@ -21,15 +21,15 @@ import time
 import tracemalloc
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 # Add Hive to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from hive.bees.async_base_bee import AsyncBaseBee
+from hive.bees.base_bee import BaseBee
 from hive.core.dna import BeeDNA
 from hive.core.interfaces import Task
-from hive.bees.base_bee import BaseBee
-from hive.bees.async_base_bee import AsyncBaseBee
 from hive.utils.logger import get_logger
 
 logger = get_logger("Hive.Benchmark")
@@ -38,6 +38,7 @@ logger = get_logger("Hive.Benchmark")
 @dataclass
 class BenchmarkResult:
     """Benchmark results container"""
+
     mode: str
     total_tasks: int
     completed_tasks: int
@@ -62,16 +63,13 @@ def create_test_tasks(count: int, task_type: str = "mixed") -> List[Task]:
                 "iterations": 2000,  # CPU-bound work iterations
                 "data": b"x" * 1000,  # Data for hashing
             },
-            timeout=60.0
+            timeout=60.0,
         )
         tasks.append(task)
     return tasks
 
 
-def run_basebee_benchmark(
-    tasks: List[Task],
-    num_workers: int
-) -> BenchmarkResult:
+def run_basebee_benchmark(tasks: List[Task], num_workers: int) -> BenchmarkResult:
     """
     Run benchmark with BaseBee (multiprocessing.Process).
 
@@ -90,7 +88,7 @@ def run_basebee_benchmark(
             id=f"basebee_{i}",
             species="BenchmarkBee",
             role="standard",
-            target_name=f"bench_target_{i}"
+            target_name=f"bench_target_{i}",
         )
         bee = BaseBee(dna, f"BaseBee-{i}", result_queue)
         bees.append(bee)
@@ -147,7 +145,7 @@ def run_basebee_benchmark(
         avg_latency=avg_latency,
         peak_memory_mb=peak / (1024 * 1024),
         cpu_percent=0,  # Not easily measured on Windows
-        task_results=task_results
+        task_results=task_results,
     )
 
 
@@ -159,20 +157,13 @@ async def run_async_bee_task(bee: AsyncBaseBee, task: Task) -> Dict[str, Any]:
             "task_id": task.id,
             "success": result.success,
             "execution_time": result.execution_time,
-            "error": result.error
+            "error": result.error,
         }
     except Exception as e:
-        return {
-            "task_id": task.id,
-            "success": False,
-            "error": str(e)
-        }
+        return {"task_id": task.id, "success": False, "error": str(e)}
 
 
-async def run_asyncbee_benchmark(
-    tasks: List[Task],
-    num_workers: int
-) -> BenchmarkResult:
+async def run_asyncbee_benchmark(tasks: List[Task], num_workers: int) -> BenchmarkResult:
     """
     Run benchmark with AsyncBaseBee (asyncio + ProcessPoolExecutor).
 
@@ -190,7 +181,7 @@ async def run_asyncbee_benchmark(
             id=f"asyncbee_{i}",
             species="BenchmarkBee",
             role="async",  # Important: triggers AsyncBaseBee routing
-            target_name=f"bench_target_{i}"
+            target_name=f"bench_target_{i}",
         )
         bee = AsyncBaseBee(dna, f"AsyncBee-{i}", result_queue, max_workers=4)
         bees.append(bee)
@@ -221,7 +212,9 @@ async def run_asyncbee_benchmark(
     failed = len(task_results) - completed
 
     throughput = completed / total_time if total_time > 0 else 0
-    avg_latency = sum(r.get("execution_time", 0) for r in task_results) / completed if completed > 0 else 0
+    avg_latency = (
+        sum(r.get("execution_time", 0) for r in task_results) / completed if completed > 0 else 0
+    )
 
     # Cleanup
     for bee in bees:
@@ -237,14 +230,11 @@ async def run_asyncbee_benchmark(
         avg_latency=avg_latency,
         peak_memory_mb=peak / (1024 * 1024),
         cpu_percent=0,
-        task_results=task_results
+        task_results=task_results,
     )
 
 
-def run_sync_baseline_benchmark(
-    tasks: List[Task],
-    num_workers: int
-) -> BenchmarkResult:
+def run_sync_baseline_benchmark(tasks: List[Task], num_workers: int) -> BenchmarkResult:
     """
     Run baseline benchmark with ThreadPoolExecutor.
 
@@ -267,17 +257,13 @@ def run_sync_baseline_benchmark(
             data = task.payload.get("data", b"x" * 1000)
             iterations = task.payload.get("iterations", 2000)
             cpu_work(data, iterations)
-            return {
-                "task_id": task.id,
-                "success": True,
-                "execution_time": time.time() - task_start
-            }
+            return {"task_id": task.id, "success": True, "execution_time": time.time() - task_start}
         except Exception as e:
             return {
                 "task_id": task.id,
                 "success": False,
                 "error": str(e),
-                "execution_time": time.time() - task_start
+                "execution_time": time.time() - task_start,
             }
 
     # Use ThreadPoolExecutor for I/O-bound async comparison
@@ -292,7 +278,9 @@ def run_sync_baseline_benchmark(
     failed = len(results) - completed
 
     throughput = completed / total_time if total_time > 0 else 0
-    avg_latency = sum(r.get("execution_time", 0) for r in results) / completed if completed > 0 else 0
+    avg_latency = (
+        sum(r.get("execution_time", 0) for r in results) / completed if completed > 0 else 0
+    )
 
     return BenchmarkResult(
         mode="ThreadPoolExecutor (baseline)",
@@ -304,7 +292,7 @@ def run_sync_baseline_benchmark(
         avg_latency=avg_latency,
         peak_memory_mb=peak / (1024 * 1024),
         cpu_percent=0,
-        task_results=results
+        task_results=results,
     )
 
 
@@ -340,7 +328,11 @@ def print_benchmark_report(results: List[BenchmarkResult]):
 
         for result in results:
             speedup = result.throughput / baseline.throughput if baseline.throughput > 0 else 0
-            memory_ratio = result.peak_memory_mb / baseline.peak_memory_mb if baseline.peak_memory_mb > 0 else 0
+            memory_ratio = (
+                result.peak_memory_mb / baseline.peak_memory_mb
+                if baseline.peak_memory_mb > 0
+                else 0
+            )
             print(f"  {result.mode}:")
             print(f"    Speedup vs baseline: {speedup:.2f}x")
             print(f"    Memory ratio:        {memory_ratio:.2f}x")
@@ -356,15 +348,29 @@ def print_benchmark_report(results: List[BenchmarkResult]):
                 print("KEY FINDINGS: AsyncBaseBee vs BaseBee (multiprocessing)")
                 print("=" * 80)
 
-                throughput_ratio = async_result.throughput / base_result.throughput if base_result.throughput > 0 else 0
-                memory_ratio = async_result.peak_memory_mb / base_result.peak_memory_mb if base_result.peak_memory_mb > 0 else 0
+                throughput_ratio = (
+                    async_result.throughput / base_result.throughput
+                    if base_result.throughput > 0
+                    else 0
+                )
+                memory_ratio = (
+                    async_result.peak_memory_mb / base_result.peak_memory_mb
+                    if base_result.peak_memory_mb > 0
+                    else 0
+                )
 
-                print(f"  Throughput Ratio:    {throughput_ratio:.2f}x ({async_result.mode} vs {base_result.mode})")
+                print(
+                    f"  Throughput Ratio:    {throughput_ratio:.2f}x ({async_result.mode} vs {base_result.mode})"
+                )
                 print(f"  Memory Ratio:        {memory_ratio:.2f}x")
 
                 if throughput_ratio > 1:
-                    print(f"\n  RESULT: AsyncBaseBee shows {throughput_ratio:.2f}x THROUGHPUT IMPROVEMENT")
-                    print(f"  This aligns with the 3-5x improvement potential from async I/O overlap.")
+                    print(
+                        f"\n  RESULT: AsyncBaseBee shows {throughput_ratio:.2f}x THROUGHPUT IMPROVEMENT"
+                    )
+                    print(
+                        f"  This aligns with the 3-5x improvement potential from async I/O overlap."
+                    )
                 else:
                     print(f"\n  NOTE: BaseBee showed better throughput in this workload.")
                     print(f"  AsyncBaseBee advantages: I/O-bound tasks, lower memory footprint")
@@ -388,7 +394,7 @@ def main():
         "--mode",
         choices=["sync", "async", "both", "threads"],
         default="both",
-        help="Benchmark mode: sync (BaseBee), async (AsyncBaseBee), both, or threads"
+        help="Benchmark mode: sync (BaseBee), async (AsyncBaseBee), both, or threads",
     )
     args = parser.parse_args()
 

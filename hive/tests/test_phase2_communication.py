@@ -8,18 +8,19 @@
 4. 导出新的枚举和类
 """
 
-import pytest
 import time
 from datetime import datetime
 from enum import Enum
 
+import pytest
+
 from hive.core.swarm_communication import (
+    MessageEnvelope,
+    MessagePriority,
+    MessageType,
+    PriorityQueueItem,
     SwarmCommunication,
     SwarmMessage,
-    MessageType,
-    MessagePriority,
-    PriorityQueueItem,
-    MessageEnvelope,
     get_swarm_communication,
 )
 
@@ -32,7 +33,7 @@ class TestMessageTypeExpansion:
         assert hasattr(MessageType, "REQUEST_ASSISTANCE")
         assert hasattr(MessageType, "REQUEST_INFORMATION")
         assert hasattr(MessageType, "REQUEST_APPROVAL")
-        
+
         assert MessageType.REQUEST_ASSISTANCE.value == "request_assistance"
         assert MessageType.REQUEST_INFORMATION.value == "request_information"
         assert MessageType.REQUEST_APPROVAL.value == "request_approval"
@@ -42,7 +43,7 @@ class TestMessageTypeExpansion:
         assert hasattr(MessageType, "RESPONSE_SUCCESS")
         assert hasattr(MessageType, "RESPONSE_FAILURE")
         assert hasattr(MessageType, "RESPONSE_PARTIAL")
-        
+
         assert MessageType.RESPONSE_SUCCESS.value == "response_success"
         assert MessageType.RESPONSE_FAILURE.value == "response_failure"
         assert MessageType.RESPONSE_PARTIAL.value == "response_partial"
@@ -52,7 +53,7 @@ class TestMessageTypeExpansion:
         assert hasattr(MessageType, "BROADCAST_DISCOVERY")
         assert hasattr(MessageType, "BROADCAST_STATUS")
         assert hasattr(MessageType, "BROADCAST_EMERGENCY")
-        
+
         assert MessageType.BROADCAST_DISCOVERY.value == "broadcast_discovery"
         assert MessageType.BROADCAST_STATUS.value == "broadcast_status"
         assert MessageType.BROADCAST_EMERGENCY.value == "broadcast_emergency"
@@ -62,7 +63,7 @@ class TestMessageTypeExpansion:
         assert hasattr(MessageType, "COLLABORATION_PROPOSAL")
         assert hasattr(MessageType, "COLLABORATION_ACCEPT")
         assert hasattr(MessageType, "COLLABORATION_REJECT")
-        
+
         assert MessageType.COLLABORATION_PROPOSAL.value == "collab_proposal"
         assert MessageType.COLLABORATION_ACCEPT.value == "collab_accept"
         assert MessageType.COLLABORATION_REJECT.value == "collab_reject"
@@ -71,7 +72,7 @@ class TestMessageTypeExpansion:
         """测试知识类消息类型"""
         assert hasattr(MessageType, "KNOWLEDGE_SHARE")
         assert hasattr(MessageType, "KNOWLEDGE_QUERY")
-        
+
         assert MessageType.KNOWLEDGE_SHARE.value == "knowledge_share"
         assert MessageType.KNOWLEDGE_QUERY.value == "knowledge_query"
 
@@ -90,16 +91,16 @@ class TestMessageTypeExpansion:
     def test_all_message_types_count(self):
         """测试消息类型总数"""
         # 原有类型: 9 个
-        # 新增类型: REQUEST_* (3) + RESPONSE_* (3) + BROADCAST_* (3) + 
+        # 新增类型: REQUEST_* (3) + RESPONSE_* (3) + BROADCAST_* (3) +
         #          COLLABORATION_* (3) + KNOWLEDGE_* (2) = 14 个
         # 总共: 9 + 14 = 23 个
-        
+
         # 实际验证
         types = list(MessageType)
-        
+
         # 至少应该有这些
         expected_min_count = 9 + 14  # 原有 + 新增
-        
+
         # 实际可能有更多，因为 KNOWLEDGE 可能和 KNOWLEDGE_SHARE 不同
         assert len(types) >= 9
 
@@ -150,7 +151,7 @@ class TestMessagePriority:
         for priority in MessagePriority:
             int_val = MessagePriority.to_int(priority)
             converted_back = MessagePriority.from_int(int_val)
-            
+
             # 可能不完全相同，因为多个 int 值映射到同一个 priority
             # 但至少应该是合理的
             assert isinstance(converted_back, MessagePriority)
@@ -168,14 +169,14 @@ class TestSwarmMessageEnhancedMethods:
             from_bee="bee_1",
         )
         assert request_msg.is_request_type() == True
-        
+
         request_msg2 = SwarmMessage(
             id="req_002",
             type=MessageType.TASK_REQUEST,
             from_bee="bee_1",
         )
         assert request_msg2.is_request_type() == True
-        
+
         # 非请求类型
         non_request_msg = SwarmMessage(
             id="non_req_001",
@@ -193,14 +194,14 @@ class TestSwarmMessageEnhancedMethods:
             from_bee="bee_1",
         )
         assert resp_msg.is_response_type() == True
-        
+
         resp_msg2 = SwarmMessage(
             id="resp_002",
             type=MessageType.RESPONSE,
             from_bee="bee_1",
         )
         assert resp_msg2.is_response_type() == True
-        
+
         # 非响应类型
         non_resp_msg = SwarmMessage(
             id="non_resp_001",
@@ -218,14 +219,14 @@ class TestSwarmMessageEnhancedMethods:
             from_bee="bee_1",
         )
         assert bc_msg.is_broadcast_type() == True
-        
+
         bc_msg2 = SwarmMessage(
             id="bc_002",
             type=MessageType.KNOWLEDGE,
             from_bee="bee_1",
         )
         assert bc_msg2.is_broadcast_type() == True
-        
+
         # 非广播类型
         non_bc_msg = SwarmMessage(
             id="non_bc_001",
@@ -242,16 +243,16 @@ class TestSwarmMessageEnhancedMethods:
             from_bee="bee_1",
             priority=5,  # NORMAL
         )
-        
+
         assert msg.get_priority_enum() == MessagePriority.NORMAL
-        
+
         msg2 = SwarmMessage(
             id="prio_002",
             type=MessageType.ALERT,
             from_bee="bee_1",
             priority=10,  # EMERGENCY
         )
-        
+
         assert msg2.get_priority_enum() == MessagePriority.EMERGENCY
 
     def test_set_priority_enum(self):
@@ -262,12 +263,12 @@ class TestSwarmMessageEnhancedMethods:
             from_bee="bee_1",
             priority=5,
         )
-        
+
         assert msg.priority == 5
         assert msg.get_priority_enum() == MessagePriority.NORMAL
-        
+
         msg.set_priority_enum(MessagePriority.EMERGENCY)
-        
+
         assert msg.priority == 10
         assert msg.get_priority_enum() == MessagePriority.EMERGENCY
 
@@ -283,7 +284,7 @@ class TestSwarmMessageEnhancedMethods:
             MessageType.KNOWLEDGE_QUERY,
             MessageType.COLLABORATION_PROPOSAL,
         ]
-        
+
         for msg_type in request_types:
             msg = SwarmMessage(
                 id=f"test_{msg_type.value}",
@@ -291,7 +292,7 @@ class TestSwarmMessageEnhancedMethods:
                 from_bee="bee_1",
             )
             assert msg.needs_response() == True, f"{msg_type} should need response"
-        
+
         # 测试响应类型不需要响应
         response_types = [
             MessageType.RESPONSE,
@@ -299,7 +300,7 @@ class TestSwarmMessageEnhancedMethods:
             MessageType.RESPONSE_FAILURE,
             MessageType.RESPONSE_PARTIAL,
         ]
-        
+
         for msg_type in response_types:
             msg = SwarmMessage(
                 id=f"test_{msg_type.value}",
@@ -315,7 +316,7 @@ class TestPriorityQueueIntegration:
     def test_message_priority_affects_queue(self):
         """测试消息优先级影响队列顺序"""
         comm = SwarmCommunication()
-        
+
         # 创建不同优先级的消息
         low_msg = SwarmMessage(
             id="low",
@@ -323,21 +324,21 @@ class TestPriorityQueueIntegration:
             from_bee="test",
             priority=MessagePriority.to_int(MessagePriority.LOW),
         )
-        
+
         high_msg = SwarmMessage(
             id="high",
             type=MessageType.ALERT,
             from_bee="test",
             priority=MessagePriority.to_int(MessagePriority.HIGH),
         )
-        
+
         emergency_msg = SwarmMessage(
             id="emergency",
             type=MessageType.BROADCAST_EMERGENCY,
             from_bee="test",
             priority=MessagePriority.to_int(MessagePriority.EMERGENCY),
         )
-        
+
         # 验证优先级值
         assert low_msg.priority == 2
         assert high_msg.priority == 7
@@ -354,9 +355,9 @@ class TestMessageEnvelope:
             type=MessageType.STATUS,
             from_bee="bee_1",
         )
-        
+
         envelope = MessageEnvelope(message=msg)
-        
+
         assert envelope.message == msg
         assert envelope.read_count == 0
         assert envelope.is_acknowledged == False
@@ -370,14 +371,14 @@ class TestSwarmCommunicationIntegration:
         """测试获取单例"""
         comm1 = get_swarm_communication()
         comm2 = get_swarm_communication()
-        
+
         assert comm1 is comm2
         assert isinstance(comm1, SwarmCommunication)
 
     def test_new_message_types_work(self):
         """测试新消息类型可以正常使用"""
         comm = SwarmCommunication()
-        
+
         # 测试创建各种新类型的消息
         test_cases = [
             (MessageType.REQUEST_ASSISTANCE, "request_1"),
@@ -395,7 +396,7 @@ class TestSwarmCommunicationIntegration:
             (MessageType.KNOWLEDGE_SHARE, "know_1"),
             (MessageType.KNOWLEDGE_QUERY, "know_2"),
         ]
-        
+
         for msg_type, msg_id in test_cases:
             msg = SwarmMessage(
                 id=msg_id,
@@ -403,7 +404,7 @@ class TestSwarmCommunicationIntegration:
                 from_bee="sender_bee",
                 content={"test": "data"},
             )
-            
+
             assert msg.id == msg_id
             assert msg.type == msg_type
             assert msg.from_bee == "sender_bee"
@@ -416,9 +417,9 @@ class TestSwarmCommunicationIntegration:
             type=MessageType.ALERT,
             from_bee="monitor",
         )
-        
+
         msg.set_priority_enum(MessagePriority.CRITICAL)
-        
+
         # 验证
         assert msg.priority == 9
         assert msg.get_priority_enum() == MessagePriority.CRITICAL
@@ -433,10 +434,10 @@ class TestSwarmCommunicationIntegration:
             to_bee="worker_b",
             content={"task": "需要协助分析代码"},
         )
-        
+
         assert request_msg.is_request_type() == True
         assert request_msg.needs_response() == True
-        
+
         # 响应消息
         response_msg = SwarmMessage(
             id="resp_001",
@@ -446,7 +447,7 @@ class TestSwarmCommunicationIntegration:
             content={"result": "已完成分析"},
             correlation_id="req_resp_001",
         )
-        
+
         assert response_msg.is_response_type() == True
         assert response_msg.correlation_id == "req_resp_001"
 
@@ -462,23 +463,23 @@ class TestPriorityQueueItem:
             from_bee="test",
             priority=2,  # LOW
         )
-        
+
         msg_high = SwarmMessage(
             id="high",
             type=MessageType.ALERT,
             from_bee="test",
             priority=7,  # HIGH
         )
-        
+
         item_low = PriorityQueueItem(priority=2, timestamp=time.time(), message=msg_low)
         item_high = PriorityQueueItem(priority=7, timestamp=time.time(), message=msg_high)
-        
+
         # 注意：PriorityQueueItem 使用的是内部优先级计算
         # 实际值是 10 - message.priority
         # 所以高优先级消息的内部值更小（先被取出）
-        
+
         # 直接比较内部优先级值
         internal_low = 10 - msg_low.priority  # 8
         internal_high = 10 - msg_high.priority  # 3
-        
+
         assert internal_high < internal_low  # 高优先级的内部值更小

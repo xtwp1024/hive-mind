@@ -8,9 +8,9 @@ ProofOfWork - 工作量证明哈希器
 """
 
 import hashlib
+import logging
 import time
 import uuid
-import logging
 from dataclasses import dataclass, field
 
 logger = logging.getLogger("Hive.ProofOfWork")
@@ -19,10 +19,11 @@ logger = logging.getLogger("Hive.ProofOfWork")
 @dataclass
 class PoWJob:
     """一个挖矿任务（对标 Stratum 协议的 job）"""
-    job_id:      str
-    blob:        str          # 任务内容摘要（对标 mining blob）
-    difficulty:  int = 2      # 难度前缀零位数（2=前16位为0，轻量演示；生产可调高）
-    issued_at:   float = field(default_factory=time.time)
+
+    job_id: str
+    blob: str  # 任务内容摘要（对标 mining blob）
+    difficulty: int = 2  # 难度前缀零位数（2=前16位为0，轻量演示；生产可调高）
+    issued_at: float = field(default_factory=time.time)
     ttl_seconds: float = 60.0
 
     @property
@@ -37,11 +38,12 @@ class PoWJob:
 @dataclass
 class PoWSolution:
     """一个满足难度的解（对标 Stratum submit）"""
-    job_id:   str
-    nonce:    int
+
+    job_id: str
+    nonce: int
     hash_hex: str
-    attempts: int          # 穷举了多少次才找到
-    elapsed:  float        # 计算耗时（秒）
+    attempts: int  # 穷举了多少次才找到
+    elapsed: float  # 计算耗时（秒）
 
 
 class ProofOfWork:
@@ -55,7 +57,7 @@ class ProofOfWork:
         throttle: 0.0=全速, 0.5=50% 空闲（对标 coin-hive throttle）
         max_attempts: 最大穷举次数（防止无限死循环）
         """
-        self.throttle    = max(0.0, min(1.0, throttle))
+        self.throttle = max(0.0, min(1.0, throttle))
         self.max_attempts = max_attempts
         self._total_hashes = 0
 
@@ -68,9 +70,9 @@ class ProofOfWork:
             logger.warning(f"[PoW] job {job.job_id[:8]} 已过期，放弃")
             return None
 
-        prefix   = job.target_prefix
-        t_start  = time.time()
-        nonce    = start_nonce
+        prefix = job.target_prefix
+        t_start = time.time()
+        nonce = start_nonce
         attempts = 0
 
         logger.info(f"[PoW] 开始挖矿 job={job.job_id[:8]}, difficulty={job.difficulty}")
@@ -82,7 +84,7 @@ class ProofOfWork:
                 time.sleep(sleep_time)
 
             raw = f"{job.blob}:{nonce}".encode()
-            h   = hashlib.sha256(raw).hexdigest()
+            h = hashlib.sha256(raw).hexdigest()
             attempts += 1
             self._total_hashes += 1
 
@@ -94,11 +96,11 @@ class ProofOfWork:
                     f"attempts={attempts} elapsed={elapsed:.3f}s"
                 )
                 return PoWSolution(
-                    job_id   = job.job_id,
-                    nonce    = nonce,
-                    hash_hex = h,
-                    attempts = attempts,
-                    elapsed  = elapsed,
+                    job_id=job.job_id,
+                    nonce=nonce,
+                    hash_hex=h,
+                    attempts=attempts,
+                    elapsed=elapsed,
                 )
             nonce += 1
 
@@ -115,9 +117,9 @@ class ProofOfWork:
         矿池端（StratumDispatcher）验证解的有效性。
         对标 Stratum 矿池的 submit 验证逻辑。
         """
-        raw      = f"{job.blob}:{solution.nonce}".encode()
-        h        = hashlib.sha256(raw).hexdigest()
-        valid    = h == solution.hash_hex and h.startswith(job.target_prefix)
+        raw = f"{job.blob}:{solution.nonce}".encode()
+        h = hashlib.sha256(raw).hexdigest()
+        valid = h == solution.hash_hex and h.startswith(job.target_prefix)
         if not valid:
             logger.warning(f"[PoW] ❌ 验证失败 job={job.job_id[:8]}")
         return valid

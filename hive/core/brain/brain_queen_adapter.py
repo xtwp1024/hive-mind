@@ -24,15 +24,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .hive_brain import HiveBrain, ThinkResult, BrainConfig
+from .hive_brain import BrainConfig, HiveBrain, ThinkResult
 from .queen_adapter import QueenAdapter
-from .strategy_selector import Strategy, CognitiveMode, ExecutionMode
-from .sandbox import SandboxEnvironment, SandboxConfig, SimulationResult
+from .sandbox import SandboxConfig, SandboxEnvironment, SimulationResult
+from .strategy_selector import CognitiveMode, ExecutionMode, Strategy
 
 # Import at file level for better performance
 try:
-    from hive.core.service_locator import BeeServiceLocator
     from hive.core.dna import BeeDNA
+    from hive.core.service_locator import BeeServiceLocator
 except ImportError:
     BeeServiceLocator = None
     BeeDNA = None
@@ -207,8 +207,9 @@ class BrainQueenAdapter:
             # 记录使用的策略
             if think_result.metadata.get("strategy"):
                 strategy_mode = think_result.metadata["strategy"].get("mode", "unknown")
-                self._stats["strategies_used"][strategy_mode] = \
+                self._stats["strategies_used"][strategy_mode] = (
                     self._stats["strategies_used"].get(strategy_mode, 0) + 1
+                )
 
             # ===== 阶段2: 执行 =====
             execution_results = []
@@ -219,11 +220,11 @@ class BrainQueenAdapter:
                 )
 
                 # 判断是否成功
-                success = all(
-                    r.get("success", False)
-                    for r in execution_results
-                    if isinstance(r, dict)
-                ) if execution_results else True
+                success = (
+                    all(r.get("success", False) for r in execution_results if isinstance(r, dict))
+                    if execution_results
+                    else True
+                )
 
                 result.success = success
                 result.message = "执行完成" if success else "部分执行失败"
@@ -339,21 +340,25 @@ class BrainQueenAdapter:
                     # System2: 标准执行
                     exec_result = await self._execute_step_via_queen(goal)
 
-                execution_results.append({
-                    "success": exec_result.get("success", False),
-                    "step_id": goal.id,
-                    "description": goal.description,
-                    "result": exec_result,
-                })
+                execution_results.append(
+                    {
+                        "success": exec_result.get("success", False),
+                        "step_id": goal.id,
+                        "description": goal.description,
+                        "result": exec_result,
+                    }
+                )
 
             except Exception as e:
                 logger.error(f"❌ Step execution error: {e}")
-                execution_results.append({
-                    "success": False,
-                    "step_id": goal.id,
-                    "description": goal.description,
-                    "error": str(e),
-                })
+                execution_results.append(
+                    {
+                        "success": False,
+                        "step_id": goal.id,
+                        "description": goal.description,
+                        "error": str(e),
+                    }
+                )
 
         return execution_results
 
@@ -412,16 +417,25 @@ class BrainQueenAdapter:
 
         # 收集执行信息
         success = result.success
-        description = result.think_result.perception.original_text if result.think_result.perception else ""
+        description = (
+            result.think_result.perception.original_text if result.think_result.perception else ""
+        )
 
         # 计算成功率
         total_steps = len(result.execution_results)
-        successful_steps = sum(
-            1 for r in result.execution_results
-            if isinstance(r, dict) and r.get("success", False)
-        ) if result.execution_results else 1
+        successful_steps = (
+            sum(
+                1
+                for r in result.execution_results
+                if isinstance(r, dict) and r.get("success", False)
+            )
+            if result.execution_results
+            else 1
+        )
 
-        success_rate = successful_steps / total_steps if total_steps > 0 else (1.0 if success else 0.0)
+        success_rate = (
+            successful_steps / total_steps if total_steps > 0 else (1.0 if success else 0.0)
+        )
 
         # 存储经验
         importance = 0.5 + success_rate * 0.3  # 0.8 for full success, 0.5 for failure
@@ -431,7 +445,11 @@ class BrainQueenAdapter:
             success=success,
             importance=importance,
             tags=[
-                result.think_result.perception.intent.value if result.think_result.perception else "unknown",
+                (
+                    result.think_result.perception.intent.value
+                    if result.think_result.perception
+                    else "unknown"
+                ),
                 "brainful_execution",
             ],
         )
@@ -442,7 +460,12 @@ class BrainQueenAdapter:
             await self.hive_brain.strategy_selector.adapt_strategy(
                 Strategy(
                     mode=CognitiveMode(strategy.get("mode", "system2")),
-                    execution_mode=getattr(result.strategy_used, 'execution_mode', None) or ExecutionMode.HYBRID if result.strategy_used is not None else ExecutionMode.HYBRID,
+                    execution_mode=(
+                        getattr(result.strategy_used, "execution_mode", None)
+                        or ExecutionMode.HYBRID
+                        if result.strategy_used is not None
+                        else ExecutionMode.HYBRID
+                    ),
                 ),
                 {"success": success, "duration": result.execution_duration_ms},
             )

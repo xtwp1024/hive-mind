@@ -10,15 +10,15 @@ Phase 3: 自主进化能力 - 单元测试
 5. DNAAdaptiveEngine - DNA 自适应修改系统
 """
 
-import unittest
-import time
-import threading
-from unittest.mock import MagicMock, patch
-from pathlib import Path
-import tempfile
 import shutil
-
 import sys
+import tempfile
+import threading
+import time
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
@@ -28,10 +28,11 @@ class TestCapabilityGapAnalyzer(unittest.TestCase):
     def setUp(self):
         from hive.core.capability_gap_analyzer import (
             CapabilityGapAnalyzer,
-            TaskExecutionRecord,
             GapSeverity,
             GapType,
+            TaskExecutionRecord,
         )
+
         self.CapabilityGapAnalyzer = CapabilityGapAnalyzer
         self.TaskExecutionRecord = TaskExecutionRecord
         self.GapSeverity = GapSeverity
@@ -164,14 +165,15 @@ class TestSpeciesBlueprint(unittest.TestCase):
 
     def setUp(self):
         from hive.core.species_blueprint import (
-            SpeciesBlueprint,
-            CapabilitySpecification,
-            TaskAffinity,
-            BlueprintStatus,
             BlueprintOrigin,
-            CapabilityPriority,
             BlueprintRegistry,
+            BlueprintStatus,
+            CapabilityPriority,
+            CapabilitySpecification,
+            SpeciesBlueprint,
+            TaskAffinity,
         )
+
         self.SpeciesBlueprint = SpeciesBlueprint
         self.CapabilitySpecification = CapabilitySpecification
         self.TaskAffinity = TaskAffinity
@@ -433,7 +435,8 @@ class TestCapabilitySpecification(unittest.TestCase):
     """测试能力规格"""
 
     def setUp(self):
-        from hive.core.species_blueprint import CapabilitySpecification, CapabilityPriority
+        from hive.core.species_blueprint import CapabilityPriority, CapabilitySpecification
+
         self.CapabilitySpecification = CapabilitySpecification
         self.CapabilityPriority = CapabilityPriority
 
@@ -482,6 +485,7 @@ class TestTaskAffinity(unittest.TestCase):
 
     def setUp(self):
         from hive.core.species_blueprint import TaskAffinity
+
         self.TaskAffinity = TaskAffinity
 
     def test_validate_valid_affinity(self):
@@ -513,12 +517,13 @@ class TestDynamicResourceAllocator(unittest.TestCase):
 
     def setUp(self):
         from hive.core.resource_allocator import (
-            DynamicResourceAllocator,
-            ResourceType,
             AllocationPriority,
             ConsumerProfile,
+            DynamicResourceAllocator,
             ResourceQuota,
+            ResourceType,
         )
+
         self.DynamicResourceAllocator = DynamicResourceAllocator
         self.ResourceType = ResourceType
         self.AllocationPriority = AllocationPriority
@@ -630,9 +635,7 @@ class TestDynamicResourceAllocator(unittest.TestCase):
         self.allocator.register_consumer(
             consumer_id="release_test_001",
             consumer_type="miner",
-            initial_quotas={
-                self.ResourceType.CPU: {"hard_limit": 2.0, "soft_limit": 1.5}
-            },
+            initial_quotas={self.ResourceType.CPU: {"hard_limit": 2.0, "soft_limit": 1.5}},
         )
 
         decision = self.allocator.request_resource(
@@ -700,6 +703,7 @@ class TestResourceQuota(unittest.TestCase):
 
     def setUp(self):
         from hive.core.resource_allocator import ResourceQuota, ResourceType
+
         self.ResourceQuota = ResourceQuota
         self.ResourceType = ResourceType
 
@@ -759,12 +763,13 @@ class TestDNAAdaptiveEngine(unittest.TestCase):
 
     def setUp(self):
         from hive.core.dna_adaptive import (
-            DNAAdaptiveEngine,
-            PerformanceSample,
             AdaptationType,
-            PerformanceTrend,
+            DNAAdaptiveEngine,
             ParameterState,
+            PerformanceSample,
+            PerformanceTrend,
         )
+
         self.DNAAdaptiveEngine = DNAAdaptiveEngine
         self.PerformanceSample = PerformanceSample
         self.AdaptationType = AdaptationType
@@ -878,6 +883,7 @@ class TestParameterState(unittest.TestCase):
 
     def setUp(self):
         from hive.core.dna_adaptive import ParameterState, PerformanceTrend
+
         self.ParameterState = ParameterState
         self.PerformanceTrend = PerformanceTrend
 
@@ -967,7 +973,6 @@ class TestParameterState(unittest.TestCase):
 
 
 import random
-
 
 if __name__ == "__main__":
     unittest.main()

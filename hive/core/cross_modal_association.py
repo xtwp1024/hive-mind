@@ -51,22 +51,23 @@ Phase 4: 多模态扩展
 """
 
 import logging
+import math
 import threading
 import time
-import math
+from collections import defaultdict, deque
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Union
-from collections import defaultdict, deque
-from copy import deepcopy
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("Hive.CrossModal")
 
 
 class AssociationType(Enum):
     """关联类型"""
+
     SEMANTIC = "semantic"
     TEMPORAL = "temporal"
     SPATIAL = "spatial"
@@ -526,9 +527,7 @@ class UnifiedRepresentationSpace:
         self._embedding_store: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
 
-        logger.info(
-            f"🌌 [UnifiedRepresentationSpace] 初始化，维度: {dimension}"
-        )
+        logger.info(f"🌌 [UnifiedRepresentationSpace] 初始化，维度: {dimension}")
 
     def project_to_unified(
         self,
@@ -551,7 +550,7 @@ class UnifiedRepresentationSpace:
         weight = self.modality_weights.get(source_modality, 1.0)
 
         if len(embedding) > self.dimension:
-            projected = embedding[:self.dimension]
+            projected = embedding[: self.dimension]
         else:
             projected = embedding + [0.0] * (self.dimension - len(embedding))
 
@@ -756,11 +755,13 @@ class CrossModalRetriever:
 
         formatted_results = []
         for emb_id, score, modality in results:
-            formatted_results.append({
-                "embedding_id": emb_id,
-                "similarity_score": score,
-                "modality": modality,
-            })
+            formatted_results.append(
+                {
+                    "embedding_id": emb_id,
+                    "similarity_score": score,
+                    "modality": modality,
+                }
+            )
 
         retrieval_time = (time.time() - start_time) * 1000
 
@@ -805,11 +806,13 @@ class CrossModalRetriever:
 
         formatted_results = []
         for emb_id, score, modality in results:
-            formatted_results.append({
-                "embedding_id": emb_id,
-                "similarity_score": score,
-                "modality": modality,
-            })
+            formatted_results.append(
+                {
+                    "embedding_id": emb_id,
+                    "similarity_score": score,
+                    "modality": modality,
+                }
+            )
 
         retrieval_time = (time.time() - start_time) * 1000
 
@@ -858,11 +861,13 @@ class CrossModalRetriever:
 
         formatted_results = []
         for emb_id, score, modality in results:
-            formatted_results.append({
-                "embedding_id": emb_id,
-                "similarity_score": score,
-                "modality": modality,
-            })
+            formatted_results.append(
+                {
+                    "embedding_id": emb_id,
+                    "similarity_score": score,
+                    "modality": modality,
+                }
+            )
 
         retrieval_time = (time.time() - start_time) * 1000
 
@@ -882,25 +887,25 @@ class CrossModalRetriever:
         """文本转嵌入的 fallback 实现"""
         import hashlib
 
-        hasher = hashlib.sha256(text.encode('utf-8'))
+        hasher = hashlib.sha256(text.encode("utf-8"))
         hash_bytes = hasher.digest()
 
         embedding = []
         for i in range(0, min(len(hash_bytes), 64), 4):
-            chunk = hash_bytes[i:i+4]
+            chunk = hash_bytes[i : i + 4]
             if len(chunk) < 4:
-                chunk = chunk + b'\x00' * (4 - len(chunk))
-            value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                chunk = chunk + b"\x00" * (4 - len(chunk))
+            value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
             embedding.append(value * 2 - 1)
 
         while len(embedding) < 128:
-            hasher.update(b'salt')
+            hasher.update(b"salt")
             hash_bytes = hasher.digest()
             for i in range(0, len(hash_bytes), 4):
-                chunk = hash_bytes[i:i+4]
+                chunk = hash_bytes[i : i + 4]
                 if len(chunk) < 4:
-                    chunk = chunk + b'\x00' * (4 - len(chunk))
-                value = int.from_bytes(chunk, 'big') / 0xFFFFFFFF
+                    chunk = chunk + b"\x00" * (4 - len(chunk))
+                value = int.from_bytes(chunk, "big") / 0xFFFFFFFF
                 embedding.append(value * 2 - 1)
                 if len(embedding) >= 128:
                     break
@@ -937,9 +942,7 @@ class CrossModalAssociationEngine:
 
         self._lock = threading.Lock()
 
-        logger.info(
-            f"🔗 [CrossModalAssociationEngine] 初始化，嵌入维度: {embedding_dim}"
-        )
+        logger.info(f"🔗 [CrossModalAssociationEngine] 初始化，嵌入维度: {embedding_dim}")
 
     def align_modalities(
         self,
@@ -1022,7 +1025,7 @@ class CrossModalAssociationEngine:
             fused = []
             for emb, _ in unified_embeddings:
                 fused.extend(emb)
-            return fused[:self.embedding_dim]
+            return fused[: self.embedding_dim]
 
         elif strategy == "average":
             dim = len(unified_embeddings[0][0])

@@ -7,9 +7,9 @@ ResultVault - 任务结果版本链仓库
 任何历史版本都可以通过 recover() 精确回溯，冲突时触发 IVersionSelector 策略。
 """
 
-import time
-import threading
 import logging
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -19,11 +19,12 @@ logger = logging.getLogger("Hive.ResultVault")
 @dataclass
 class ResultVersion:
     """一个版本节点（对标 Hive2Hive 中的 IFileVersion）"""
+
     version_idx: int
-    value:       Any
-    author:      str           # 写入者 agent ID
-    timestamp:   float = field(default_factory=time.time)
-    note:        str   = ""    # 版本说明（可选）
+    value: Any
+    author: str  # 写入者 agent ID
+    timestamp: float = field(default_factory=time.time)
+    note: str = ""  # 版本说明（可选）
 
     def __repr__(self) -> str:
         ts = time.strftime("%H:%M:%S", time.localtime(self.timestamp))
@@ -32,6 +33,7 @@ class ResultVersion:
 
 class VersionConflictError(Exception):
     """同一 key 在写入时检测到潜在冲突（对标 Hive2Hive ConflictManagement）"""
+
     pass
 
 
@@ -79,7 +81,7 @@ class ResultVault:
             if key not in self._store:
                 raise KeyError(f"key={key!r} 不存在，请先用 add() 创建")
             idx = len(self._store[key])
-            v   = ResultVersion(version_idx=idx, value=value, author=author, note=note)
+            v = ResultVersion(version_idx=idx, value=value, author=author, note=note)
             self._store[key].append(v)
 
         logger.info(f"[ResultVault] ✅ update({key!r}) → {v}")
@@ -110,10 +112,10 @@ class ResultVault:
 
         target = chain[version_idx]
         recovered = self.update(
-            key    = key,
-            value  = target.value,
-            author = f"recover(←v{version_idx})",
-            note   = f"回溯自 {target}",
+            key=key,
+            value=target.value,
+            author=f"recover(←v{version_idx})",
+            note=f"回溯自 {target}",
         )
         logger.info(f"[ResultVault] ⏪ recover({key!r}, v{version_idx}) → 已作为 {recovered} 追加")
         return recovered

@@ -8,7 +8,8 @@ Phase 1: LLM 驱动的即时检索，输出真实代码片段而非文本匹配
 import re
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from hive.bees.base_bee import BaseBee
 from hive.core.dna import BeeDNA
 from hive.utils.logger import get_logger
@@ -22,10 +23,13 @@ except ImportError:
 # 默认知识库路径：根锚点由 hive.paths 单一真源解析（P1-7），
 # 不再回退 cwd（从别处启动进程时知识库会找不到）。
 import os as _os
+
 from hive.paths import resolve_hive_home
 
 _PROJECT_ROOT = resolve_hive_home()
-KB_PATH = Path(_os.getenv("HIVE_KB_PATH", str(_PROJECT_ROOT / "docs" / "AGENT_DEVELOPMENT_KNOWLEDGE_BASE.md")))
+KB_PATH = Path(
+    _os.getenv("HIVE_KB_PATH", str(_PROJECT_ROOT / "docs" / "AGENT_DEVELOPMENT_KNOWLEDGE_BASE.md"))
+)
 
 # 本地代码库路径（用于检索真实代码片段）
 CODE_REPOS_PATH = Path(_os.getenv("HIVE_CODE_REPOS_PATH", str(_PROJECT_ROOT / "Data" / "Repos")))
@@ -59,7 +63,7 @@ class LibrarianBee(BaseBee):
         """加载本地知识库到内存"""
         if KB_PATH.exists():
             try:
-                with open(KB_PATH, 'r', encoding='utf-8') as f:
+                with open(KB_PATH, "r", encoding="utf-8") as f:
                     self.kb_content = f.read()
                 self.logger.info(f"📚 Librarian 已加载知识库: {len(self.kb_content)} chars")
             except Exception as e:
@@ -99,7 +103,7 @@ class LibrarianBee(BaseBee):
                 f"Found {len(keyword_hits)} KB sections, "
                 f"{len(code_snippets)} code snippets, "
                 f"{len(immune_warnings)} warnings"
-            )
+            ),
         }
 
     def _search_real_code_snippets(self, query: str) -> List[Dict[str, Any]]:
@@ -123,29 +127,31 @@ class LibrarianBee(BaseBee):
                 break
 
             # 在代码库中搜索匹配的文件
-            for file_path in CODE_REPOS_PATH.rglob('*'):
+            for file_path in CODE_REPOS_PATH.rglob("*"):
                 if len(snippets) >= max_results:
                     break
                 if not file_path.is_file():
                     continue
-                if file_path.suffix.lower() not in {'.py', '.js', '.ts', '.go', '.java', '.md'}:
+                if file_path.suffix.lower() not in {".py", ".js", ".ts", ".go", ".java", ".md"}:
                     continue
 
                 try:
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
                     if keyword.lower() not in content.lower():
                         continue
 
                     # 找到匹配，提取上下文片段
                     snippet = self._extract_code_snippet(content, keyword, file_path)
                     if snippet:
-                        snippets.append({
-                            "file": str(file_path.relative_to(CODE_REPOS_PATH)),
-                            "language": file_path.suffix[1:],
-                            "matched_keyword": keyword,
-                            "snippet": snippet,
-                            "score": content.lower().count(keyword.lower())
-                        })
+                        snippets.append(
+                            {
+                                "file": str(file_path.relative_to(CODE_REPOS_PATH)),
+                                "language": file_path.suffix[1:],
+                                "matched_keyword": keyword,
+                                "snippet": snippet,
+                                "score": content.lower().count(keyword.lower()),
+                            }
+                        )
                 except Exception as e:
                     self.logger.debug(f"📚 读取文件失败 {file_path}: {e}")
 
@@ -182,21 +188,16 @@ class LibrarianBee(BaseBee):
         # 如果没有匹配，使用查询词本身
         if not keywords:
             # 提取英文单词作为关键词
-            words = re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', query)
+            words = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*", query)
             keywords = [w for w in words if len(w) > 2][:3]
 
         return keywords[:3]  # 最多3个关键词
 
-    def _extract_code_snippet(
-        self,
-        content: str,
-        keyword: str,
-        file_path: Path
-    ) -> Optional[str]:
+    def _extract_code_snippet(self, content: str, keyword: str, file_path: Path) -> Optional[str]:
         """
         从文件中提取包含关键词的代码片段（前8行 + 后8行上下文）
         """
-        lines = content.split('\n')
+        lines = content.split("\n")
         keyword_lower = keyword.lower()
 
         for i, line in enumerate(lines):
@@ -209,18 +210,15 @@ class LibrarianBee(BaseBee):
                 result = []
                 for j, l in enumerate(snippet_lines):
                     line_no = start + j + 1
-                    prefix = ">>> " if l.strip().startswith(('#', '//')) else "    "
+                    prefix = ">>> " if l.strip().startswith(("#", "//")) else "    "
                     result.append(f"{line_no:4d}: {l.rstrip()}")
 
-                return '\n'.join(result)
+                return "\n".join(result)
 
         return None
 
     def _llm_summarize(
-        self,
-        query: str,
-        keyword_hits: List[Dict[str, Any]],
-        code_snippets: List[Dict[str, Any]]
+        self, query: str, keyword_hits: List[Dict[str, Any]], code_snippets: List[Dict[str, Any]]
     ) -> Optional[str]:
         """
         Phase 1: 调用 LLM 对检索结果进行总结和回答
@@ -277,13 +275,13 @@ class LibrarianBee(BaseBee):
         """
         if not death_cert:
             return {"status": "error", "message": "Missing death certificate"}
-            
+
         target = death_cert.get("target_name", "Unknown")
         error = death_cert.get("error_message", "Unknown Error")
         bee_type = death_cert.get("bee_type", "UnknownBee")
-        
+
         self.logger.info(f"🛡️ [Immune Memory] 记录失败因子: {target} | {bee_type}")
-        
+
         # 构造 Markdown 条目
         entry = (
             f"\n### 🛡️ Pathogen Archive: {target} ({bee_type})\n"
@@ -292,19 +290,19 @@ class LibrarianBee(BaseBee):
             f"- **Traceback Snippet**: `{death_cert.get('traceback_str', '')[:200]}...`\n"
             f"- **Immune Response**: Avoid this specific state in future generations.\n"
         )
-        
+
         try:
             # 找到或创建 ## 🛡️ Immune Memory 章节
-            kb_text = KB_PATH.read_text(encoding='utf-8')
+            kb_text = KB_PATH.read_text(encoding="utf-8")
             immune_header = "## 🛡️ Immune Memory (Pathogen Archive)"
-            
+
             if immune_header not in kb_text:
                 kb_text += f"\n\n{immune_header}\n*This section contains records of failed biological mutations to prevent regressions.*\n"
-            
+
             # 追加记录
             kb_text += entry
-            KB_PATH.write_text(kb_text, encoding='utf-8')
-            
+            KB_PATH.write_text(kb_text, encoding="utf-8")
+
             # 更新内存
             self.kb_content = kb_text
             return {"status": "success", "message": "Immune memory recorded"}
@@ -319,56 +317,52 @@ class LibrarianBee(BaseBee):
         warnings = []
         if "🛡️ Pathogen Archive" not in self.kb_content:
             return warnings
-            
+
         # 简单匹配：搜索上下文中提到的项目名或错误类型
         immune_section = self.kb_content.split("## 🛡️ Immune Memory")[1]
         archives = immune_section.split("### 🛡️ Pathogen Archive:")
-        
-        for archive in archives[1:]: # 第一个是标题前的说明
+
+        for archive in archives[1:]:  # 第一个是标题前的说明
             if any(keyword.lower() in archive.lower() for keyword in context.split()):
                 lines = archive.split("\n")
                 summary = lines[0].strip()
                 error_info = next((l for l in lines if "**Error**" in l), "Unknown Error")
                 warnings.append(f"PAST FAILURE [{summary}]: {error_info}")
-                
-        return warnings[:3] # 最多返回三个警告
+
+        return warnings[:3]  # 最多返回三个警告
 
     def _search_markdown_kb(self, query: str) -> List[Dict[str, str]]:
         """在 Markdown 知识库中进行简单的块级搜索"""
         hits = []
         if not self.kb_content:
             return hits
-            
+
         # 简单切分：按二级标题切分项目
-        sections = re.split(r'\n## ', self.kb_content)
-        
+        sections = re.split(r"\n## ", self.kb_content)
+
         for section in sections:
             if query.lower() in section.lower():
                 # 提取标题
-                lines = section.split('\n')
+                lines = section.split("\n")
                 title = lines[0].strip()
-                preview = "\n".join(lines[:10]) + "..." # 取前10行作为摘要
-                
-                hits.append({
-                    "title": title,
-                    "preview": preview,
-                    "full_content": "## " + section
-                })
-                
-                if len(hits) >= 5: # 限制返回数量
+                preview = "\n".join(lines[:10]) + "..."  # 取前10行作为摘要
+
+                hits.append({"title": title, "preview": preview, "full_content": "## " + section})
+
+                if len(hits) >= 5:  # 限制返回数量
                     break
-        
+
         return hits
 
     def consult_library(self, query: str) -> str:
         """对外的高级接口，直接返回人类可读的答案"""
         results = self.specialized_task(query)
-        
-        if not results['keyword_hits']:
+
+        if not results["keyword_hits"]:
             return "📚 Librarian: 抱歉，我在知识库中没找到相关信息。"
-            
+
         response = f"📚 Librarian: 找到了 {len(results['keyword_hits'])} 个相关项目：\n\n"
-        for hit in results['keyword_hits']:
+        for hit in results["keyword_hits"]:
             response += f"--- **{hit['title']}** ---\n{hit['preview']}\n\n"
-            
+
         return response

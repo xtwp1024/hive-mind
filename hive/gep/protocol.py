@@ -12,21 +12,23 @@ import os
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("Hive.GEP")
+
 
 class GEPManager:
     def __init__(self, data_dir: str = None):
         if not data_dir:
             from hive.config.settings import get_settings
+
             data_dir = os.path.join(get_settings().DATA_DIR, "gep")
-        
+
         self.data_dir = Path(data_dir)
         self.genes_file = self.data_dir / "genes.json"
         self.capsules_file = self.data_dir / "capsules.json"
         self.events_file = self.data_dir / "events.jsonl"
-        
+
         self._ensure_files()
 
     def _ensure_files(self):
@@ -56,7 +58,7 @@ class GEPManager:
             "id": f"evt-{uuid.uuid4().hex[:8]}",
             "timestamp": time.time(),
             "type": event_type,
-            "details": details
+            "details": details,
         }
         with open(self.events_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
@@ -90,11 +92,14 @@ class GEPManager:
         try:
             with open(self.events_file, "r", encoding="utf-8") as f:
                 for line in f:
-                    if not line.strip(): continue
+                    if not line.strip():
+                        continue
                     evt = json.loads(line)
-                    if evt.get("timestamp", 0) > cutoff and evt.get("type") in ["PROCESS_CRASH", "TASK_FAILED"]:
+                    if evt.get("timestamp", 0) > cutoff and evt.get("type") in [
+                        "PROCESS_CRASH",
+                        "TASK_FAILED",
+                    ]:
                         failures.append(evt)
         except Exception as e:
             logger.error(f"分析失败日志异常: {e}")
         return failures
-

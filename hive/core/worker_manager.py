@@ -10,15 +10,15 @@ Phase 3 P3: 自然选择机制 — 接入 SwarmEvolutionCoordinator 淘汰闭环
 - 触发替换孵化（可选：自动补充被淘汰的蜂）
 """
 
+import logging
 import multiprocessing
 import time
-import logging
 from typing import Any, Optional
 
-from hive.core.dna import BeeDNA
-from hive.core.bee_factory import BeeFactory
-from hive.bees.base_bee import BaseBee
 from hive.bees.async_base_bee import AsyncBaseBee
+from hive.bees.base_bee import BaseBee
+from hive.core.bee_factory import BeeFactory
+from hive.core.dna import BeeDNA
 
 logger = logging.getLogger("Hive.WorkerManager")
 
@@ -28,9 +28,10 @@ class WorkerManager:
 
     def __init__(self, result_queue: multiprocessing.Queue):
         from hive.config.settings import get_settings
+
         self.result_queue = result_queue
         self.active_workers: dict[str, multiprocessing.Process] = {}
-        self.active_async_workers: dict[str, 'AsyncBaseBee'] = {}  # Track async workers separately
+        self.active_async_workers: dict[str, "AsyncBaseBee"] = {}  # Track async workers separately
         self.worker_futures: dict[str, dict[str, Any]] = {}
         self.bee_registry: dict[str, type[BaseBee]] = {}
         self.MAX_ACTIVE_WORKERS = get_settings().MAX_WORKERS
@@ -56,7 +57,9 @@ class WorkerManager:
         - Otherwise: Creates BaseBee as multiprocessing.Process (spawns new process)
         """
         if not self.has_available_slot():
-            logger.warning(f"[WorkerManager] 无可用槽位 ({len(self.active_workers)}/{self.MAX_ACTIVE_WORKERS})")
+            logger.warning(
+                f"[WorkerManager] 无可用槽位 ({len(self.active_workers)}/{self.MAX_ACTIVE_WORKERS})"
+            )
             return None
 
         worker_id = f"Worker-{dna.id}"
@@ -131,7 +134,7 @@ class WorkerManager:
             "dna": dna,
             "bee_class": bee_class.__name__,
             "start_time": time.time(),
-            "status": "running"
+            "status": "running",
         }
 
     def has_available_slot(self) -> bool:
@@ -165,8 +168,7 @@ class WorkerManager:
 
         # ── 第 1 路：正常死亡 ──
         dead_items = [
-            (wid, proc) for wid, proc in self.active_workers.items()
-            if not proc.is_alive()
+            (wid, proc) for wid, proc in self.active_workers.items() if not proc.is_alive()
         ]
 
         # ── 第 2 路：僵死检测 ──
@@ -209,10 +211,12 @@ class WorkerManager:
         threads = []
         for wid, proc in dead_items:
             t = threading.Thread(target=_join_or_kill, args=(wid, proc, results, 1))
-            threads.append(t); t.start()
+            threads.append(t)
+            t.start()
         for wid, proc in zombie_items:
             t = threading.Thread(target=_join_or_kill, args=(wid, proc, results, 1.5))
-            threads.append(t); t.start()
+            threads.append(t)
+            t.start()
         for t in threads:
             t.join(timeout=5)
 
@@ -231,7 +235,10 @@ class WorkerManager:
         if worker_id in self.worker_futures:
             self.worker_futures[worker_id]["status"] = "completed"
             self.worker_futures[worker_id]["end_time"] = time.time()
-            duration = self.worker_futures[worker_id]["end_time"] - self.worker_futures[worker_id]["start_time"]
+            duration = (
+                self.worker_futures[worker_id]["end_time"]
+                - self.worker_futures[worker_id]["start_time"]
+            )
             logger.debug(f"[WorkerManager] Worker {worker_id} 已结束 ({duration:.2f}s)")
 
         # 防止 worker_futures 无界增长，保留最近 1000 条已完成记录
@@ -264,7 +271,12 @@ class WorkerManager:
     def _register_swarm(self):
         """Phase 3 P3: 注册到蜂群通信，订阅淘汰警报"""
         try:
-            from hive.core.swarm_communication import get_swarm_communication, MessageType, SwarmMessage
+            from hive.core.swarm_communication import (
+                MessageType,
+                SwarmMessage,
+                get_swarm_communication,
+            )
+
             self._swarm = get_swarm_communication()
             self._swarm.register_bee("WorkerManager", self)
             self._swarm.subscribe(MessageType.ALERT, self._on_swarm_alert)
@@ -275,13 +287,15 @@ class WorkerManager:
     def _on_swarm_alert(self, message: Any):
         """Phase 3 P3: 处理蜂群警报（淘汰通知）"""
         try:
-            content = message.content if hasattr(message, 'content') else {}
+            content = message.content if hasattr(message, "content") else {}
             topic = content.get("topic", "")
             if topic == "bee_culled":
                 bee_id = content.get("bee_id")
                 bee_type = content.get("bee_type", "unknown")
                 reason = content.get("reason", "unknown")
-                logger.info(f"🔪 [WorkerManager] 收到淘汰警报: {bee_id} ({bee_type}) reason={reason}")
+                logger.info(
+                    f"🔪 [WorkerManager] 收到淘汰警报: {bee_id} ({bee_type}) reason={reason}"
+                )
                 terminated = self.terminate_worker(bee_id)
                 if terminated:
                     logger.info(f"🔪 [WorkerManager] 已执行自然淘汰: {bee_id}")
@@ -346,7 +360,12 @@ class WorkerManager:
 
         try:
             from hive.core.dna import BeeDNA
-            dna = BeeDNA(id=f"{bee_type}_respawn_{int(time.time())}", role=bee_type.lower(), species=bee_type.lower())
+
+            dna = BeeDNA(
+                id=f"{bee_type}_respawn_{int(time.time())}",
+                role=bee_type.lower(),
+                species=bee_type.lower(),
+            )
             new_id = self.spawn_worker(dna)
             if new_id:
                 logger.info(f"🔪 [WorkerManager] 已补充 {bee_type} -> {new_id}")
@@ -361,5 +380,5 @@ class WorkerManager:
             "active_workers": len(self.active_workers),
             "active_async_workers": len(self.active_async_workers),
             "worker_futures": len(self.worker_futures),
-            "available_slots": self.available_slots()
+            "available_slots": self.available_slots(),
         }

@@ -1,6 +1,7 @@
 import unittest
 from typing import List
 
+
 class NetworkProtocolsHttpManager:
     """Manages HTTP network protocols with methods to handle common operations."""
 
@@ -99,6 +100,7 @@ class TestNetworkProtocolsHttpManager(unittest.TestCase):
         response = self.manager.delete_resource(url)
         self.assertIn("HTTP Response from http://example.com/resource", response)
         self.assertIn("(deleted)", response)
+
 
 if __name__ == "__main__":
     unittest.main()

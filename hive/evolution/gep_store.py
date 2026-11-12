@@ -13,8 +13,8 @@ GEPStore - SQLite 后端的 GEP 持久化层
 import json
 import logging
 import sqlite3
-import time
 import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -47,10 +47,12 @@ class GEPStore:
 
             # 线程退出时自动关闭连接，防止连接泄漏
             import weakref
+
             conn_ref = weakref.ref(conn)
             threading.current_thread()._gep_store_conn_ref = conn_ref
 
             import atexit
+
             def _close_conn(ref=conn_ref):
                 c = ref()
                 if c is not None:
@@ -58,6 +60,7 @@ class GEPStore:
                         c.close()
                     except Exception:
                         pass
+
             atexit.register(_close_conn)
 
         return self._local.conn
@@ -65,7 +68,8 @@ class GEPStore:
     def _init_db(self) -> None:
         """初始化数据库表结构"""
         conn = self._get_conn()
-        conn.executescript("""
+        conn.executescript(
+            """
             CREATE TABLE IF NOT EXISTS genes (
                 id          TEXT PRIMARY KEY,
                 data        TEXT NOT NULL,
@@ -83,7 +87,8 @@ class GEPStore:
                 data        TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp);
-        """)
+        """
+        )
         conn.commit()
 
     # ─────────────────────────────────── Genes ──
@@ -99,7 +104,6 @@ class GEPStore:
             except Exception:
                 if attempt == max_retries - 1:
                     raise
-                import time
                 time.sleep(0.01 * (attempt + 1))
         try:
             conn.execute(
@@ -112,9 +116,7 @@ class GEPStore:
             raise
 
     def get_gene(self, gene_id: str) -> Optional[dict]:
-        row = self._get_conn().execute(
-            "SELECT data FROM genes WHERE id = ?", (gene_id,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT data FROM genes WHERE id = ?", (gene_id,)).fetchone()
         return json.loads(row["data"]) if row else None
 
     def get_all_genes(self) -> Dict[str, dict]:
@@ -133,12 +135,9 @@ class GEPStore:
                 if attempt == max_retries - 1:
                     raise
                 # SQLite BUSY or LOCKED - wait and retry
-                import time
                 time.sleep(0.01 * (attempt + 1))
         try:
-            row = conn.execute(
-                "SELECT data FROM genes WHERE id = ?", (gene_id,)
-            ).fetchone()
+            row = conn.execute("SELECT data FROM genes WHERE id = ?", (gene_id,)).fetchone()
             if not row:
                 conn.execute("ROLLBACK")
                 return False
@@ -167,9 +166,11 @@ class GEPStore:
         conn.commit()
 
     def get_capsule(self, capsule_id: str) -> Optional[dict]:
-        row = self._get_conn().execute(
-            "SELECT data FROM capsules WHERE id = ?", (capsule_id,)
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute("SELECT data FROM capsules WHERE id = ?", (capsule_id,))
+            .fetchone()
+        )
         return json.loads(row["data"]) if row else None
 
     def get_all_capsules(self) -> Dict[str, dict]:
@@ -182,16 +183,19 @@ class GEPStore:
         conn = self._get_conn()
         conn.execute(
             "INSERT OR IGNORE INTO events (id, timestamp, type, data) VALUES (?, ?, ?, ?)",
-            (event["id"], event["timestamp"], event["type"],
-             json.dumps(event, ensure_ascii=False)),
+            (event["id"], event["timestamp"], event["type"], json.dumps(event, ensure_ascii=False)),
         )
         conn.commit()
 
     def get_recent_events(self, since: float) -> list:
-        rows = self._get_conn().execute(
-            "SELECT data FROM events WHERE timestamp > ? ORDER BY timestamp DESC",
-            (since,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT data FROM events WHERE timestamp > ? ORDER BY timestamp DESC",
+                (since,),
+            )
+            .fetchall()
+        )
         return [json.loads(r["data"]) for r in rows]
 
     # ─────────────────────────────────── Migration ──
@@ -248,5 +252,7 @@ class GEPStore:
             "genes": genes_count,
             "capsules": capsules_count,
             "events": events_count,
-            "db_size_kb": round(self.db_path.stat().st_size / 1024, 1) if self.db_path.exists() else 0,
+            "db_size_kb": (
+                round(self.db_path.stat().st_size / 1024, 1) if self.db_path.exists() else 0
+            ),
         }

@@ -8,9 +8,9 @@ Reconciler 是"声明式哲学"的执行引擎：
 池子里少了工蜂？补！死蜂占着坑？清！任务超期？驱逐！
 """
 
-import time
-import threading
 import logging
+import threading
+import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -47,10 +47,11 @@ class BeeReconciler:
     def _actual_state(self) -> dict:
         """实际状态：快照当前池"""
         from hive.core.cluster_pool import BeeState
+
         with self.pool._lock:
             hibernated = sum(1 for b in self.pool._pool.values() if b.state == BeeState.HIBERNATED)
-            running    = sum(1 for b in self.pool._pool.values() if b.state == BeeState.RUNNING)
-            all_bees   = list(self.pool._pool.values())
+            running = sum(1 for b in self.pool._pool.values() if b.state == BeeState.RUNNING)
+            all_bees = list(self.pool._pool.values())
         return {"hibernated": hibernated, "running": running, "all_bees": all_bees}
 
     def _reconcile_once(self) -> None:
@@ -58,7 +59,7 @@ class BeeReconciler:
         from hive.core.cluster_pool import BeeState
 
         desired = self._desired_state()
-        actual  = self._actual_state()
+        actual = self._actual_state()
 
         # 1. 清除超期工蜂（对标 ClusterClaim.Spec.Lifetime 超时销毁）
         now = time.time()
@@ -66,7 +67,9 @@ class BeeReconciler:
             if bee.state == BeeState.RUNNING and bee.claimed_at:
                 age = now - bee.claimed_at
                 if age > self.max_lifetime:
-                    logger.warning(f"[Reconciler:{self.pool.name}] {bee.bee_id} 存活超期 ({age:.0f}s)，强制驱逐")
+                    logger.warning(
+                        f"[Reconciler:{self.pool.name}] {bee.bee_id} 存活超期 ({age:.0f}s)，强制驱逐"
+                    )
                     self.pool._deprovision(bee.bee_id)
 
         # 2. 补充池（期望 > 实际冬眠数）
@@ -89,7 +92,9 @@ class BeeReconciler:
             excess = abs(gap)
             logger.info(f"[Reconciler:{self.pool.name}] 池过剩 {excess} 只，缩减...")
             with self.pool._lock:
-                hibernated_bees = [b for b in self.pool._pool.values() if b.state == BeeState.HIBERNATED]
+                hibernated_bees = [
+                    b for b in self.pool._pool.values() if b.state == BeeState.HIBERNATED
+                ]
             for bee in hibernated_bees[:excess]:
                 self.pool._deprovision(bee.bee_id)
 
@@ -111,7 +116,9 @@ class BeeReconciler:
         if self._thread and self._thread.is_alive():
             return
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run_loop, name=f"Reconciler-{self.pool.name}", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run_loop, name=f"Reconciler-{self.pool.name}", daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:

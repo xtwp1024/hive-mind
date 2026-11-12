@@ -6,11 +6,7 @@ class DesignPatternsArchitectureManager:
 
     def __init__(self):
         """Initialize the DesignPatternsArchitectureManager."""
-        self.patterns = {
-            'Observer': None,
-            'Strategy': None,
-            'Factory': None
-        }
+        self.patterns = {"Observer": None, "Strategy": None, "Factory": None}
 
     def register_observer(self, observer):
         """Register an observer pattern for notifications.
@@ -23,7 +19,7 @@ class DesignPatternsArchitectureManager:
         """
         if not isinstance(observer, ObserverInterface):
             raise TypeError("Observer must implement ObserverInterface.")
-        self.patterns['Observer'] = observer
+        self.patterns["Observer"] = observer
 
     def notify_observers(self, message):
         """Notify all registered observers with a message.
@@ -34,9 +30,9 @@ class DesignPatternsArchitectureManager:
         Raises:
             RuntimeError: If no observers are registered.
         """
-        if self.patterns['Observer'] is None:
+        if self.patterns["Observer"] is None:
             raise RuntimeError("No observers registered.")
-        self.patterns['Observer'].update(message)
+        self.patterns["Observer"].update(message)
 
     def set_strategy(self, strategy):
         """Set a new strategy pattern.
@@ -49,7 +45,7 @@ class DesignPatternsArchitectureManager:
         """
         if not isinstance(strategy, StrategyInterface):
             raise TypeError("Strategy must implement StrategyInterface.")
-        self.patterns['Strategy'] = strategy
+        self.patterns["Strategy"] = strategy
 
     def execute_strategy(self):
         """Execute the current strategy pattern.
@@ -57,9 +53,9 @@ class DesignPatternsArchitectureManager:
         Raises:
             RuntimeError: If no strategy is set.
         """
-        if self.patterns['Strategy'] is None:
+        if self.patterns["Strategy"] is None:
             raise RuntimeError("No strategy set.")
-        self.patterns['Strategy'].execute()
+        self.patterns["Strategy"].execute()
 
     def create_factory(self, product_class):
         """Create a product using the factory pattern.
@@ -82,9 +78,15 @@ class DesignPatternsArchitectureManager:
         try:
             # Define unit tests here
             # Example test case:
-            assert isinstance(self.patterns['Observer'], ObserverInterface), "Observer pattern is not registered."
-            assert isinstance(self.patterns['Strategy'], StrategyInterface), "Strategy pattern is not set."
-            assert isinstance(self.create_factory(str), str), "Factory pattern did not create a string."
+            assert isinstance(
+                self.patterns["Observer"], ObserverInterface
+            ), "Observer pattern is not registered."
+            assert isinstance(
+                self.patterns["Strategy"], StrategyInterface
+            ), "Strategy pattern is not set."
+            assert isinstance(
+                self.create_factory(str), str
+            ), "Factory pattern did not create a string."
             print("All unit tests passed.")
         except AssertionError as e:
             print(f"Test failed: {e}")
@@ -95,6 +97,7 @@ class DesignPatternsArchitectureManager:
 # Interfaces for Observer and Strategy patterns
 class ObserverInterface:
     """Interface for Observer pattern implementations."""
+
     def update(self, message):
         """Receive notification of an event."""
         pass
@@ -102,6 +105,7 @@ class ObserverInterface:
 
 class StrategyInterface:
     """Interface for Strategy pattern implementations."""
+
     def execute(self):
         """Execute the strategy."""
         pass
@@ -110,6 +114,7 @@ class StrategyInterface:
 # Factory pattern implementation
 class Factory:
     """Factory class for creating products."""
+
     @staticmethod
     def create(product_class):
         """Create a product instance.

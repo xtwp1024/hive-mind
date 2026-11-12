@@ -40,13 +40,18 @@ def _exc_info_filter(logger: Any, method_name: str, event_dict: dict) -> dict:
             if lines:
                 # 更彻底地清理路径信息
                 import re
+
                 # 移除常见的路径模式 C:\, D:\, /home/, /Users/ 等
                 cleaned_lines = []
                 for line in lines:
                     # 移除 Windows 路径模式 (如 C:\Users\...)
-                    line = re.sub(r'[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n]+(?:\\[^\\/:*?"<>|\r\n]+)*)?', '[PATH]', line)
+                    line = re.sub(
+                        r'[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n]+(?:\\[^\\/:*?"<>|\r\n]+)*)?',
+                        "[PATH]",
+                        line,
+                    )
                     # 移除 Unix 路径模式 (如 /home/user/... 或 /Users/...)
-                    line = re.sub(r'/(?:[^/:\r\n]+/)*[^/:\r\n]*', '[PATH]', line)
+                    line = re.sub(r"/(?:[^/:\r\n]+/)*[^/:\r\n]*", "[PATH]", line)
                     cleaned_lines.append(line)
                 event_dict["exception"] = "\n".join(cleaned_lines)
     return event_dict
@@ -76,12 +81,13 @@ def setup_logging(
     global _stdout_wrapped
     if sys.platform == "win32" and not _stdout_wrapped:
         import io
+
         if not isinstance(sys.stdout, io.TextIOWrapper):
-            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
         if not isinstance(sys.stderr, io.TextIOWrapper):
-            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
         _stdout_wrapped = True
-    
+
     # 配置标准logging
     logging.basicConfig(
         format="%(message)s",
@@ -130,9 +136,7 @@ def setup_logging(
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_processor = structlog.processors.JSONRenderer(ensure_ascii=False)
 
-        processors.append(
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter
-        )
+        processors.append(structlog.stdlib.ProcessorFormatter.wrap_for_formatter)
     else:
         file_processor = None
 

@@ -15,45 +15,45 @@ Usage:
     result = await brain.think("帮我分析这个项目")
 """
 
-from .cognitive_bus import CognitiveBus, Message, MessageType
-from .working_memory import WorkingMemory
-from .memory_hierarchy import MemoryHierarchy, MemoryItem, Experience
-from .memory_archival import MemoryArchiver, MemoryArchive, StorageTier
-from .perception import Perceiver, Perception
-from .goal_decomposer import GoalDecomposer, SubGoal
-from .planner import Planner, Plan
-from .hive_brain import HiveBrain
-from .attention_economy import AttentionEconomy, AttentionBudget
-from .meta_cognition import (
-    MetaCognitionLayer,
-    AttentionAllocation,
-    CognitiveModel,
-    OptimizationResult,
-    PerformanceMetrics,
-    Adjustment,
-    SelfImprovementEngine,
-    AUTOTUNABLE_PARAMS,
+from .attention_economy import AttentionBudget, AttentionEconomy
+from .brain_queen_adapter import (
+    BrainfulResult,
+    BrainfulSandboxConfig,
+    BrainQueenAdapter,
 )
+from .cognitive_bus import CognitiveBus, Message, MessageType
 from .cognitive_diversity import (
+    PERSONALITIES,
     BrainPersonality,
     CognitiveSwarm,
     CollectiveResult,
-    PERSONALITIES,
     get_personality,
     suggest_personality_for_task,
 )
+from .goal_decomposer import GoalDecomposer, SubGoal
+from .hive_brain import HiveBrain
+from .memory_archival import MemoryArchive, MemoryArchiver, StorageTier
+from .memory_hierarchy import Experience, MemoryHierarchy, MemoryItem
+from .meta_cognition import (
+    AUTOTUNABLE_PARAMS,
+    Adjustment,
+    AttentionAllocation,
+    CognitiveModel,
+    MetaCognitionLayer,
+    OptimizationResult,
+    PerformanceMetrics,
+    SelfImprovementEngine,
+)
+from .perception import Perceiver, Perception
+from .planner import Plan, Planner
+from .queen_adapter import QueenAdapter, QueenAdapterConfig
 from .sandbox import (
-    SandboxEnvironment,
     SandboxConfig,
+    SandboxEnvironment,
     SimulatedOp,
     SimulationResult,
 )
-from .brain_queen_adapter import (
-    BrainQueenAdapter,
-    BrainfulResult,
-    BrainfulSandboxConfig,
-)
-from .queen_adapter import QueenAdapter, QueenAdapterConfig
+from .working_memory import WorkingMemory
 
 __all__ = [
     # Cognitive Diversity

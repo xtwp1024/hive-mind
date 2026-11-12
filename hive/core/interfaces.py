@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from hive.core.dna import BeeDNA, DNA
+from hive.core.dna import DNA, BeeDNA
 from hive.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -217,7 +217,7 @@ class QueenInterface(ABC):
     @abstractmethod
     def deploy_swarm(self, colony_dna: list[BeeDNA]) -> None:
         """部署蜂群
-        
+
         Args:
             colony_dna: 蜜蜂DNA列表
         """

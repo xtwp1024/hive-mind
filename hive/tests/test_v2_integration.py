@@ -4,17 +4,18 @@ Hive V2.0.0 集成测试
 测试Ministers、Bees、Utils、Core、Config等模块之间的交互
 """
 
-import pytest
 import multiprocessing
 import time
 from pathlib import Path
 
-from hive.ministers.intel import IntelBee
-from hive.ministers.engineer import EngineerBee
-from hive.ministers.alchemist import AlchemistBee
+import pytest
+
+from hive.config.settings import HiveSettings
 from hive.core.dna import DNA
 from hive.core.interfaces import Task, TaskResult
-from hive.config.settings import HiveSettings
+from hive.ministers.alchemist import AlchemistBee
+from hive.ministers.engineer import EngineerBee
+from hive.ministers.intel import IntelBee
 
 
 class TestV2Integration:
@@ -28,11 +29,7 @@ class TestV2Integration:
     @pytest.fixture
     def dna(self):
         """创建DNA对象"""
-        return DNA(
-            species="TestBee",
-            generation=1
-        )
-
+        return DNA(species="TestBee", generation=1)
 
     @pytest.fixture
     def result_queue(self):
@@ -42,30 +39,18 @@ class TestV2Integration:
     def test_ministers_initialization(self, dna, result_queue):
         """测试Ministers初始化"""
         # 测试IntelBee初始化
-        intel = IntelBee(
-            dna=dna,
-            id="test_intel",
-            result_queue=result_queue
-        )
+        intel = IntelBee(dna=dna, id="test_intel", result_queue=result_queue)
         assert intel is not None
         assert intel.id == "test_intel"
         assert intel.dna.species == "TestBee"
 
         # 测试EngineerBee初始化
-        engineer = EngineerBee(
-            dna=dna,
-            id="test_engineer",
-            result_queue=result_queue
-        )
+        engineer = EngineerBee(dna=dna, id="test_engineer", result_queue=result_queue)
         assert engineer is not None
         assert engineer.id == "test_engineer"
 
         # 测试AlchemistBee初始化
-        alchemist = AlchemistBee(
-            dna=dna,
-            id="test_alchemist",
-            result_queue=result_queue
-        )
+        alchemist = AlchemistBee(dna=dna, id="test_alchemist", result_queue=result_queue)
         assert alchemist is not None
         assert alchemist.id == "test_alchemist"
 
@@ -76,28 +61,19 @@ class TestV2Integration:
         alchemist = AlchemistBee(dna=dna, id="test_alchemist", result_queue=result_queue)
 
         # 测试IntelBee的advise
-        intel_context = {
-            "task": "analyze_project",
-            "project_files": ["file1.py", "file2.py"]
-        }
+        intel_context = {"task": "analyze_project", "project_files": ["file1.py", "file2.py"]}
         intel_result = intel.advise(intel_context)
         assert intel_result is not None
         assert "recommendations" in intel_result
 
         # 测试EngineerBee的advise
-        engineer_context = {
-            "task": "design_solution",
-            "requirements": ["fast", "reliable"]
-        }
+        engineer_context = {"task": "design_solution", "requirements": ["fast", "reliable"]}
         engineer_result = engineer.advise(engineer_context)
         assert engineer_result is not None
         assert "recommendations" in engineer_result
 
         # 测试AlchemistBee的advise
-        alchemist_context = {
-            "task": "optimize_code",
-            "code": "def test():\n    pass"
-        }
+        alchemist_context = {"task": "optimize_code", "code": "def test():\n    pass"}
         alchemist_result = alchemist.advise(alchemist_context)
         assert alchemist_result is not None
         assert "recommendations" in alchemist_result
@@ -112,7 +88,7 @@ class TestV2Integration:
         # 模拟完整的工作流：分析 -> 设计 -> 优化
         task_data = {
             "project_name": "TestProject",
-            "requirements": ["high_performance", "scalable"]
+            "requirements": ["high_performance", "scalable"],
         }
 
         # 1. IntelBee分析
@@ -138,21 +114,18 @@ class TestV2Integration:
     def test_config_system(self):
         """测试配置系统"""
         config = HiveSettings()
-        
+
         # 测试默认配置
         assert config is not None
-        assert hasattr(config, 'LOG_LEVEL') or True  # 配置项可能存在
-        
+        assert hasattr(config, "LOG_LEVEL") or True  # 配置项可能存在
+
         # 测试配置加载
-        assert config.LOG_LEVEL in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+        assert config.LOG_LEVEL in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
     def test_dna_system(self):
         """测试DNA系统"""
         dna = DNA(
-            species="TestSpecies",
-            generation=1,
-            mining_capability=0.8,
-            gathering_capability=0.7
+            species="TestSpecies", generation=1, mining_capability=0.8, gathering_capability=0.7
         )
 
         assert dna.species == "TestSpecies"
@@ -173,7 +146,7 @@ class TestV2Integration:
             priority=1,
             payload={"key": "value"},
             timeout=300.0,
-            metadata={"meta": "data"}
+            metadata={"meta": "data"},
         )
 
         assert task.id == "test_task"
@@ -189,7 +162,7 @@ class TestV2Integration:
             result="test_result",
             error=None,
             execution_time=1.0,
-            metadata={"meta": "data"}
+            metadata={"meta": "data"},
         )
 
         assert result.task_id == "test_task"
@@ -200,26 +173,15 @@ class TestV2Integration:
     def test_cross_module_data_flow(self, dna, result_queue):
         """测试跨模块数据流转"""
         # 1. 创建DNA（core模块）
-        dna = DNA(
-            species="IntegrationTestBee",
-            generation=1,
-            architectural_capability=0.9
-        )
+        dna = DNA(species="IntegrationTestBee", generation=1, architectural_capability=0.9)
 
         # 2. 创建Task（core模块）
         task = Task(
-            id="integration_task",
-            type="integration_test",
-            priority=5,
-            payload={"test": "data"}
+            id="integration_task", type="integration_test", priority=5, payload={"test": "data"}
         )
 
         # 3. 使用DNA创建Minister（ministers模块）
-        intel = IntelBee(
-            dna=dna,
-            id="integration_intel",
-            result_queue=result_queue
-        )
+        intel = IntelBee(dna=dna, id="integration_intel", result_queue=result_queue)
 
         # 4. 使用config（config模块）
         config = HiveSettings()
@@ -229,7 +191,7 @@ class TestV2Integration:
             "task": "integrate_modules",
             "dna": {"species": dna.species, "generation": dna.generation},
             "task_data": task.payload,
-            "config": {"LOG_LEVEL": config.LOG_LEVEL}
+            "config": {"LOG_LEVEL": config.LOG_LEVEL},
         }
 
         result = intel.advise(context)
@@ -282,10 +244,7 @@ class TestV2Integration:
         # 1. 初始化所有组件
         config = HiveSettings()
         task = Task(
-            id="workflow_task",
-            type="complete_workflow",
-            priority=5,
-            payload={"test": "data"}
+            id="workflow_task", type="complete_workflow", priority=5, payload={"test": "data"}
         )
 
         # 2. 创建Ministers
@@ -297,28 +256,19 @@ class TestV2Integration:
         project_data = {
             "name": "TestProject",
             "description": "Integration test project",
-            "requirements": ["test_requirement"]
+            "requirements": ["test_requirement"],
         }
 
         # 分析阶段
-        analysis_result = intel.advise({
-            "task": "analyze",
-            "data": project_data
-        })
+        analysis_result = intel.advise({"task": "analyze", "data": project_data})
         assert analysis_result is not None
 
         # 设计阶段
-        design_result = engineer.advise({
-            "task": "design",
-            "analysis": analysis_result
-        })
+        design_result = engineer.advise({"task": "design", "analysis": analysis_result})
         assert design_result is not None
 
         # 优化阶段
-        optimization_result = alchemist.advise({
-            "task": "optimize",
-            "design": design_result
-        })
+        optimization_result = alchemist.advise({"task": "optimize", "design": design_result})
         assert optimization_result is not None
 
         # 验证完整流程
@@ -350,7 +300,7 @@ class TestV2IntegrationEdgeCases:
         # 创建大上下文
         large_context = {
             "task": "handle_large_data",
-            "data": ["item_" + str(i) for i in range(1000)]
+            "data": ["item_" + str(i) for i in range(1000)],
         }
 
         result = intel.advise(large_context)

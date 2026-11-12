@@ -16,9 +16,9 @@ BeeFactory - 蜜蜂实例工厂
 import logging
 from typing import Optional
 
-from hive.core.dna import BeeDNA
-from hive.bees.base_bee import BaseBee
 from hive.bees.async_base_bee import AsyncBaseBee
+from hive.bees.base_bee import BaseBee
+from hive.core.dna import BeeDNA
 
 logger = logging.getLogger("Hive.BeeFactory")
 
@@ -67,9 +67,9 @@ class BeeFactory:
 
         # 尝试按优先级查找注册表
         lookup_keys = [
-            dna.species,           # species 优先级最高
-            dna.mutation_gene,     # 然后是 mutation_gene
-            dna.role,              # 最后是 role
+            dna.species,  # species 优先级最高
+            dna.mutation_gene,  # 然后是 mutation_gene
+            dna.role,  # 最后是 role
         ]
 
         for key in lookup_keys:
@@ -84,9 +84,12 @@ class BeeFactory:
 
         # 2. 尝试从 BEE_SPECIES 静态注册表查找（支持 PascalCase key，大小写不敏感）
         from hive.bees import BEE_SPECIES
+
         for species_name, bee_class in BEE_SPECIES.items():
             if species_name.lower() == dna.species.lower():
-                logger.debug(f"[BeeFactory] Routing {dna.id} to {bee_class.__name__} (BEE_SPECIES match)")
+                logger.debug(
+                    f"[BeeFactory] Routing {dna.id} to {bee_class.__name__} (BEE_SPECIES match)"
+                )
                 return bee_class
 
         # 3. fallback

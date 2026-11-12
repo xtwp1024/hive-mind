@@ -7,11 +7,11 @@
 2. GEP 模式：树结构基因表达式（genome 字段）
 """
 
+import random
+import uuid
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Optional
-import uuid
-import random
 
 from hive.utils.logger import get_logger
 
@@ -20,9 +20,14 @@ logger = get_logger(__name__)
 # GEP imports - lazy loading to avoid circular dependency
 try:
     from hive.core.gep_gene import (
-        GEPGene, GEPChromosome, GEPGeneFactory,
-        GEPFitnessEvaluator, GEPOperators, FunctionType
+        FunctionType,
+        GEPChromosome,
+        GEPFitnessEvaluator,
+        GEPGene,
+        GEPGeneFactory,
+        GEPOperators,
     )
+
     GEP_AVAILABLE = True
 except ImportError:
     GEP_AVAILABLE = False
@@ -92,6 +97,7 @@ class DNA:
 
     def _mutate_capability(self, value: float, rate: float) -> float:
         import random
+
         if random.random() < rate:
             delta = random.gauss(0, 0.1)
             return max(0.0, min(1.0, value + delta))
@@ -130,7 +136,10 @@ class DNA:
             "fitness": (self.fitness + other.fitness) / 2,
             "mining_capability": (self.mining_capability + other.mining_capability) / 2,
             "gathering_capability": (self.gathering_capability + other.gathering_capability) / 2,
-            "architectural_capability": (self.architectural_capability + other.architectural_capability) / 2,
+            "architectural_capability": (
+                self.architectural_capability + other.architectural_capability
+            )
+            / 2,
             "librarian_capability": (self.librarian_capability + other.librarian_capability) / 2,
             "sentinel_capability": (self.sentinel_capability + other.sentinel_capability) / 2,
             "immune_response": (self.immune_response + other.immune_response) / 2,
@@ -182,7 +191,7 @@ class BeeDNA(DNA):
     target_name: str = ""
     target_url: str = ""
     mutation_gene: str = "standard"
-    can_merge_back: bool = False # 是否允许该个体导回修改
+    can_merge_back: bool = False  # 是否允许该个体导回修改
 
     # 性能指标
     success_rate: float = 0.0
@@ -221,7 +230,7 @@ class BeeDNA(DNA):
         error_factor = 1.0 / (1.0 + self.error_count)
 
         # 加权平均
-        self.fitness = (success_factor * 0.5 + time_factor * 0.3 + error_factor * 0.2)
+        self.fitness = success_factor * 0.5 + time_factor * 0.3 + error_factor * 0.2
 
         return self.fitness
 
@@ -233,12 +242,12 @@ class BeeDNA(DNA):
         # 构建评估上下文
         context = {
             "task_type": self.role,
-            "task_complexity": getattr(self, 'task_complexity', 0.5),
+            "task_complexity": getattr(self, "task_complexity", 0.5),
             "success_rate": self.success_rate,
             "error_count": self.error_count,
             "avg_time": self.task_completion_time,
-            "memory_usage": getattr(self, 'memory_usage', 0.5),
-            "cpu_usage": getattr(self, 'cpu_usage', 0.5),
+            "memory_usage": getattr(self, "memory_usage", 0.5),
+            "cpu_usage": getattr(self, "cpu_usage", 0.5),
         }
 
         evaluator = GEPFitnessEvaluator()
@@ -249,25 +258,26 @@ class BeeDNA(DNA):
             self.fitness = fitness
         except Exception as e:
             logger.warning(f"[BeeDNA] GEP fitness evaluation failed: {e}, falling back to legacy")
-            self.fitness = (self.success_rate * 0.5 +
-                          (1.0 / (1.0 + self.task_completion_time)) * 0.3 +
-                          (1.0 / (1.0 + self.error_count)) * 0.2)
+            self.fitness = (
+                self.success_rate * 0.5
+                + (1.0 / (1.0 + self.task_completion_time)) * 0.3
+                + (1.0 / (1.0 + self.error_count)) * 0.2
+            )
 
         return self.fitness
 
     def add_fitness_context(self, context: dict) -> None:
         """添加评估上下文（用于 GEP 多样本评估）"""
-        if not hasattr(self, '_fitness_contexts'):
+        if not hasattr(self, "_fitness_contexts"):
             self._fitness_contexts = []
         self._fitness_contexts.append(context)
         # 保留最近 100 个上下文防止无界增长
         if len(self._fitness_contexts) > 100:
             self._fitness_contexts = self._fitness_contexts[-100:]
 
-    def init_gep_genome(self,
-                        num_genes: int = 3,
-                        max_depth: int = 5,
-                        linking_function: str = "AND") -> "BeeDNA":
+    def init_gep_genome(
+        self, num_genes: int = 3, max_depth: int = 5, linking_function: str = "AND"
+    ) -> "BeeDNA":
         """
         为当前 BeeDNA 初始化一个 GEP 基因组。
 
@@ -318,7 +328,7 @@ class BeeDNA(DNA):
         mutated_chromosome = GEPChromosome(
             genes=mutated_genes,
             linking_function=self.genome.linking_function,
-            max_genes=self.genome.max_genes
+            max_genes=self.genome.max_genes,
         )
 
         new_dna = BeeDNA(
@@ -372,7 +382,10 @@ class BeeDNA(DNA):
             fitness=0.0,
             mining_capability=(self.mining_capability + other.mining_capability) / 2,
             gathering_capability=(self.gathering_capability + other.gathering_capability) / 2,
-            architectural_capability=(self.architectural_capability + other.architectural_capability) / 2,
+            architectural_capability=(
+                self.architectural_capability + other.architectural_capability
+            )
+            / 2,
             librarian_capability=(self.librarian_capability + other.librarian_capability) / 2,
             sentinel_capability=(self.sentinel_capability + other.sentinel_capability) / 2,
             immune_response=(self.immune_response + other.immune_response) / 2,
@@ -399,7 +412,10 @@ class BeeDNA(DNA):
             fitness=0.0,
             mining_capability=(self.mining_capability + other.mining_capability) / 2,
             gathering_capability=(self.gathering_capability + other.gathering_capability) / 2,
-            architectural_capability=(self.architectural_capability + other.architectural_capability) / 2,
+            architectural_capability=(
+                self.architectural_capability + other.architectural_capability
+            )
+            / 2,
             librarian_capability=(self.librarian_capability + other.librarian_capability) / 2,
             sentinel_capability=(self.sentinel_capability + other.sentinel_capability) / 2,
             immune_response=(self.immune_response + other.immune_response) / 2,
@@ -425,12 +441,13 @@ class BeeDNA(DNA):
         """生成突变的BeeDNA副本 - 覆盖基类方法"""
         # 先调用父类逻辑获取基础突变 (注意：父类返回的是 DNA 实例)
         import random
+
         base_mutated = super().mutate(mutation_rate)
-        
+
         # 转换回 BeeDNA 并处理特有字段
         # 生成新 ID
         new_id = f"{self.id}_mut_{int(random.random()*1000)}"
-        
+
         mutated = BeeDNA(
             # 基础字段
             species=base_mutated.species,
@@ -446,7 +463,6 @@ class BeeDNA(DNA):
             learning_rate=base_mutated.learning_rate,
             mutation_rate=base_mutated.mutation_rate,
             metadata=base_mutated.metadata,
-            
             # BeeDNA 特有字段
             id=new_id,
             role=self.role,
@@ -455,9 +471,9 @@ class BeeDNA(DNA):
             mutation_gene=self.mutation_gene,
             can_merge_back=self.can_merge_back,
             # 性能指标重置
-            success_rate=self.success_rate * 0.9, # 突变后稍作衰减
+            success_rate=self.success_rate * 0.9,  # 突变后稍作衰减
             task_completion_time=0.0,
-            error_count=0
+            error_count=0,
         )
         return mutated
 
@@ -479,7 +495,9 @@ class BeeDNA(DNA):
         if self.task_completion_time == 0:
             self.task_completion_time = completion_time
         else:
-            self.task_completion_time = alpha * completion_time + (1 - alpha) * self.task_completion_time
+            self.task_completion_time = (
+                alpha * completion_time + (1 - alpha) * self.task_completion_time
+            )
 
         # 更新错误计数
         if error:
@@ -535,6 +553,7 @@ class DNAPool:
 
     def _breed_new_individuals(self, best_dnas: list, population_size: int) -> list[DNA]:
         import random
+
         new_generation = []
         while len(new_generation) < population_size:
             parents = random.sample(best_dnas, min(2, len(best_dnas)))

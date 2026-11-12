@@ -1,6 +1,6 @@
 class Agent:
     """Represents an individual agent in the swarm, responsible for processing sentiment data."""
-    
+
     def __init__(self, data_source: str):
         self.data_source = data_source
         self.sentiment_score = 0.0
@@ -22,7 +22,7 @@ class Agent:
 
 class Swarm:
     """Represents a group of agents working together to analyze market sentiment."""
-    
+
     def __init__(self, social_feeds: list):
         self.agents = [Agent(data_source) for data_source in social_feeds]
 
@@ -40,6 +40,7 @@ class Swarm:
         """Get the unified sentiment signal from the swarm."""
         self.process_social_feeds()
         return self.aggregate_sentiments()
+
 
 # Example usage
 if __name__ == "__main__":

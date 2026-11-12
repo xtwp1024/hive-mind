@@ -42,21 +42,23 @@ import logging
 import socket
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
-import urllib.request
-import urllib.error
 
 logger = logging.getLogger("Hive.Federation")
 
 
 # ===== 节点描述 =====
 
+
 @dataclass
 class HiveNode:
     """蜂巢节点描述"""
+
     node_id: str
     host: str
     port: int
@@ -103,6 +105,7 @@ class HiveNode:
 
 
 # ===== 蜂巢联邦 =====
+
 
 class HiveFederation:
     """
@@ -181,7 +184,9 @@ class HiveFederation:
         self.heartbeat_interval = 10.0  # 秒
         self.node_timeout = 60.0  # 秒
 
-        logger.info(f"🔗 [Federation] 蜂巢联邦初始化: node_id={self.node_id}, mode={discovery_mode}")
+        logger.info(
+            f"🔗 [Federation] 蜂巢联邦初始化: node_id={self.node_id}, mode={discovery_mode}"
+        )
 
     # ===== 生命周期 =====
 
@@ -242,7 +247,9 @@ class HiveFederation:
                 return True
 
             self._nodes[node.node_id] = node
-            logger.info(f"🔗 [Federation] 新节点注册: {node.node_id} ({node.host}:{node.port}), cap={node.capabilities}")
+            logger.info(
+                f"🔗 [Federation] 新节点注册: {node.node_id} ({node.host}:{node.port}), cap={node.capabilities}"
+            )
             return True
 
     def deregister_node(self, node_id: str):
@@ -266,7 +273,8 @@ class HiveFederation:
         """获取具有特定能力的节点"""
         with self._nodes_lock:
             return [
-                n for n in self._nodes.values()
+                n
+                for n in self._nodes.values()
                 if n.is_alive(self.node_timeout) and capability in n.capabilities
             ]
 
@@ -303,11 +311,13 @@ class HiveFederation:
             广播到的节点数量
         """
         with self._kb_lock:
-            self._knowledge_base.append({
-                "knowledge": knowledge,
-                "timestamp": time.time(),
-                "origin": self.node_id,
-            })
+            self._knowledge_base.append(
+                {
+                    "knowledge": knowledge,
+                    "timestamp": time.time(),
+                    "origin": self.node_id,
+                }
+            )
             # 保留最近 1000 条知识
             if len(self._knowledge_base) > 1000:
                 self._knowledge_base = self._knowledge_base[-1000:]
@@ -316,10 +326,14 @@ class HiveFederation:
         for node in self.get_all_nodes():
             if exclude_self and node.node_id == self.node_id:
                 continue
-            if self._send_to_node(node, self.MSG_KNOWLEDGE_BROADCAST, {
-                "knowledge": knowledge,
-                "origin": self.node_id,
-            }):
+            if self._send_to_node(
+                node,
+                self.MSG_KNOWLEDGE_BROADCAST,
+                {
+                    "knowledge": knowledge,
+                    "origin": self.node_id,
+                },
+            ):
                 count += 1
 
         logger.info(f"📡 [Federation] 知识广播完成: {count} 个节点")
@@ -337,7 +351,7 @@ class HiveFederation:
         task: dict,
         target_capabilities: Optional[list[str]] = None,
         target_node_id: Optional[str] = None,
-        timeout: float = 60.0
+        timeout: float = 60.0,
     ) -> Optional[dict]:
         """
         将任务委托给其他节点
@@ -367,11 +381,15 @@ class HiveFederation:
             self._pending_tasks[task_id] = {"node": node.node_id, "task": task}
 
         # 发送任务
-        success = self._send_to_node(node, self.MSG_TASK_DELEGATE, {
-            "task_id": task_id,
-            "task": task,
-            "origin": self.node_id,
-        })
+        success = self._send_to_node(
+            node,
+            self.MSG_TASK_DELEGATE,
+            {
+                "task_id": task_id,
+                "task": task,
+                "origin": self.node_id,
+            },
+        )
 
         if not success:
             with self._tasks_lock:
@@ -401,7 +419,9 @@ class HiveFederation:
 
     # ===== 状态更新 =====
 
-    def update_status(self, status: str, load_factor: float = 0.0, capabilities: Optional[list[str]] = None):
+    def update_status(
+        self, status: str, load_factor: float = 0.0, capabilities: Optional[list[str]] = None
+    ):
         """更新本节点状态"""
         self.status = status
         self.load_factor = load_factor
@@ -411,12 +431,16 @@ class HiveFederation:
         # 广播更新
         for node in self.get_all_nodes():
             if node.node_id != self.node_id:
-                self._send_to_node(node, self.MSG_NODE_HEARTBEAT, {
-                    "node_id": self.node_id,
-                    "status": status,
-                    "load_factor": load_factor,
-                    "capabilities": self.capabilities or [],
-                })
+                self._send_to_node(
+                    node,
+                    self.MSG_NODE_HEARTBEAT,
+                    {
+                        "node_id": self.node_id,
+                        "status": status,
+                        "load_factor": load_factor,
+                        "capabilities": self.capabilities or [],
+                    },
+                )
 
     # ===== HTTP API (简化版) =====
 
@@ -457,9 +481,7 @@ class HiveFederation:
         self._stop_http.clear()
         self._http_server = ThreadedHTTPServer(("0.0.0.0", self.port), Handler)
         self._http_thread = threading.Thread(
-            target=self._http_server.serve_forever,
-            daemon=True,
-            name="federation-http"
+            target=self._http_server.serve_forever, daemon=True, name="federation-http"
         )
         self._http_thread.start()
         logger.info(f"🔗 [Federation] HTTP API 启动: {self.host}:{self.port}")
@@ -480,11 +502,13 @@ class HiveFederation:
             return None
         elif msg_type == self.MSG_KNOWLEDGE_BROADCAST:
             with self._kb_lock:
-                self._knowledge_base.append({
-                    "knowledge": payload.get("knowledge"),
-                    "timestamp": time.time(),
-                    "origin": payload.get("origin"),
-                })
+                self._knowledge_base.append(
+                    {
+                        "knowledge": payload.get("knowledge"),
+                        "timestamp": time.time(),
+                        "origin": payload.get("origin"),
+                    }
+                )
             # Phase 5 P2: 通知知识同步回调
             if self._knowledge_callback:
                 try:
@@ -527,7 +551,7 @@ class HiveFederation:
                 node.get_url("api"),
                 data=data,
                 headers={"Content-Type": "application/json"},
-                method="POST"
+                method="POST",
             )
             with urllib.request.urlopen(req, timeout=5.0) as resp:
                 return resp.status == 200
@@ -583,11 +607,15 @@ class HiveFederation:
             # 发送自己的心跳
             for node in self.get_all_nodes():
                 if node.node_id != self.node_id:
-                    self._send_to_node(node, self.MSG_NODE_HEARTBEAT, {
-                        "node_id": self.node_id,
-                        "status": getattr(self, "status", "active"),
-                        "load_factor": getattr(self, "load_factor", 0.0),
-                    })
+                    self._send_to_node(
+                        node,
+                        self.MSG_NODE_HEARTBEAT,
+                        {
+                            "node_id": self.node_id,
+                            "status": getattr(self, "status", "active"),
+                            "load_factor": getattr(self, "load_factor", 0.0),
+                        },
+                    )
 
     def _discovery_loop(self):
         """节点发现循环"""
@@ -624,15 +652,19 @@ class HiveFederation:
                                 port=self.port,
                             )
                             sock.sendto(
-                                json.dumps({"type": "hive_response", "node": self_node.to_dict()}).encode(),
-                                (addr[0], self.broadcast_port)
+                                json.dumps(
+                                    {"type": "hive_response", "node": self_node.to_dict()}
+                                ).encode(),
+                                (addr[0], self.broadcast_port),
                             )
                 except socket.timeout:
                     # 定期广播自己的存在
                     self_node = HiveNode(node_id=self.node_id, host=self.host, port=self.port)
                     sock.sendto(
-                        json.dumps({"type": "hive_discovery", "node": self_node.to_dict()}).encode(),
-                        (self.broadcast_group, self.broadcast_port)
+                        json.dumps(
+                            {"type": "hive_discovery", "node": self_node.to_dict()}
+                        ).encode(),
+                        (self.broadcast_group, self.broadcast_port),
                     )
                 except Exception as e:
                     logger.debug(f"🔗 [Federation] 多播发现异常: {e}")
@@ -665,7 +697,7 @@ class HiveFederation:
                 node.get_url("api"),
                 data=data,
                 headers={"Content-Type": "application/json"},
-                method="POST"
+                method="POST",
             )
             with urllib.request.urlopen(req, timeout=10.0) as resp:
                 return json.loads(resp.read().decode("utf-8"))

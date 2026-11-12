@@ -32,6 +32,7 @@ class ToolDefinition:
     def to_dict(self) -> Dict[str, Any]:
         """转为可描述字典（供 LLM 读取）"""
         import inspect
+
         sig = inspect.signature(self.fn)
         params = {
             name: str(p.annotation) if p.annotation != inspect.Parameter.empty else "any"
@@ -93,11 +94,14 @@ def bee_tool(name: str, description: str) -> Callable:
         # 其他工蜂调用：
         result = BeeToolRegistry.invoke("分析JSON", file_path="data.json")
     """
+
     def decorator(fn: Callable) -> Callable:
         BeeToolRegistry.register(name, description, fn)
 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             return fn(*args, **kwargs)
+
         return wrapper
+
     return decorator

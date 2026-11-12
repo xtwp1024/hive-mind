@@ -34,7 +34,7 @@ def test_logger():
 def test_retry():
     """测试重试机制"""
     print("\n=== Testing Retry ===")
-    from hive.utils.retry import retry, RetryConfig
+    from hive.utils.retry import RetryConfig, retry
 
     call_count = 0
 
@@ -82,7 +82,7 @@ def test_monitor():
 def test_metrics():
     """测试指标收集"""
     print("\n=== Testing Metrics ===")
-    from hive.utils.metrics import MetricsCollector, get_metrics, Timer
+    from hive.utils.metrics import MetricsCollector, Timer, get_metrics
 
     collector = get_metrics()
 
@@ -194,7 +194,7 @@ def test_interfaces():
 def test_settings():
     """测试配置"""
     print("\n=== Testing Settings ===")
-    from hive.config.settings import settings, HiveSettings
+    from hive.config.settings import HiveSettings, settings
 
     # 测试默认值
     assert settings.ENVIRONMENT in ["development", "production", "testing"]

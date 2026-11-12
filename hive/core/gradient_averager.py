@@ -24,10 +24,11 @@ logger = logging.getLogger("Hive.GradientAverager")
 @dataclass
 class NodeResult:
     """单个节点的局部结果（对标 hivemind 中的梯度张量）"""
-    node_id:  str
-    value:    float          # 单维简化（真实场景为向量/张量）
-    weight:   float = 1.0   # 节点权重（可按计算量加权）
-    alive:    bool  = True   # 节点是否在线
+
+    node_id: str
+    value: float  # 单维简化（真实场景为向量/张量）
+    weight: float = 1.0  # 节点权重（可按计算量加权）
+    alive: bool = True  # 节点是否在线
 
 
 class GradientAverager:
@@ -37,7 +38,7 @@ class GradientAverager:
     """
 
     def __init__(self, n_rounds: int = 4):
-        self.n_rounds = n_rounds   # 迭代轮数（log2(n_nodes) 最优）
+        self.n_rounds = n_rounds  # 迭代轮数（log2(n_nodes) 最优）
         self._nodes: dict[str, NodeResult] = {}
         self._lock = threading.Lock()
 
@@ -72,8 +73,8 @@ class GradientAverager:
 
         for a, b in pairs:
             # 加权平均（对标 hivemind 的 weighted average step）
-            total_w  = a.weight + b.weight
-            new_val  = (a.value * a.weight + b.value * b.weight) / total_w
+            total_w = a.weight + b.weight
+            new_val = (a.value * a.weight + b.value * b.weight) / total_w
             with self._lock:
                 self._nodes[a.node_id].value = new_val
                 self._nodes[b.node_id].value = new_val

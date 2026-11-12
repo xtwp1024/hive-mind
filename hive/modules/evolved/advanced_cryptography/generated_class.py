@@ -1,6 +1,7 @@
 import hashlib
 from typing import Any
 
+
 class AdvancedCryptographyManager:
     """
     A class to manage advanced cryptography functionalities.
@@ -21,6 +22,7 @@ class AdvancedCryptographyManager:
         self.key = key
         self.iv = iv
         from Crypto.Cipher import AES
+
         self.cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
 
     def hash_data(self, data: Any) -> bytes:
@@ -32,7 +34,7 @@ class AdvancedCryptographyManager:
         """
         if not isinstance(data, (str, bytes)):
             raise TypeError("Data must be a string or bytes.")
-        return hashlib.sha256(data.encode('utf-8')).hexdigest()
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
     def encrypt_data(self, data: bytes) -> bytes:
         """
@@ -56,26 +58,31 @@ class AdvancedCryptographyManager:
         if not isinstance(encrypted_data, bytes):
             raise TypeError("Encrypted data must be bytes.")
         from Crypto.Cipher import AES
+
         cipher = AES.new(self.key, AES.MODE_CBC, self.iv)
         return cipher.decrypt(encrypted_data)
 
+
 # Unit tests for each method
 def test_hash_data():
-    manager = AdvancedCryptographyManager(b'key', b'iv')
-    assert manager.hash_data('hello').startswith('5e884898da28047151d0e56f8dc62927')
+    manager = AdvancedCryptographyManager(b"key", b"iv")
+    assert manager.hash_data("hello").startswith("5e884898da28047151d0e56f8dc62927")
+
 
 def test_encrypt_data():
-    manager = AdvancedCryptographyManager(b'key', b'iv')
-    data = b'hello'
+    manager = AdvancedCryptographyManager(b"key", b"iv")
+    data = b"hello"
     encrypted = manager.encrypt_data(data)
     assert len(encrypted) == len(data) + 16  # Padding added
 
+
 def test_decrypt_data():
-    manager = AdvancedCryptographyManager(b'key', b'iv')
-    data = b'hello'
+    manager = AdvancedCryptographyManager(b"key", b"iv")
+    data = b"hello"
     encrypted = manager.encrypt_data(data)
     decrypted = manager.decrypt_data(encrypted)
     assert decrypted == data
+
 
 # Run unit tests
 test_hash_data()

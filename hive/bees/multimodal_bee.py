@@ -20,12 +20,12 @@ Phase 4 P3: 多模态融合
     })
 """
 
-import logging
-import json
-import time
 import asyncio
+import json
+import logging
+import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from hive.bees.base_bee import BaseBee
 from hive.core.dna import BeeDNA
@@ -60,6 +60,7 @@ class MultimodalBee(BaseBee):
         """懒加载 BrainInterface"""
         if self._brain is None:
             from hive.utils.brain_interface import get_brain
+
             self._brain = get_brain()
         return self._brain
 
@@ -88,7 +89,10 @@ class MultimodalBee(BaseBee):
         mode = task.get("mode", "unified")
 
         if not prompt and not text and not images and not audio:
-            return {"status": "error", "message": "At least one input required (prompt/text/images/audio)"}
+            return {
+                "status": "error",
+                "message": "At least one input required (prompt/text/images/audio)",
+            }
 
         if mode == "unified":
             return self._do_unified_analysis(prompt, text, images, audio)
@@ -100,17 +104,15 @@ class MultimodalBee(BaseBee):
             return {"status": "error", "message": f"Unknown mode: {mode}"}
 
     def _do_unified_analysis(
-        self,
-        prompt: str,
-        text: Optional[str],
-        images: Optional[list],
-        audio: Optional[str]
+        self, prompt: str, text: Optional[str], images: Optional[list], audio: Optional[str]
     ) -> Dict[str, Any]:
         """统一多模态分析 (单次 LLM 调用)"""
         brain = self._get_brain()
 
-        if not hasattr(brain, 'consult_multimodal'):
-            logger.warning(f"🔮 [Multimodal] BrainInterface 不支持 consult_multimodal，降级为 sequential")
+        if not hasattr(brain, "consult_multimodal"):
+            logger.warning(
+                f"🔮 [Multimodal] BrainInterface 不支持 consult_multimodal，降级为 sequential"
+            )
             return self._do_sequential_analysis(prompt, text, images, audio)
 
         result = brain.consult_multimodal(
@@ -128,22 +130,18 @@ class MultimodalBee(BaseBee):
                 "analysis": result,
                 "mode": "unified",
                 "modalities": self._count_modalities(text, images, audio),
-                "bee_id": self.id
+                "bee_id": self.id,
             }
         else:
             return {
                 "status": "error",
                 "message": "Multimodal analysis failed",
                 "mode": "unified",
-                "bee_id": self.id
+                "bee_id": self.id,
             }
 
     def _do_sequential_analysis(
-        self,
-        prompt: str,
-        text: Optional[str],
-        images: Optional[list],
-        audio: Optional[str]
+        self, prompt: str, text: Optional[str], images: Optional[list], audio: Optional[str]
     ) -> Dict[str, Any]:
         """顺序多模态分析 (各模态依次处理，再综合)"""
         modality_results = {}
@@ -172,11 +170,7 @@ class MultimodalBee(BaseBee):
             all_failed = False
 
         if all_failed:
-            return {
-                "status": "error",
-                "message": "All modalities failed",
-                "bee_id": self.id
-            }
+            return {"status": "error", "message": "All modalities failed", "bee_id": self.id}
 
         # 4. 综合分析
         synthesis = self._synthesize_results(prompt, modality_results)
@@ -186,15 +180,11 @@ class MultimodalBee(BaseBee):
             "modality_results": modality_results,
             "mode": "sequential",
             "modalities": self._count_modalities(text, images, audio),
-            "bee_id": self.id
+            "bee_id": self.id,
         }
 
     def _do_parallel_analysis(
-        self,
-        prompt: str,
-        text: Optional[str],
-        images: Optional[list],
-        audio: Optional[str]
+        self, prompt: str, text: Optional[str], images: Optional[list], audio: Optional[str]
     ) -> Dict[str, Any]:
         """并行多模态分析 (各模态同时处理)"""
         import concurrent.futures
@@ -228,11 +218,7 @@ class MultimodalBee(BaseBee):
             modality_results["text"] = text
 
         if not modality_results:
-            return {
-                "status": "error",
-                "message": "All modalities failed",
-                "bee_id": self.id
-            }
+            return {"status": "error", "message": "All modalities failed", "bee_id": self.id}
 
         # 综合分析
         synthesis = self._synthesize_results(prompt, modality_results)
@@ -242,13 +228,13 @@ class MultimodalBee(BaseBee):
             "modality_results": modality_results,
             "mode": "parallel",
             "modalities": self._count_modalities(text, images, audio),
-            "bee_id": self.id
+            "bee_id": self.id,
         }
 
     def _analyze_single_image(self, image_path: str, question: str) -> Optional[str]:
         """分析单张图片"""
         brain = self._get_brain()
-        if hasattr(brain, 'consult_vision'):
+        if hasattr(brain, "consult_vision"):
             return brain.consult_vision(
                 prompt=question,
                 image_path=image_path,
@@ -260,7 +246,7 @@ class MultimodalBee(BaseBee):
     def _transcribe_audio(self, audio_path: str) -> Optional[str]:
         """转录音频"""
         brain = self._get_brain()
-        if hasattr(brain, 'transcribe_audio'):
+        if hasattr(brain, "transcribe_audio"):
             return brain.transcribe_audio(
                 audio_path=audio_path,
                 model=self._audio_model,
@@ -301,7 +287,7 @@ class MultimodalBee(BaseBee):
         response = brain.consult(
             prompt=synthesis_prompt,
             system_prompt="你是一个专业的多模态综合分析专家，擅长将不同来源的信息整合为连贯的分析。",
-            model="glm-4"
+            model="glm-4",
         )
         return response or "综合分析失败。"
 
@@ -324,7 +310,7 @@ class MultimodalBee(BaseBee):
         text: Optional[str] = None,
         images: Optional[list[str]] = None,
         audio: Optional[str] = None,
-        mode: str = "unified"
+        mode: str = "unified",
     ) -> Dict[str, Any]:
         """
         统一分析接口
@@ -339,19 +325,18 @@ class MultimodalBee(BaseBee):
         Returns:
             多模态分析结果
         """
-        return self.specialized_task({
-            "prompt": prompt,
-            "text": text,
-            "images": images or [],
-            "audio": audio,
-            "mode": mode,
-        })
+        return self.specialized_task(
+            {
+                "prompt": prompt,
+                "text": text,
+                "images": images or [],
+                "audio": audio,
+                "mode": mode,
+            }
+        )
 
     def analyze_image_text(
-        self,
-        prompt: str,
-        image_path: str,
-        text: Optional[str] = None
+        self, prompt: str, image_path: str, text: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         分析图片+文本组合
@@ -367,10 +352,7 @@ class MultimodalBee(BaseBee):
         return self.analyze(prompt=prompt, text=text, images=[image_path])
 
     def analyze_video_frame(
-        self,
-        prompt: str,
-        frame_paths: list[str],
-        transcript: Optional[str] = None
+        self, prompt: str, frame_paths: list[str], transcript: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         分析视频帧序列 (截图+音频转录)
@@ -383,12 +365,7 @@ class MultimodalBee(BaseBee):
         Returns:
             分析结果
         """
-        return self.analyze(
-            prompt=prompt,
-            text=transcript,
-            images=frame_paths,
-            mode="sequential"
-        )
+        return self.analyze(prompt=prompt, text=transcript, images=frame_paths, mode="sequential")
 
 
-__all__ = ['MultimodalBee']
+__all__ = ["MultimodalBee"]

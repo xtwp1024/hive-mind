@@ -133,20 +133,39 @@ class StrategySelector:
 
     # System1 触发条件
     SYSTEM1_TRIGGERS = {
-        "greeting", "goodbye", "help", "status",
-        "简单查询", "查看状态", "打招呼",
+        "greeting",
+        "goodbye",
+        "help",
+        "status",
+        "简单查询",
+        "查看状态",
+        "打招呼",
     }
 
     # 高风险操作
     RISKY_OPERATIONS = {
-        "delete", "remove", "drop", "rm",
-        "删除", "销毁", "强制", "kill",
+        "delete",
+        "remove",
+        "drop",
+        "rm",
+        "删除",
+        "销毁",
+        "强制",
+        "kill",
     }
 
     # 复杂任务关键词
     COMPLEX_TASK_KEYWORDS = {
-        "分析", "设计", "实现", "重构", "优化",
-        "create", "design", "implement", "refactor", "optimize",
+        "分析",
+        "设计",
+        "实现",
+        "重构",
+        "优化",
+        "create",
+        "design",
+        "implement",
+        "refactor",
+        "optimize",
     }
 
     # ===== Phase 1: 动态模型路由 =====

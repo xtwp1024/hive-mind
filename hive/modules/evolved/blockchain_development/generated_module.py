@@ -12,6 +12,7 @@ class Block:
         block_string = f"{self.index}{self.transactions}{self.timestamp}{self.previous_hash}"
         return hash(block_string)
 
+
 class Blockchain:
     def __init__(self):
         """Initialize a new blockchain."""
@@ -26,7 +27,12 @@ class Blockchain:
     def add_block(self, transactions):
         """Add a new block to the blockchain."""
         previous_block = self.chain[-1]
-        new_block = Block(index=len(self.chain), transactions=transactions, timestamp=0, previous_hash=previous_block.hash)
+        new_block = Block(
+            index=len(self.chain),
+            transactions=transactions,
+            timestamp=0,
+            previous_hash=previous_block.hash,
+        )
         self.chain.append(new_block)
 
     def is_chain_valid(self):
@@ -39,6 +45,7 @@ class Blockchain:
             if current_block.previous_hash != previous_block.hash:
                 return False
         return True
+
 
 class BlockchainDevelopmentManager:
     """Manager class for blockchain development."""
@@ -59,24 +66,28 @@ class BlockchainDevelopmentManager:
         """Get the current blockchain."""
         return self.blockchain.chain
 
+
 # Unit tests
 def test_blockchain_creation():
     manager = BlockchainDevelopmentManager()
     assert isinstance(manager.blockchain, Blockchain)
     assert manager.blockchain.chain == [manager.blockchain.chain[0]]
 
+
 def test_blockchain_add_transaction():
     manager = BlockchainDevelopmentManager()
-    manager.add_transaction('Transaction1')
+    manager.add_transaction("Transaction1")
     assert len(manager.blockchain.chain) == 2
-    assert manager.blockchain.chain[1].transactions == ['Transaction1']
+    assert manager.blockchain.chain[1].transactions == ["Transaction1"]
+
 
 def test_blockchain_validation():
     manager = BlockchainDevelopmentManager()
-    manager.add_transaction('Transaction1')
+    manager.add_transaction("Transaction1")
     assert manager.validate_blockchain()
-    manager.blockchain.chain[1].transactions[0] = 'InvalidTransaction'
+    manager.blockchain.chain[1].transactions[0] = "InvalidTransaction"
     assert not manager.validate_blockchain()
+
 
 # Run unit tests
 test_blockchain_creation()

@@ -15,6 +15,7 @@ from pathlib import Path as _Path
 
 from .paths import resolve_hive_home as _resolve_hive_home
 
+
 def _force_cache_to_drive() -> None:
     """将 AI 相关缓存目录重定向到 hive 根（不写死盘符、不拼 cwd）"""
     # 根锚点统一由 hive.paths.resolve_hive_home 解析（P1-7 单一真源）。
@@ -51,6 +52,7 @@ def _force_cache_to_drive() -> None:
 
     # ChromaDB 额外的 ONNX 模型缓存路径（这个最关键）
     _os.environ.setdefault("CHROMA_ONNX_CACHE", str(cache_root / "chroma" / "onnx"))
+
 
 _force_cache_to_drive()
 del _force_cache_to_drive  # 释放辅助符号

@@ -104,7 +104,9 @@ class HoneyProcessor:
         target = bad_honey.get("dna", {}).get("target_name", "unknown")
 
         try:
-            logger.warning(f"[HoneyProcessor] 免疫响应 #{self.antibody_count}: {source} -> {target}: {error}")
+            logger.warning(
+                f"[HoneyProcessor] 免疫响应 #{self.antibody_count}: {source} -> {target}: {error}"
+            )
             self._archive_immune_memory(bad_honey)
         except Exception as e:
             logger.warning(f"[HoneyProcessor] 免疫响应错误: {e}")
@@ -117,6 +119,7 @@ class HoneyProcessor:
 
         try:
             from hive.utils.immune_archive import archive_failure
+
             archive_failure(death_cert)
             logger.info("[HoneyProcessor] 免疫记忆已归档")
         except ImportError:
@@ -137,7 +140,7 @@ class HoneyProcessor:
             "honey_stomach_size": len(self.honey_stomach),
             "processed_count": self.processed_count,
             "digested_count": self.digested_count,
-            "antibody_count": self.antibody_count
+            "antibody_count": self.antibody_count,
         }
 
     def shutdown(self) -> None:

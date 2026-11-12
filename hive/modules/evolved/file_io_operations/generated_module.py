@@ -1,6 +1,7 @@
 import os
 import unittest
 
+
 class FileIoOperationsManager:
     """
     A class for handling file input/output operations.
@@ -25,7 +26,7 @@ class FileIoOperationsManager:
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"The file {self.file_path} does not exist.")
         try:
-            with open(self.file_path, 'r') as file:
+            with open(self.file_path, "r") as file:
                 return file.read()
         except IOError as e:
             raise IOError(f"An error occurred while reading the file: {e}")
@@ -38,7 +39,7 @@ class FileIoOperationsManager:
         :raises IOError: If there is an error writing to the file.
         """
         try:
-            with open(self.file_path, 'w') as file:
+            with open(self.file_path, "w") as file:
                 file.write(content)
         except IOError as e:
             raise IOError(f"An error occurred while writing to the file: {e}")
@@ -51,7 +52,7 @@ class FileIoOperationsManager:
         :raises IOError: If there is an error appending to the file.
         """
         try:
-            with open(self.file_path, 'a') as file:
+            with open(self.file_path, "a") as file:
                 file.write(content)
         except IOError as e:
             raise IOError(f"An error occurred while appending to the file: {e}")
@@ -63,7 +64,7 @@ class TestFileIoOperationsManager(unittest.TestCase):
     """
 
     def setUp(self):
-        self.test_file_path = 'test_file.txt'
+        self.test_file_path = "test_file.txt"
         self.manager = FileIoOperationsManager(self.test_file_path)
 
     def tearDown(self):
@@ -74,35 +75,35 @@ class TestFileIoOperationsManager(unittest.TestCase):
         """
         Test the read_file method.
         """
-        with open(self.test_file_path, 'w') as file:
-            file.write('Hello, World!')
-        self.assertEqual(self.manager.read_file(), 'Hello, World!')
+        with open(self.test_file_path, "w") as file:
+            file.write("Hello, World!")
+        self.assertEqual(self.manager.read_file(), "Hello, World!")
 
     def test_write_file(self):
         """
         Test the write_file method.
         """
-        content = 'Test content'
+        content = "Test content"
         self.manager.write_file(content)
-        with open(self.test_file_path, 'r') as file:
+        with open(self.test_file_path, "r") as file:
             self.assertEqual(file.read(), content)
 
     def test_append_to_file(self):
         """
         Test the append_to_file method.
         """
-        content = 'First line'
+        content = "First line"
         self.manager.write_file(content)
-        content += '\nSecond line'
+        content += "\nSecond line"
         self.manager.append_to_file(content)
-        with open(self.test_file_path, 'r') as file:
+        with open(self.test_file_path, "r") as file:
             self.assertEqual(file.read(), content)
 
     def test_file_not_found_error(self):
         """
         Test that FileNotFoundError is raised when file does not exist.
         """
-        manager = FileIoOperationsManager('non_existent_file.txt')
+        manager = FileIoOperationsManager("non_existent_file.txt")
         with self.assertRaises(FileNotFoundError):
             manager.read_file()
 
@@ -111,7 +112,8 @@ class TestFileIoOperationsManager(unittest.TestCase):
         Test that IOError is raised when an I/O error occurs.
         """
         with self.assertRaises(IOError):
-            self.manager.write_file('This should raise an IOError')
+            self.manager.write_file("This should raise an IOError")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

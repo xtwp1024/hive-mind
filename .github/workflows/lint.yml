@@ -28,34 +28,33 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -e ".[dev]"
+        pip install -e ".[lint]"
 
     - name: Check code formatting with black
       id: black
       run: |
         black --check hive/
-      continue-on-error: true
 
     - name: Check import order with isort
       id: isort
       run: |
         isort --check-only hive/
-      continue-on-error: true
 
     - name: Lint with ruff (fast)
       id: ruff
       run: |
-        pip install ruff
         ruff check hive/
-      continue-on-error: true
 
     - name: Static type check with mypy
       id: mypy
+      # 报告型：现存类型债务见 LOOP.md P1-16，分批清理后再升级为阻塞门禁
       run: |
         mypy hive/ --ignore-missing-imports --warn-unused-configs
       continue-on-error: true
 
     - name: Check for security issues with bandit
       id: bandit
+      # 报告型：只产出报告，不作为合并门禁
       run: |
         pip install bandit
         bandit -r hive/ -f json -o bandit-report.json || true
@@ -64,12 +63,14 @@ jobs:
 
     - name: Check dead code with vulture
       id: vulture
+      # 报告型：只产出报告，不作为合并门禁
       run: |
         pip install vulture
         vulture hive/ --exclude=*_test.py,*/tests/* || true
       continue-on-error: true
 
     - name: Summary
+      if: always()
       run: |
         echo "=== Code Quality Summary ==="
         echo ""
@@ -81,12 +82,14 @@ jobs:
         echo "Vulture (dead code): ${{ steps.vulture.outcome }}"
         echo ""
         
-        # 只有关键检查失败才阻止合并
-        if [ "${{ steps.black.outcome }}" = "failure" ] || [ "${{ steps.ruff.outcome }}" = "failure" ]; then
-          echo "❌ Critical checks failed - blocking merge"
+        # R12：black/isort/ruff 已去掉 continue-on-error，失败会在对应 step 直接终止 job；
+        # 这里用 always() 再汇总一次，并把三项都纳入阻塞判定，便于一眼看清。
+        # mypy/bandit/vulture 仍是报告型，只打印不阻塞（见 LOOP.md P1-16）。
+        if [ "${{ steps.black.outcome }}" = "failure" ] || [ "${{ steps.isort.outcome }}" = "failure" ] || [ "${{ steps.ruff.outcome }}" = "failure" ]; then
+          echo "Critical checks failed - blocking merge"
           exit 1
         else
-          echo "✅ All critical checks passed"
+          echo "All critical checks passed"
           exit 0
         fi
 

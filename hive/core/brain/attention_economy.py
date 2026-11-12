@@ -172,9 +172,7 @@ class AttentionEconomy:
             "usage_ratio": self.budget.get_usage_ratio(),
             "consumed_by": dict(self.budget.consumed_by),
             "is_low": self.budget.is_depleted(self.LOW_BUDGET_THRESHOLD),
-            "can_afford": dict(
-                {op: self.can_afford(op) for op in self.ATTENTION_COSTS.keys()}
-            ),
+            "can_afford": dict({op: self.can_afford(op) for op in self.ATTENTION_COSTS.keys()}),
         }
 
     def is_low_budget(self) -> bool:

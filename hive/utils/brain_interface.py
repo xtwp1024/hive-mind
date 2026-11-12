@@ -1,22 +1,24 @@
 # -*- coding: utf-8 -*-
 import json
-import requests
-import time
+import logging
 import random
+import time
 import urllib.request
 from pathlib import Path
-from typing import Dict, Any, Optional
-import logging
+from typing import Any, Dict, Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
+
 class BrainInterface:
     """大脑接口 - 连接 LLM 服务 (支持 DeepSeek, Gemini, Claude 等)"""
-    
+
     def __init__(self, config_path: str = "brain_config.json"):
         """
         初始化大脑接口
-        
+
         Args:
             config_path: 配置文件路径
         """
@@ -25,23 +27,20 @@ class BrainInterface:
         self.base_url = self.config.get("base_url")
         self.api_key = self.config.get("api_key")
         self.model = self.config.get("model", "deepseek-chat")
-        
+
         logger.info(f"🧠 大脑接口初始化: {self.provider} - {self.model}")
-    
+
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """加载配置文件"""
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"加载配置失败: {e}")
             return {}
-    
+
     def consult(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        model: Optional[str] = None
+        self, prompt: str, system_prompt: Optional[str] = None, model: Optional[str] = None
     ) -> Optional[str]:
         """
         咨询大脑 - 带有指数退避重试机制
@@ -55,7 +54,7 @@ class BrainInterface:
         # 0. 检查手动覆盖 (Teleoperation)
         override_path = Path("brain_override.md")
         if override_path.exists():
-            content = override_path.read_text(encoding='utf-8').strip()
+            content = override_path.read_text(encoding="utf-8").strip()
             if content and not content.startswith("# IGNORE"):
                 logger.info("🧠 [Neural Link] 检测到手动指令，已覆盖 AI 输出")
                 return content
@@ -87,8 +86,10 @@ class BrainInterface:
             except Exception as e:
                 error_str = str(e).lower()
                 if ("429" in error_str or "rate limit" in error_str) and attempt < max_retries - 1:
-                    wait_time = 2 ** attempt + random.random()
-                    logger.warning(f"🧠 Rate limit hit (429). Waiting {wait_time:.1f}s before retry {attempt+1}/{max_retries}")
+                    wait_time = 2**attempt + random.random()
+                    logger.warning(
+                        f"🧠 Rate limit hit (429). Waiting {wait_time:.1f}s before retry {attempt+1}/{max_retries}"
+                    )
                     time.sleep(wait_time)
                     continue
 
@@ -99,10 +100,7 @@ class BrainInterface:
         return None
 
     def _consult_openai_compatible(
-        self,
-        prompt: str,
-        system_prompt: Optional[str],
-        model: str
+        self, prompt: str, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """OpenAI 兼容接口调用"""
         messages = []
@@ -112,19 +110,11 @@ class BrainInterface:
 
         response = requests.post(
             f"{self.base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 2000
-            },
-            timeout=45
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            json={"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 2000},
+            timeout=45,
         )
-        
+
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         elif response.status_code == 429:
@@ -134,10 +124,7 @@ class BrainInterface:
             return None
 
     def _consult_ollama(
-        self,
-        prompt: str,
-        system_prompt: Optional[str],
-        model: str
+        self, prompt: str, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """
         Phase 2 P4: Ollama 本地模型接口
@@ -156,13 +143,8 @@ class BrainInterface:
         response = requests.post(
             f"{base}/v1/chat/completions",
             headers={"Content-Type": "application/json"},
-            json={
-                "model": model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 2000
-            },
-            timeout=60
+            json={"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 2000},
+            timeout=60,
         )
 
         if response.status_code == 200:
@@ -175,47 +157,46 @@ class BrainInterface:
             return None
 
     def _consult_gemini(
-        self,
-        prompt: str,
-        system_prompt: Optional[str],
-        model: str
+        self, prompt: str, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """Gemini REST API 调用"""
         full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
         headers = {"Content-Type": "application/json"}
-        data = {
-            "contents": [{"parts": [{"text": full_prompt}]}]
-        }
-        
-        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method='POST')
+        data = {"contents": [{"parts": [{"text": full_prompt}]}]}
+
+        req = urllib.request.Request(
+            url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST"
+        )
         with urllib.request.urlopen(req) as response:
-            result = json.loads(response.read().decode('utf-8'))
-            return result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+            result = json.loads(response.read().decode("utf-8"))
+            return (
+                result.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+            )
 
     def _consult_claude(
-        self,
-        prompt: str,
-        system_prompt: Optional[str],
-        model: str
+        self, prompt: str, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """Claude API 调用"""
         url = f"{self.base_url}/messages"
         headers = {
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
+            "content-type": "application/json",
         }
         data = {
             "model": model,
             "max_tokens": 2048,
             "system": system_prompt if system_prompt else "",
-            "messages": [{"role": "user", "content": prompt}]
+            "messages": [{"role": "user", "content": prompt}],
         }
 
         response = requests.post(url, headers=headers, json=data, timeout=45)
         if response.status_code == 200:
-            return response.json().get('content', [{}])[0].get('text', '')
+            return response.json().get("content", [{}])[0].get("text", "")
         return None
 
     def _consult_vision(
@@ -223,7 +204,7 @@ class BrainInterface:
         prompt: str,
         image_path: str,
         system_prompt: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
     ) -> Optional[str]:
         """
         Phase 4 P1: 多模态视觉推理
@@ -266,117 +247,112 @@ class BrainInterface:
             return self._consult_openai_vision(prompt, img_base64, system_prompt, effective_model)
 
     def _consult_claude_vision(
-        self,
-        prompt: str,
-        img_base64: str,
-        system_prompt: Optional[str],
-        model: str
+        self, prompt: str, img_base64: str, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """Claude Vision API (Anthropic)"""
         url = f"{self.base_url}/messages"
         headers = {
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
+            "content-type": "application/json",
         }
         content = [
             {
                 "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/png",
-                    "data": img_base64
-                }
+                "source": {"type": "base64", "media_type": "image/png", "data": img_base64},
             },
-            {"type": "text", "text": prompt}
+            {"type": "text", "text": prompt},
         ]
 
         data = {
             "model": model,
             "max_tokens": 2048,
             "system": system_prompt or "你是一个专业的代码架构分析专家。",
-            "messages": [{"role": "user", "content": content}]
+            "messages": [{"role": "user", "content": content}],
         }
 
         response = requests.post(url, headers=headers, json=data, timeout=60)
         if response.status_code == 200:
             result = response.json()
-            return result.get('content', [{}])[0].get('text', '')
+            return result.get("content", [{}])[0].get("text", "")
         else:
-            logger.error(f"🖼️ [Claude Vision] API错误: {response.status_code} - {response.text[:200]}")
+            logger.error(
+                f"🖼️ [Claude Vision] API错误: {response.status_code} - {response.text[:200]}"
+            )
             return None
 
     def _consult_gemini_vision(
-        self,
-        prompt: str,
-        img_base64: str,
-        system_prompt: Optional[str],
-        model: str
+        self, prompt: str, img_base64: str, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """Gemini Pro Vision API"""
         import json
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
         headers = {"Content-Type": "application/json"}
         data = {
-            "contents": [{
-                "parts": [
-                    {"inline_data": {"mime_type": "image/png", "data": img_base64}},
-                    {"text": prompt}
-                ]
-            }],
-            "system_instruction": {"parts": [{"text": system_prompt or ""}]} if system_prompt else None
+            "contents": [
+                {
+                    "parts": [
+                        {"inline_data": {"mime_type": "image/png", "data": img_base64}},
+                        {"text": prompt},
+                    ]
+                }
+            ],
+            "system_instruction": (
+                {"parts": [{"text": system_prompt or ""}]} if system_prompt else None
+            ),
         }
         data = {k: v for k, v in data.items() if v is not None}
 
-        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method='POST')
+        req = urllib.request.Request(
+            url, data=json.dumps(data).encode("utf-8"), headers=headers, method="POST"
+        )
         try:
             with urllib.request.urlopen(req, timeout=60) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                return result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                result = json.loads(response.read().decode("utf-8"))
+                return (
+                    result.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [{}])[0]
+                    .get("text", "")
+                )
         except Exception as e:
             logger.error(f"🖼️ [Gemini Vision] API错误: {e}")
             return None
 
     def _consult_openai_vision(
-        self,
-        prompt: str,
-        img_base64: str,
-        system_prompt: Optional[str],
-        model: str
+        self, prompt: str, img_base64: str, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """OpenAI 兼容格式 (GPT-4V 等)"""
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{img_base64}"}
-                }
-            ]
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    },
+                ],
+            }
+        )
 
         response = requests.post(
             f"{self.base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": model,
-                "messages": messages,
-                "max_tokens": 2000
-            },
-            timeout=60
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            json={"model": model, "messages": messages, "max_tokens": 2000},
+            timeout=60,
         )
 
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         else:
-            logger.error(f"🖼️ [OpenAI Vision] API错误: {response.status_code} - {response.text[:200]}")
+            logger.error(
+                f"🖼️ [OpenAI Vision] API错误: {response.status_code} - {response.text[:200]}"
+            )
             return None
 
     def consult_vision(
@@ -384,7 +360,7 @@ class BrainInterface:
         prompt: str,
         image_path: str,
         system_prompt: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
     ) -> Optional[str]:
         """
         Phase 4 P1: 视觉推理公开接口
@@ -417,7 +393,7 @@ class BrainInterface:
         audio_path: str,
         prompt: Optional[str] = None,
         language: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
     ) -> Optional[str]:
         """
         Phase 4 P2: 音频转录
@@ -449,11 +425,7 @@ class BrainInterface:
         return None
 
     def _transcribe_audio(
-        self,
-        audio_path: str,
-        prompt: Optional[str],
-        language: Optional[str],
-        model: Optional[str]
+        self, audio_path: str, prompt: Optional[str], language: Optional[str], model: Optional[str]
     ) -> Optional[str]:
         """内部音频转录路由"""
         import os
@@ -473,11 +445,7 @@ class BrainInterface:
             return self._transcribe_whisper(audio_path, prompt, language, effective_model)
 
     def _transcribe_whisper(
-        self,
-        audio_path: str,
-        prompt: Optional[str],
-        language: Optional[str],
-        model: str
+        self, audio_path: str, prompt: Optional[str], language: Optional[str], model: str
     ) -> Optional[str]:
         """OpenAI 兼容格式 Whisper API 转录"""
         import base64
@@ -487,6 +455,7 @@ class BrainInterface:
 
         # 检测格式
         import mimetypes
+
         mime_type = mimetypes.guess_type(audio_path)[0] or "audio/mp3"
 
         data = {
@@ -504,13 +473,14 @@ class BrainInterface:
         if "openai" in base_url_lower or "api.deepseek" in base_url_lower:
             # OpenAI/DeepSeek: 用 multipart form
             import requests
+
             files = {"file": (audio_path, audio_bytes, mime_type)}
             response = requests.post(
                 f"{self.base_url}/audio/transcriptions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 data=data,
                 files=files,
-                timeout=60
+                timeout=60,
             )
         else:
             # 其他兼容服务: base64 编码
@@ -520,10 +490,10 @@ class BrainInterface:
                 f"{self.base_url}/audio/transcriptions",
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
                 json=data,
-                timeout=60
+                timeout=60,
             )
 
         if response.status_code == 200:
@@ -534,15 +504,12 @@ class BrainInterface:
             return None
 
     def _transcribe_ollama_whisper(
-        self,
-        audio_path: str,
-        prompt: Optional[str],
-        language: Optional[str],
-        model: str
+        self, audio_path: str, prompt: Optional[str], language: Optional[str], model: str
     ) -> Optional[str]:
         """Ollama whisper 本地转录"""
         try:
             from hive.utils.ollama_interface import get_ollama
+
             ollama = get_ollama()
             if not ollama or not ollama.is_available():
                 logger.warning(f"🎙️ [Ollama] 服务不可用")
@@ -551,6 +518,7 @@ class BrainInterface:
             effective_model = model or "whisper"
             # Ollama 用 /api/whisper 端点
             import mimetypes
+
             mime_type = mimetypes.guess_type(audio_path)[0] or "audio/mp3"
 
             with open(audio_path, "rb") as f:
@@ -558,6 +526,7 @@ class BrainInterface:
 
             # Ollama whisper API: POST /api/whisper
             import requests
+
             files = {"file": (audio_path, audio_bytes, mime_type)}
             data = {"model": effective_model}
             if prompt:
@@ -567,13 +536,15 @@ class BrainInterface:
                 f"{self.base_url or 'http://localhost:11434'}/api/whisper",
                 data=data,
                 files=files,
-                timeout=120
+                timeout=120,
             )
 
             if response.status_code == 200:
                 return response.json().get("text", "")
             else:
-                logger.error(f"🎙️ [Ollama whisper] API错误: {response.status_code} - {response.text[:200]}")
+                logger.error(
+                    f"🎙️ [Ollama whisper] API错误: {response.status_code} - {response.text[:200]}"
+                )
                 return None
         except Exception as e:
             logger.error(f"🎙️ [Ollama whisper] 转录失败: {e}")
@@ -588,7 +559,7 @@ class BrainInterface:
         images: Optional[list[str]] = None,
         audio_path: Optional[str] = None,
         system_prompt: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
     ) -> Optional[str]:
         """
         Phase 4 P3: 统一多模态接口
@@ -627,7 +598,7 @@ class BrainInterface:
         images: Optional[list[str]],
         audio_path: Optional[str],
         system_prompt: Optional[str],
-        model: Optional[str]
+        model: Optional[str],
     ) -> Optional[str]:
         """内部多模态融合路由"""
         import os
@@ -651,16 +622,16 @@ class BrainInterface:
 
         if context_parts:
             combined_context = "\n\n".join(context_parts)
-            content_parts.append({
-                "type": "text",
-                "text": f"上下文信息:\n{combined_context}\n\n用户问题: {prompt}"
-            })
+            content_parts.append(
+                {"type": "text", "text": f"上下文信息:\n{combined_context}\n\n用户问题: {prompt}"}
+            )
         else:
             content_parts.append({"type": "text", "text": prompt})
 
         # 图片部分 (Claude Vision / GPT-4V 格式)
         if images:
             import base64
+
             for img_path in images:
                 if not os.path.exists(img_path):
                     logger.warning(f"🔮 [Multimodal] 图片不存在，跳过: {img_path}")
@@ -671,20 +642,24 @@ class BrainInterface:
                 # 根据 provider 选择格式
                 provider = self.provider.lower()
                 if provider in ["claude", "anthropic"]:
-                    content_parts.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/png",
-                            "data": img_base64
+                    content_parts.append(
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": img_base64,
+                            },
                         }
-                    })
+                    )
                 else:
                     # OpenAI 兼容格式
-                    content_parts.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{img_base64}"}
-                    })
+                    content_parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                        }
+                    )
 
         # 3. 调用对应 provider
         effective_model = model or self.config.get("multimodal_model")
@@ -696,37 +671,33 @@ class BrainInterface:
             return self._multimodal_openai(content_parts, system_prompt, effective_model)
 
     def _multimodal_claude(
-        self,
-        content: list,
-        system_prompt: Optional[str],
-        model: str
+        self, content: list, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """Claude 多模态调用"""
         url = f"{self.base_url}/messages"
         headers = {
             "x-api-key": self.api_key,
             "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
+            "content-type": "application/json",
         }
         data = {
             "model": model or "claude-3-sonnet-20240229",
             "max_tokens": 2048,
             "system": system_prompt or "你是一个专业的多模态分析专家。",
-            "messages": [{"role": "user", "content": content}]
+            "messages": [{"role": "user", "content": content}],
         }
 
         response = requests.post(url, headers=headers, json=data, timeout=60)
         if response.status_code == 200:
-            return response.json().get('content', [{}])[0].get('text', '')
+            return response.json().get("content", [{}])[0].get("text", "")
         else:
-            logger.error(f"🔮 [Claude Multimodal] API错误: {response.status_code} - {response.text[:200]}")
+            logger.error(
+                f"🔮 [Claude Multimodal] API错误: {response.status_code} - {response.text[:200]}"
+            )
             return None
 
     def _multimodal_openai(
-        self,
-        content: list,
-        system_prompt: Optional[str],
-        model: str
+        self, content: list, system_prompt: Optional[str], model: str
     ) -> Optional[str]:
         """OpenAI 兼容多模态调用 (GPT-4V 等)"""
         messages = []
@@ -736,39 +707,39 @@ class BrainInterface:
 
         response = requests.post(
             f"{self.base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": model or "gpt-4o",
-                "messages": messages,
-                "max_tokens": 2000
-            },
-            timeout=60
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            json={"model": model or "gpt-4o", "messages": messages, "max_tokens": 2000},
+            timeout=60,
         )
 
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         else:
-            logger.error(f"🔮 [OpenAI Multimodal] API错误: {response.status_code} - {response.text[:200]}")
+            logger.error(
+                f"🔮 [OpenAI Multimodal] API错误: {response.status_code} - {response.text[:200]}"
+            )
             return None
 
     SENSITIVE_PATTERNS = [
-        "api_key", "apikey", "password", "secret", "token", "authorization",
-        "sk-", "Bearer ", "x-api-key"
+        "api_key",
+        "apikey",
+        "password",
+        "secret",
+        "token",
+        "authorization",
+        "sk-",
+        "Bearer ",
+        "x-api-key",
     ]
 
     def _sanitize_for_log(self, text: str) -> str:
         """从日志中移除敏感信息"""
         import re
+
         sanitized = text
         for pattern in self.SENSITIVE_PATTERNS:
             sanitized = re.sub(
-                rf'({pattern}[=:]\s*)[^\s,"\']+',
-                rf'\1[REDACTED]',
-                sanitized,
-                flags=re.IGNORECASE
+                rf'({pattern}[=:]\s*)[^\s,"\']+', rf"\1[REDACTED]", sanitized, flags=re.IGNORECASE
             )
         return sanitized
 
@@ -777,32 +748,33 @@ class BrainInterface:
         try:
             log_path = Path("brain_activity.log")
             import datetime
+
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
             safe_prompt = self._sanitize_for_log(prompt)
             safe_content = self._sanitize_for_log(content)
-            
+
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(f"\n[{timestamp}] PROMPT: {safe_prompt[:100]}...\n")
                 f.write(f"[{timestamp}] BRAIN: {safe_content[:200]}...\n")
                 f.write("-" * 20 + "\n")
         except Exception as e:
             logger.debug(f"Failed to write brain activity log: {e}")
-    
+
     def analyze_github_trends(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         分析 GitHub 趋势
-        
+
         Args:
             data: GitHub 数据
-            
+
         Returns:
             分析结果
         """
         system_prompt = """你是 Hive 2.0 的智能分析专家。
 你的任务是分析 GitHub 趋势数据,提供战略建议。
 请以 JSON 格式返回分析结果。"""
-        
+
         prompt = f"""分析以下 GitHub 数据并提供战略建议:
 
 数据: {json.dumps(data, ensure_ascii=False, indent=2)}
@@ -814,33 +786,34 @@ class BrainInterface:
 4. 风险评估
 
 以 JSON 格式返回,包含: trends, keywords, priorities, risks"""
-        
+
         response = self.consult(prompt, system_prompt)
-        
+
         if response:
             try:
                 # 尝试解析 JSON
                 import re
-                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+
+                json_match = re.search(r"\{.*\}", response, re.DOTALL)
                 if json_match:
                     return json.loads(json_match.group())
             except (json.JSONDecodeError, AttributeError) as e:
                 logger.debug(f"Failed to parse GitHub trends JSON: {e}")
-        
+
         return None
-    
+
     def evaluate_project(self, project_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         评估项目价值
-        
+
         Args:
             project_info: 项目信息
-            
+
         Returns:
             评估结果
         """
         system_prompt = "你是代码项目评估专家,擅长判断项目的技术价值和学习价值。"
-        
+
         prompt = f"""评估以下项目:
 
 项目信息: {json.dumps(project_info, ensure_ascii=False, indent=2)}
@@ -852,23 +825,26 @@ class BrainInterface:
 4. 推荐理由
 
 以 JSON 格式返回: tech_value, learning_value, code_quality, reason"""
-        
+
         response = self.consult(prompt, system_prompt)
-        
+
         if response:
             try:
                 import re
-                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+
+                json_match = re.search(r"\{.*\}", response, re.DOTALL)
                 if json_match:
                     return json.loads(json_match.group())
             except (json.JSONDecodeError, AttributeError) as e:
                 logger.debug(f"Failed to parse project evaluation JSON: {e}")
-        
+
         return None
+
 
 # 全局单例
 _brain_instance = None
-_brain_lock = __import__('threading').Lock()
+_brain_lock = __import__("threading").Lock()
+
 
 def get_brain() -> BrainInterface:
     """获取大脑接口单例"""

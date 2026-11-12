@@ -91,7 +91,7 @@ async def test_perceiver():
     logger.info("Testing Perceiver")
     logger.info("=" * 50)
 
-    from .perception import Perceiver, Intent
+    from .perception import Intent, Perceiver
 
     perceiver = Perceiver()
 
@@ -107,7 +107,9 @@ async def test_perceiver():
     for text, expected_intent in test_cases:
         perception = await perceiver.process(text)
         logger.info(f"  '{text}' -> {perception.intent.value} (expected: {expected_intent.value})")
-        assert perception.intent == expected_intent, f"Expected {expected_intent}, got {perception.intent}"
+        assert (
+            perception.intent == expected_intent
+        ), f"Expected {expected_intent}, got {perception.intent}"
 
     logger.info("✅ Perceiver test passed")
 
@@ -168,7 +170,7 @@ async def test_hive_brain():
     logger.info("Testing HiveBrain (Full)")
     logger.info("=" * 50)
 
-    from .hive_brain import HiveBrain, BrainConfig
+    from .hive_brain import BrainConfig, HiveBrain
 
     config = BrainConfig(
         name="TestBrain",
@@ -208,7 +210,7 @@ async def test_memory_hierarchy():
     logger.info("Testing MemoryHierarchy")
     logger.info("=" * 50)
 
-    from .memory_hierarchy import MemoryHierarchy, Experience
+    from .memory_hierarchy import Experience, MemoryHierarchy
 
     hierarchy = MemoryHierarchy()
     await hierarchy.initialize()
@@ -240,9 +242,10 @@ async def test_memory_archival():
     logger.info("Testing MemoryArchival")
     logger.info("=" * 50)
 
-    from .memory_archival import MemoryArchiver, MemoryArchive, StorageTier
-    from .memory_hierarchy import MemoryItem
     import time
+
+    from .memory_archival import MemoryArchive, MemoryArchiver, StorageTier
+    from .memory_hierarchy import MemoryItem
 
     archiver = MemoryArchiver()
 
@@ -275,15 +278,17 @@ async def test_memory_archival():
     assert rehydrated.metadata.get("rehydrated") is True
 
     # 测试4: 层级迁移
-    archive2 = await archiver._archive_memory(MemoryItem(
-        id="test_memory_002",
-        content="另一个测试记忆",
-        memory_type="semantic",
-        importance=0.6,
-        created_at=time.time(),
-        last_accessed=time.time(),
-        access_count=10,
-    ))
+    archive2 = await archiver._archive_memory(
+        MemoryItem(
+            id="test_memory_002",
+            content="另一个测试记忆",
+            memory_type="semantic",
+            importance=0.6,
+            created_at=time.time(),
+            last_accessed=time.time(),
+            access_count=10,
+        )
+    )
     await archiver.migrate_tier("test_memory_002", StorageTier.HOT)
     assert archiver.archives["test_memory_002"].storage_tier == StorageTier.HOT
 
@@ -305,7 +310,7 @@ async def test_attention_economy():
     logger.info("Testing AttentionEconomy")
     logger.info("=" * 50)
 
-    from .attention_economy import AttentionEconomy, AttentionBudget
+    from .attention_economy import AttentionBudget, AttentionEconomy
 
     # 测试1: 基本消耗
     economy = AttentionEconomy()
@@ -371,7 +376,7 @@ async def test_sandbox_environment():
     logger.info("Testing SandboxEnvironment")
     logger.info("=" * 50)
 
-    from .sandbox import SandboxEnvironment, SandboxConfig, SimulationResult
+    from .sandbox import SandboxConfig, SandboxEnvironment, SimulationResult
 
     # 测试1: 基本沙箱配置
     config = SandboxConfig(
@@ -381,7 +386,9 @@ async def test_sandbox_environment():
         max_iterations=100,
         timeout_seconds=30.0,
     )
-    logger.info(f"  Config: allow_delete={config.allow_file_delete}, allow_network={config.allow_network}")
+    logger.info(
+        f"  Config: allow_delete={config.allow_file_delete}, allow_network={config.allow_network}"
+    )
 
     # 测试2: 创建带 mock_fs 的沙箱
     mock_fs = {
@@ -395,7 +402,9 @@ async def test_sandbox_environment():
     # 测试3: 低风险任务 - 应该通过
     safe_task = "帮我分析这个项目"
     result = await sandbox.simulate_think(safe_task)
-    logger.info(f"  Safe task result: compliant={result.safety_compliance}, risks={len(result.risks_identified)}")
+    logger.info(
+        f"  Safe task result: compliant={result.safety_compliance}, risks={len(result.risks_identified)}"
+    )
     assert isinstance(result, SimulationResult)
     assert result.safety_compliance is True
     assert len(result.risks_identified) == 0
@@ -403,21 +412,27 @@ async def test_sandbox_environment():
     # 测试4: 高风险任务 - 删除操作（不允许）
     delete_task = "删除所有文件"
     result = await sandbox.simulate_think(delete_task)
-    logger.info(f"  Delete task: compliant={result.safety_compliance}, blocked={sum(1 for op in result.operations if not op.allowed)}")
+    logger.info(
+        f"  Delete task: compliant={result.safety_compliance}, blocked={sum(1 for op in result.operations if not op.allowed)}"
+    )
     assert result.safety_compliance is False
     assert any("delete" in op.type.lower() for op in result.operations)
 
     # 测试5: 网络操作（不允许）
     network_task = "curl http://example.com"
     result = await sandbox.simulate_think(network_task)
-    logger.info(f"  Network task: compliant={result.safety_compliance}, risks={result.risks_identified}")
+    logger.info(
+        f"  Network task: compliant={result.safety_compliance}, risks={result.risks_identified}"
+    )
     assert result.safety_compliance is False
     assert any(op.type == "network" and not op.allowed for op in result.operations)
 
     # 测试6: 命令执行（不在白名单）
     exec_task = "执行 rm -rf /"
     result = await sandbox.simulate_think(exec_task)
-    logger.info(f"  Exec task: compliant={result.safety_compliance}, blocked={sum(1 for op in result.operations if not op.allowed)}")
+    logger.info(
+        f"  Exec task: compliant={result.safety_compliance}, blocked={sum(1 for op in result.operations if not op.allowed)}"
+    )
     assert result.safety_compliance is False
 
     # 测试7: 白名单命令应该允许
@@ -459,10 +474,10 @@ async def test_cognitive_diversity():
     logger.info("=" * 50)
 
     from .cognitive_diversity import (
+        PERSONALITIES,
         BrainPersonality,
         CognitiveSwarm,
         CollectiveResult,
-        PERSONALITIES,
         get_personality,
         suggest_personality_for_task,
     )
@@ -470,9 +485,11 @@ async def test_cognitive_diversity():
     # 测试预设性格
     logger.info("Testing preset personalities:")
     for name, personality in PERSONALITIES.items():
-        logger.info(f"  {name}: risk={personality.risk_tolerance:.1f}, "
-                    f"exploration={personality.exploration_rate:.1f}, "
-                    f"boldness={personality.boldness:.1f}")
+        logger.info(
+            f"  {name}: risk={personality.risk_tolerance:.1f}, "
+            f"exploration={personality.exploration_rate:.1f}, "
+            f"boldness={personality.boldness:.1f}"
+        )
     assert len(PERSONALITIES) >= 6, "Should have at least 6 preset personalities"
     logger.info("✅ Preset personalities test passed")
 
@@ -496,15 +513,19 @@ async def test_cognitive_diversity():
     brain_info = swarm.get_brain_info()
     logger.info(f"  Swarm has {len(brain_info)} brains:")
     for info in brain_info:
-        logger.info(f"    Brain {info['index']}: {info['personality']} "
-                    f"(risk={info['risk_tolerance']:.1f})")
+        logger.info(
+            f"    Brain {info['index']}: {info['personality']} "
+            f"(risk={info['risk_tolerance']:.1f})"
+        )
     assert len(brain_info) == 3
     logger.info("✅ CognitiveSwarm initialization test passed")
 
     # 测试集体思考
     collective_result = await swarm.collective_think("帮我分析这个项目")
     logger.info(f"  Collective think result:")
-    logger.info(f"    Success count: {collective_result.success_count}/{collective_result.total_count}")
+    logger.info(
+        f"    Success count: {collective_result.success_count}/{collective_result.total_count}"
+    )
     logger.info(f"    Confidence: {collective_result.confidence:.2f}")
     logger.info(f"    Best brain index: {collective_result.best_brain_index}")
     if collective_result.disagreement_points:
@@ -530,8 +551,7 @@ async def test_cognitive_diversity():
 
     # 测试性格调整
     adjusted_result = await swarm.think_with_personality_adjustment(
-        "快速决策",
-        {"boldness": 0.9, "patience": 0.2}
+        "快速决策", {"boldness": 0.9, "patience": 0.2}
     )
     logger.info(f"  Adjusted personality think: success={adjusted_result.success}")
     assert adjusted_result.success

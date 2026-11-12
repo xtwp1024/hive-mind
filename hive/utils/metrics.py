@@ -4,11 +4,11 @@
 收集和跟踪系统级别的性能指标。
 """
 
+import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any, Optional
-import threading
 
 from hive.utils.logger import get_logger
 
@@ -68,7 +68,9 @@ class MetricsCollector:
         # 时间戳
         self._start_time = time.time()
 
-    def increment(self, name: str, value: float = 1.0, labels: Optional[dict[str, str]] = None) -> None:
+    def increment(
+        self, name: str, value: float = 1.0, labels: Optional[dict[str, str]] = None
+    ) -> None:
         """增加计数器
 
         Args:
@@ -153,7 +155,9 @@ class MetricsCollector:
         full_name = self._make_full_name(name, labels)
         return self._gauges.get(full_name)
 
-    def get_histogram_stats(self, name: str, labels: Optional[dict[str, str]] = None) -> Optional[MetricStats]:
+    def get_histogram_stats(
+        self, name: str, labels: Optional[dict[str, str]] = None
+    ) -> Optional[MetricStats]:
         """获取直方图统计信息
 
         Args:
@@ -184,7 +188,7 @@ class MetricsCollector:
                         "min": stats.min,
                         "max": stats.max,
                         "avg": stats.avg,
-                    }
+                    },
                 }
                 for name, values, stats in [
                     (name, self._histograms[name], self._histogram_stats[name])
@@ -241,7 +245,9 @@ class Timer:
     用于测量代码块的执行时间并记录到直方图。
     """
 
-    def __init__(self, collector: MetricsCollector, name: str, labels: Optional[dict[str, str]] = None):
+    def __init__(
+        self, collector: MetricsCollector, name: str, labels: Optional[dict[str, str]] = None
+    ):
         """初始化计时器
 
         Args:

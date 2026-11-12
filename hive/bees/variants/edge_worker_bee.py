@@ -20,7 +20,7 @@ Phase 2 P4: 边缘智能试点
 
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from hive.bees.async_base_bee import AsyncBaseBee
 from hive.core.dna import BeeDNA
@@ -54,6 +54,7 @@ class EdgeWorkerBee(AsyncBaseBee):
         if self._ollama is None:
             try:
                 from hive.utils.ollama_interface import get_ollama
+
                 self._ollama = get_ollama(model=self._preferred_model)
                 if not self._ollama.is_available():
                     logger.warning(f"🤖 [EdgeWorker] Ollama 服务未运行 (localhost:11434)")
@@ -93,7 +94,7 @@ class EdgeWorkerBee(AsyncBaseBee):
                     system_prompt=system_prompt,
                     model=model,
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
                 if result:
                     return {
@@ -101,7 +102,7 @@ class EdgeWorkerBee(AsyncBaseBee):
                         "result": result,
                         "model_used": model,
                         "provider": "ollama",
-                        "bee_id": self.id
+                        "bee_id": self.id,
                     }
             except Exception as e:
                 logger.warning(f"🤖 [EdgeWorker] Ollama 推理失败: {e}")
@@ -111,12 +112,13 @@ class EdgeWorkerBee(AsyncBaseBee):
             logger.info(f"🤖 [EdgeWorker] 回退到 BrainInterface...")
             try:
                 from hive.utils.brain_interface import get_brain
+
                 brain = get_brain()
                 if brain:
                     result = brain.consult(
                         prompt=prompt,
                         system_prompt=system_prompt,
-                        model=model if model != self._preferred_model else None
+                        model=model if model != self._preferred_model else None,
                     )
                     if result:
                         return {
@@ -125,7 +127,7 @@ class EdgeWorkerBee(AsyncBaseBee):
                             "model_used": model,
                             "provider": "brain",
                             "bee_id": self.id,
-                            "fallback": True
+                            "fallback": True,
                         }
             except Exception as e:
                 logger.error(f"🤖 [EdgeWorker] BrainInterface 回退也失败: {e}")
@@ -133,7 +135,7 @@ class EdgeWorkerBee(AsyncBaseBee):
         return {
             "status": "error",
             "message": "Both Ollama and BrainInterface unavailable",
-            "bee_id": self.id
+            "bee_id": self.id,
         }
 
     # ===== 快速检查接口 =====
@@ -147,7 +149,8 @@ class EdgeWorkerBee(AsyncBaseBee):
             包含 is_running, available_models 的字典
         """
         try:
-            from hive.utils.ollama_interface import is_ollama_running, get_ollama
+            from hive.utils.ollama_interface import get_ollama, is_ollama_running
+
             running = is_ollama_running()
             if running:
                 ollama = get_ollama()
@@ -158,4 +161,4 @@ class EdgeWorkerBee(AsyncBaseBee):
             return {"is_running": False, "error": str(e)}
 
 
-__all__ = ['EdgeWorkerBee']
+__all__ = ["EdgeWorkerBee"]

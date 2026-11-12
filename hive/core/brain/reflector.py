@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .memory_hierarchy import MemoryHierarchy, Experience
+from .memory_hierarchy import Experience, MemoryHierarchy
 from .perception import Perception
 
 logger = logging.getLogger("Hive.Brain.Reflector")
@@ -97,19 +97,44 @@ class Reflector:
 
     # 成功/失败关键词
     SUCCESS_INDICATORS = {
-        "完成", "成功", "通过", "正常", "有效",
-        "completed", "success", "passed", "done", "worked",
+        "完成",
+        "成功",
+        "通过",
+        "正常",
+        "有效",
+        "completed",
+        "success",
+        "passed",
+        "done",
+        "worked",
     }
     FAILURE_INDICATORS = {
-        "失败", "错误", "异常", "问题", "无法", "超时",
-        "failed", "error", "exception", "failed", "timeout",
+        "失败",
+        "错误",
+        "异常",
+        "问题",
+        "无法",
+        "超时",
+        "failed",
+        "error",
+        "exception",
+        "failed",
+        "timeout",
     }
 
     # 模式关键词
     PATTERN_KEYWORDS = [
-        "总是", "经常", "每次", "通常",
-        "always", "often", "every time", "usually",
-        "repeated", "again", "same",
+        "总是",
+        "经常",
+        "每次",
+        "通常",
+        "always",
+        "often",
+        "every time",
+        "usually",
+        "repeated",
+        "again",
+        "same",
     ]
 
     def __init__(self, memory_hierarchy: Optional[MemoryHierarchy] = None):
@@ -224,36 +249,42 @@ class Reflector:
 
         # 检查是否有可复用的模式
         if "分析" in description:
-            insights.append(Insight(
-                id=f"{base_id}_1",
-                type=ReflectionType.SUCCESS_ANALYSIS,
-                content="分析类任务通常可以通过分解为子任务来提高成功率",
-                confidence=0.75,
-                source_experience=description,
-                priority=2,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_1",
+                    type=ReflectionType.SUCCESS_ANALYSIS,
+                    content="分析类任务通常可以通过分解为子任务来提高成功率",
+                    confidence=0.75,
+                    source_experience=description,
+                    priority=2,
+                )
+            )
 
         if "创建" in description or "实现" in description:
-            insights.append(Insight(
-                id=f"{base_id}_2",
-                type=ReflectionType.SUCCESS_ANALYSIS,
-                content="实现类任务需要充分的设计阶段",
-                confidence=0.7,
-                source_experience=description,
-                priority=3,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_2",
+                    type=ReflectionType.SUCCESS_ANALYSIS,
+                    content="实现类任务需要充分的设计阶段",
+                    confidence=0.7,
+                    source_experience=description,
+                    priority=3,
+                )
+            )
 
         # 检查效率
         duration = result.get("duration", 0)
         if duration > 0 and duration < 60:
-            insights.append(Insight(
-                id=f"{base_id}_3",
-                type=ReflectionType.SUCCESS_ANALYSIS,
-                content=f"快速完成（{duration:.0f}s），可能是重复任务或简单任务",
-                confidence=0.6,
-                source_experience=description,
-                priority=1,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_3",
+                    type=ReflectionType.SUCCESS_ANALYSIS,
+                    content=f"快速完成（{duration:.0f}s），可能是重复任务或简单任务",
+                    confidence=0.6,
+                    source_experience=description,
+                    priority=1,
+                )
+            )
 
         return insights
 
@@ -271,48 +302,56 @@ class Reflector:
 
         # 根因分类
         if "超时" in error:
-            insights.append(Insight(
-                id=f"{base_id}_1",
-                type=ReflectionType.FAILURE_ANALYSIS,
-                content="任务超时，可能是复杂度超出预期或资源不足",
-                confidence=0.8,
-                source_experience=description,
-                actionable=True,
-                priority=5,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_1",
+                    type=ReflectionType.FAILURE_ANALYSIS,
+                    content="任务超时，可能是复杂度超出预期或资源不足",
+                    confidence=0.8,
+                    source_experience=description,
+                    actionable=True,
+                    priority=5,
+                )
+            )
 
         if "权限" in error or "permission" in error.lower():
-            insights.append(Insight(
-                id=f"{base_id}_2",
-                type=ReflectionType.FAILURE_ANALYSIS,
-                content="权限不足，需要检查执行环境或降级操作",
-                confidence=0.85,
-                source_experience=description,
-                actionable=True,
-                priority=5,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_2",
+                    type=ReflectionType.FAILURE_ANALYSIS,
+                    content="权限不足，需要检查执行环境或降级操作",
+                    confidence=0.85,
+                    source_experience=description,
+                    actionable=True,
+                    priority=5,
+                )
+            )
 
         if "找不到" in error or "not found" in error.lower():
-            insights.append(Insight(
-                id=f"{base_id}_3",
-                type=ReflectionType.FAILURE_ANALYSIS,
-                content="依赖不存在，应先检查前置条件",
-                confidence=0.8,
-                source_experience=description,
-                actionable=True,
-                priority=4,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_3",
+                    type=ReflectionType.FAILURE_ANALYSIS,
+                    content="依赖不存在，应先检查前置条件",
+                    confidence=0.8,
+                    source_experience=description,
+                    actionable=True,
+                    priority=4,
+                )
+            )
 
         if "内存" in error or "memory" in error.lower():
-            insights.append(Insight(
-                id=f"{base_id}_4",
-                type=ReflectionType.FAILURE_ANALYSIS,
-                content="内存问题，可能存在泄漏或大数据处理",
-                confidence=0.75,
-                source_experience=description,
-                actionable=True,
-                priority=4,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_4",
+                    type=ReflectionType.FAILURE_ANALYSIS,
+                    content="内存问题，可能存在泄漏或大数据处理",
+                    confidence=0.75,
+                    source_experience=description,
+                    actionable=True,
+                    priority=4,
+                )
+            )
 
         return insights
 
@@ -394,27 +433,31 @@ class Reflector:
         if perception:
             for entity in perception.entities:
                 if entity.type == "file":
-                    insights.append(Insight(
-                        id=f"{base_id}_file_{entity.value}",
-                        type=ReflectionType.KNOWLEDGE_DISTILLATION,
-                        content=f"涉及文件操作: {entity.value}",
-                        confidence=0.6,
-                        source_experience=description,
-                        actionable=False,
-                        priority=2,
-                    ))
+                    insights.append(
+                        Insight(
+                            id=f"{base_id}_file_{entity.value}",
+                            type=ReflectionType.KNOWLEDGE_DISTILLATION,
+                            content=f"涉及文件操作: {entity.value}",
+                            confidence=0.6,
+                            source_experience=description,
+                            actionable=False,
+                            priority=2,
+                        )
+                    )
 
         # 从结果中提炼
         if "分析" in description and is_success:
-            insights.append(Insight(
-                id=f"{base_id}_analysis_knowledge",
-                type=ReflectionType.KNOWLEDGE_DISTILLATION,
-                content="分析类任务的关键是理解问题的本质结构",
-                confidence=0.65,
-                source_experience=description,
-                actionable=False,
-                priority=2,
-            ))
+            insights.append(
+                Insight(
+                    id=f"{base_id}_analysis_knowledge",
+                    type=ReflectionType.KNOWLEDGE_DISTILLATION,
+                    content="分析类任务的关键是理解问题的本质结构",
+                    confidence=0.65,
+                    source_experience=description,
+                    actionable=False,
+                    priority=2,
+                )
+            )
 
         return insights
 

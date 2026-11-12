@@ -5,17 +5,17 @@ Cerebellum (小脑) - System 1 快速反射系统
 从 Hive 1.0 移植并增强
 """
 
-import json
-import re
 import difflib
-import logging
 import hashlib
-import time
-import threading
+import json
+import logging
 import queue
+import re
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("Hive.Cerebellum")
 
@@ -83,6 +83,7 @@ class Cerebellum:
         if self._vault is None:
             try:
                 from hive.core.vector_vault import get_vector_vault
+
                 self._vault = get_vector_vault()
                 logger.info("💾 [Cerebellum] VectorVault 连接成功")
             except ImportError:
@@ -244,11 +245,7 @@ class Cerebellum:
 
         prompt_clean = prompt.strip().lower()
         for mem_prompt in self.memory.keys():
-            score = difflib.SequenceMatcher(
-                None,
-                prompt_clean,
-                mem_prompt.lower()
-            ).ratio()
+            score = difflib.SequenceMatcher(None, prompt_clean, mem_prompt.lower()).ratio()
 
             if score > highest_score:
                 highest_score = score
@@ -323,53 +320,61 @@ class Cerebellum:
             "neuromorphic-computing-sim",
             "multi-agent-orchestration",
             "LLM-tool-calling",
-            "agent-memory-systems"
+            "agent-memory-systems",
         ]
 
         selected = random.sample(topics, min(3, len(topics)))
 
-        return json.dumps({
-            "strategy_name": "小脑反射 (快速路径)",
-            "topics": selected,
-            "analysis": "基于本能的基线演化策略"
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "strategy_name": "小脑反射 (快速路径)",
+                "topics": selected,
+                "analysis": "基于本能的基线演化策略",
+            },
+            ensure_ascii=False,
+        )
 
     def _instinct_summarize(self, prompt: str) -> str:
         """本能: 文件摘要"""
-        return json.dumps({
-            "summary": "文件内容已被系统吸收 (快速摘要)",
-            "keywords": ["code", "source", "asset"]
-        }, ensure_ascii=False)
+        return json.dumps(
+            {"summary": "文件内容已被系统吸收 (快速摘要)", "keywords": ["code", "source", "asset"]},
+            ensure_ascii=False,
+        )
 
     def _instinct_trend_analysis(self, prompt: str) -> str:
         """本能: 趋势分析"""
-        return json.dumps({
-            "trend": "AI Agent 技术持续升温",
-            "keywords": ["multi-agent", "autonomous", "LLM-orchestration"],
-            "confidence": 0.8
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "trend": "AI Agent 技术持续升温",
+                "keywords": ["multi-agent", "autonomous", "LLM-orchestration"],
+                "confidence": 0.8,
+            },
+            ensure_ascii=False,
+        )
 
     def _instinct_keywords(self, prompt: str) -> str:
         """本能: 关键词推荐"""
         import random
 
         keyword_pool = [
-            "autonomous-agents", "multi-agent-systems", "LLM-orchestration",
-            "agent-memory", "tool-calling", "self-improving-AI",
-            "swarm-intelligence", "distributed-agents"
+            "autonomous-agents",
+            "multi-agent-systems",
+            "LLM-orchestration",
+            "agent-memory",
+            "tool-calling",
+            "self-improving-AI",
+            "swarm-intelligence",
+            "distributed-agents",
         ]
 
         selected = random.sample(keyword_pool, 3)
 
-        return json.dumps({
-            "keywords": selected,
-            "source": "小脑本能"
-        }, ensure_ascii=False)
+        return json.dumps({"keywords": selected, "source": "小脑本能"}, ensure_ascii=False)
 
 
 # 全局单例
 _cerebellum_instance: Optional[Cerebellum] = None
-_cerebellum_lock = __import__('threading').Lock()
+_cerebellum_lock = __import__("threading").Lock()
 
 
 def get_cerebellum() -> Cerebellum:

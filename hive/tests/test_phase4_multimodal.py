@@ -20,15 +20,15 @@ Phase 4: 多模态扩展 - 单元测试
    - CrossModalReasoningEngine - 跨模态推理引擎
 """
 
-import unittest
-import time
-import threading
-from unittest.mock import MagicMock, patch
-from pathlib import Path
-import tempfile
 import shutil
-
 import sys
+import tempfile
+import threading
+import time
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
@@ -36,7 +36,8 @@ class TestTextEncoder(unittest.TestCase):
     """测试文本编码器"""
 
     def setUp(self):
-        from hive.core.multimodal_encoder import TextEncoder, ModalityType, EncoderType
+        from hive.core.multimodal_encoder import EncoderType, ModalityType, TextEncoder
+
         self.TextEncoder = TextEncoder
         self.ModalityType = ModalityType
         self.EncoderType = EncoderType
@@ -85,7 +86,8 @@ class TestImageEncoder(unittest.TestCase):
     """测试图像编码器"""
 
     def setUp(self):
-        from hive.core.multimodal_encoder import ImageEncoder, ModalityType, EncoderType
+        from hive.core.multimodal_encoder import EncoderType, ImageEncoder, ModalityType
+
         self.ImageEncoder = ImageEncoder
         self.ModalityType = ModalityType
         self.EncoderType = EncoderType
@@ -94,9 +96,9 @@ class TestImageEncoder(unittest.TestCase):
 
     def test_methods_exist(self):
         """测试核心方法存在"""
-        self.assertTrue(hasattr(self.encoder, 'encode'))
-        self.assertTrue(hasattr(self.encoder, 'analyze_architecture'))
-        self.assertTrue(hasattr(self.encoder, 'analyze_screenshot'))
+        self.assertTrue(hasattr(self.encoder, "encode"))
+        self.assertTrue(hasattr(self.encoder, "analyze_architecture"))
+        self.assertTrue(hasattr(self.encoder, "analyze_screenshot"))
 
     def test_analyze_architecture_method(self):
         """测试架构图分析方法存在"""
@@ -117,7 +119,8 @@ class TestAudioEncoder(unittest.TestCase):
     """测试音频编码器"""
 
     def setUp(self):
-        from hive.core.multimodal_encoder import AudioEncoder, ModalityType, EncoderType
+        from hive.core.multimodal_encoder import AudioEncoder, EncoderType, ModalityType
+
         self.AudioEncoder = AudioEncoder
         self.ModalityType = ModalityType
         self.EncoderType = EncoderType
@@ -126,8 +129,8 @@ class TestAudioEncoder(unittest.TestCase):
 
     def test_methods_exist(self):
         """测试核心方法存在"""
-        self.assertTrue(hasattr(self.encoder, 'encode'))
-        self.assertTrue(hasattr(self.encoder, 'transcribe_and_summarize'))
+        self.assertTrue(hasattr(self.encoder, "encode"))
+        self.assertTrue(hasattr(self.encoder, "transcribe_and_summarize"))
 
     def test_transcribe_and_summarize_method(self):
         """测试转录总结方法存在"""
@@ -145,8 +148,12 @@ class TestMultimodalEncoder(unittest.TestCase):
 
     def setUp(self):
         from hive.core.multimodal_encoder import (
-            MultimodalEncoder, ModalityType, EncoderType, ModalityEmbedding
+            EncoderType,
+            ModalityEmbedding,
+            ModalityType,
+            MultimodalEncoder,
         )
+
         self.MultimodalEncoder = MultimodalEncoder
         self.ModalityType = ModalityType
         self.EncoderType = EncoderType
@@ -161,18 +168,12 @@ class TestMultimodalEncoder(unittest.TestCase):
 
     def test_detect_modality_with_metadata(self):
         """测试带元数据的模态检测"""
-        modality = self.encoder.detect_modality(
-            "Hello",
-            metadata={"modality": "text"}
-        )
+        modality = self.encoder.detect_modality("Hello", metadata={"modality": "text"})
         self.assertEqual(modality, self.ModalityType.TEXT)
 
     def test_detect_modality_mime_type(self):
         """测试 MIME 类型模态检测"""
-        modality = self.encoder.detect_modality(
-            "test",
-            metadata={"mime_type": "image/png"}
-        )
+        modality = self.encoder.detect_modality("test", metadata={"mime_type": "image/png"})
         self.assertEqual(modality, self.ModalityType.IMAGE)
 
     def test_encode_text(self):
@@ -224,9 +225,7 @@ class TestMultimodalEncoder(unittest.TestCase):
         )
 
         fused = self.encoder.fuse_embeddings(
-            [emb1, emb2],
-            strategy="weighted_average",
-            weights={"text": 2.0, "image": 1.0}
+            [emb1, emb2], strategy="weighted_average", weights={"text": 2.0, "image": 1.0}
         )
 
         self.assertIsNotNone(fused)
@@ -270,6 +269,7 @@ class TestCrossModalAttention(unittest.TestCase):
 
     def setUp(self):
         from hive.core.cross_modal_association import CrossModalAttention
+
         self.CrossModalAttention = CrossModalAttention
 
         self.attention = self.CrossModalAttention(embedding_dim=4)
@@ -368,6 +368,7 @@ class TestUnifiedRepresentationSpace(unittest.TestCase):
 
     def setUp(self):
         from hive.core.cross_modal_association import UnifiedRepresentationSpace
+
         self.UnifiedRepresentationSpace = UnifiedRepresentationSpace
 
         self.space = self.UnifiedRepresentationSpace(dimension=128)
@@ -474,8 +475,10 @@ class TestCrossModalRetriever(unittest.TestCase):
 
     def setUp(self):
         from hive.core.cross_modal_association import (
-            CrossModalRetriever, UnifiedRepresentationSpace
+            CrossModalRetriever,
+            UnifiedRepresentationSpace,
         )
+
         self.CrossModalRetriever = CrossModalRetriever
         self.UnifiedRepresentationSpace = UnifiedRepresentationSpace
 
@@ -525,9 +528,8 @@ class TestTaskTypeClassifier(unittest.TestCase):
     """测试任务类型分类器"""
 
     def setUp(self):
-        from hive.core.multimodal_task_decoder import (
-            TaskTypeClassifier, TaskType, OutputFormat
-        )
+        from hive.core.multimodal_task_decoder import OutputFormat, TaskType, TaskTypeClassifier
+
         self.TaskTypeClassifier = TaskTypeClassifier
         self.TaskType = TaskType
         self.OutputFormat = OutputFormat
@@ -544,17 +546,13 @@ class TestTaskTypeClassifier(unittest.TestCase):
 
     def test_classify_summarization(self):
         """测试摘要任务分类"""
-        task_type, confidence = self.classifier.classify(
-            "总结以下内容的要点"
-        )
+        task_type, confidence = self.classifier.classify("总结以下内容的要点")
 
         self.assertEqual(task_type, self.TaskType.TEXT_SUMMARIZATION)
 
     def test_classify_question_answering(self):
         """测试问答任务分类"""
-        task_type, confidence = self.classifier.classify(
-            "什么是 Python 中的列表推导式？"
-        )
+        task_type, confidence = self.classifier.classify("什么是 Python 中的列表推导式？")
 
         self.assertEqual(task_type, self.TaskType.QUESTION_ANSWERING)
 
@@ -566,8 +564,7 @@ class TestTaskTypeClassifier(unittest.TestCase):
         )
 
         self.assertIn(
-            task_type,
-            [self.TaskType.IMAGE_UNDERSTANDING, self.TaskType.MULTIMODAL_REASONING]
+            task_type, [self.TaskType.IMAGE_UNDERSTANDING, self.TaskType.MULTIMODAL_REASONING]
         )
 
     def test_classify_empty(self):
@@ -619,9 +616,8 @@ class TestMultimodalTaskDecoder(unittest.TestCase):
     """测试多模态任务解码器"""
 
     def setUp(self):
-        from hive.core.multimodal_task_decoder import (
-            MultimodalTaskDecoder, TaskType, OutputFormat
-        )
+        from hive.core.multimodal_task_decoder import MultimodalTaskDecoder, OutputFormat, TaskType
+
         self.MultimodalTaskDecoder = MultimodalTaskDecoder
         self.TaskType = TaskType
         self.OutputFormat = OutputFormat
@@ -698,9 +694,7 @@ class TestMultimodalTaskDecoder(unittest.TestCase):
     def test_extract_knowledge_from_multimodal(self):
         """测试从多模态提取知识"""
         result = self.decoder.extract_knowledge_from_multimodal(
-            text_inputs=[
-                "Python is a programming language. It was created by Guido van Rossum."
-            ],
+            text_inputs=["Python is a programming language. It was created by Guido van Rossum."],
             focus="programming languages",
         )
 
@@ -727,6 +721,7 @@ class TestCrossModalReasoningEngine(unittest.TestCase):
 
     def setUp(self):
         from hive.core.multimodal_task_decoder import CrossModalReasoningEngine
+
         self.CrossModalReasoningEngine = CrossModalReasoningEngine
 
         self.engine = self.CrossModalReasoningEngine(embedding_dim=128)
@@ -779,5 +774,5 @@ class TestCrossModalReasoningEngine(unittest.TestCase):
         self.assertIn("conclusion", result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -5,10 +5,10 @@ CodeGeneratorBee - 知识驱动的代码生成器
 基于 ChromaDB 知识库和 GLM-4 大脑生成代码
 """
 
-import logging
 import json
+import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from hive.bees.base_bee import BaseBee
 from hive.core.vector_vault import get_vector_vault
@@ -16,14 +16,15 @@ from hive.utils.brain_interface import BrainInterface
 
 logger = logging.getLogger("Hive.CodeGenerator")
 
+
 class CodeGeneratorBee(BaseBee):
     """代码生成蜂 - 基于知识库的智能代码生成"""
-    
+
     def __init__(self, dna, config=None, result_queue=None):
         super().__init__(dna, config, result_queue)
         self.vault = self._connect_vault()
         self.brain = self._connect_brain()
-    
+
     def _connect_vault(self):
         try:
             v = get_vector_vault()
@@ -46,35 +47,49 @@ class CodeGeneratorBee(BaseBee):
         logger.info("⚠️ CodeGeneratorBee 应通过 generate_code() 方法使用")
         return {"status": "use_generate_code_method"}
 
-    def generate_code(self, requirement: str, output_dir: str = "./generated", language: str = "python", max_ref: int = 10) -> Dict:
+    def generate_code(
+        self,
+        requirement: str,
+        output_dir: str = "./generated",
+        language: str = "python",
+        max_ref: int = 10,
+    ) -> Dict:
         logger.info(f"🎯 开始生成代码: {requirement}")
         refs = self._retrieve_knowledge(requirement, max_ref)
         code_data = self._generate_with_brain(requirement, refs, language)
-        
-        if not code_data: return {"status": "FAILED", "error": "代码生成失败"}
-        
+
+        if not code_data:
+            return {"status": "FAILED", "error": "代码生成失败"}
+
         saved = self._save_code(code_data, Path(output_dir))
         return {
-            "status": "SUCCESS", "requirement": requirement,
-            "references_used": len(refs), "files_generated": saved,
-            "output_dir": output_dir
+            "status": "SUCCESS",
+            "requirement": requirement,
+            "references_used": len(refs),
+            "files_generated": saved,
+            "output_dir": output_dir,
         }
 
     def _retrieve_knowledge(self, query: str, limit: int) -> List[Dict]:
-        if not self.vault: return []
+        if not self.vault:
+            return []
         try:
             results = self.vault.search(query, limit=limit)
-            return [{"content": r.get("document", "")[:500], "similarity": 1-r.get("distance", 1.0)} for r in results]
+            return [
+                {"content": r.get("document", "")[:500], "similarity": 1 - r.get("distance", 1.0)}
+                for r in results
+            ]
         except Exception as e:
             logger.error(f"❌ 检索失败: {e}")
             return []
 
     def _generate_with_brain(self, req: str, refs: List[Dict], lang: str) -> Optional[Dict]:
-        if not self.brain: return None
-        
+        if not self.brain:
+            return None
+
         sys_prompt = self._construct_system_prompt(lang)
         user_prompt = self._construct_user_prompt(req, refs, lang)
-        
+
         try:
             resp = self.brain.consult(user_prompt, sys_prompt)
             return self._parse_brain_response(resp) if resp else None
@@ -91,20 +106,28 @@ class CodeGeneratorBee(BaseBee):
 }}"""
 
     def _construct_user_prompt(self, req: str, refs: List[Dict], lang: str) -> str:
-        ref_text = "\n".join([f"Ref {i+1}: {r['content'][:300]}..." for i, r in enumerate(refs[:5])])
+        ref_text = "\n".join(
+            [f"Ref {i+1}: {r['content'][:300]}..." for i, r in enumerate(refs[:5])]
+        )
         return f"用户需求: {req}\n语言: {lang}\n参考:\n{ref_text}\n请生成 JSON。"
 
     def _parse_brain_response(self, response: str) -> Dict:
         try:
             clean_resp = self._extract_json_block(response)
             data = json.loads(clean_resp)
-            return data if "files" in data else {"files": {"generated.py": clean_resp}, "explanation": "Wrapped"}
+            return (
+                data
+                if "files" in data
+                else {"files": {"generated.py": clean_resp}, "explanation": "Wrapped"}
+            )
         except json.JSONDecodeError:
             return {"files": {"generated.txt": response}, "explanation": "Raw response"}
 
     def _extract_json_block(self, text: str) -> str:
-        if "```json" in text: return text.split("```json")[1].split("```")[0].strip()
-        if "```" in text: return text.split("```")[1].split("```")[0].strip()
+        if "```json" in text:
+            return text.split("```json")[1].split("```")[0].strip()
+        if "```" in text:
+            return text.split("```")[1].split("```")[0].strip()
         return text.strip()
 
     def _save_code(self, data: Dict, out_dir: Path) -> List[str]:
@@ -125,10 +148,15 @@ class CodeGeneratorBee(BaseBee):
                 logger.error(f"保存失败 {name}: {e}")
         return saved
 
+
 def generate_code(requirement: str, output_dir: str = "./generated") -> Dict:
     from hive.core.dna import BeeDNA
-    dna = BeeDNA(species="bee", role="code_generator", id="CodeGen_001", target_name="code_generation")
+
+    dna = BeeDNA(
+        species="bee", role="code_generator", id="CodeGen_001", target_name="code_generation"
+    )
     return CodeGeneratorBee(dna).generate_code(requirement, output_dir)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

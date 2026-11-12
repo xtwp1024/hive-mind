@@ -1,18 +1,21 @@
-
-from hive.core.component import HiveComponent, ComponentConfig
-import os
 import glob
+import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+from hive.core.component import ComponentConfig, HiveComponent
+
 
 class IOConfig(ComponentConfig):
     root_path: str = "d:/antigravity_scratch"
+
 
 class IOComponent(HiveComponent):
     """
     Provides File System capabilities.
     Replaces: LibrarianBee
     """
+
     def __init__(self, config: IOConfig = None):
         super().__init__(config or IOConfig())
 
@@ -34,7 +37,7 @@ class IOComponent(HiveComponent):
         """
         try:
             # Check for null bytes first
-            if '\0' in path:
+            if "\0" in path:
                 return False
 
             # Resolve the path to its absolute form
@@ -46,7 +49,19 @@ class IOComponent(HiveComponent):
             # Use os.path.sep to ensure cross-platform correctness
             root_str = str(root)
             p_str = str(p)
-            if not p_str.startswith(root_str + ("" if root_str.endswith(('\\', '/',)) else (Path(path).separator))):
+            if not p_str.startswith(
+                root_str
+                + (
+                    ""
+                    if root_str.endswith(
+                        (
+                            "\\",
+                            "/",
+                        )
+                    )
+                    else (Path(path).separator)
+                )
+            ):
                 self.logger.warning(f"Path traversal attempt detected: {path} not in {root}")
                 return False
 
@@ -62,7 +77,7 @@ class IOComponent(HiveComponent):
             return ""
 
         try:
-            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 return f.read()
         except Exception as e:
             self.logger.error("Read failed", path=path, error=str(e))
@@ -77,7 +92,7 @@ class IOComponent(HiveComponent):
         try:
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             return True
         except Exception as e:
@@ -92,7 +107,7 @@ class IOComponent(HiveComponent):
 
         search_path = os.path.join(directory, pattern)
         return glob.glob(search_path)
-    
+
     async def action_scan_directory(self, directory: str) -> Dict[str, Any]:
         """Deep scan for structural analysis"""
         stats = {"files": 0, "size": 0, "extensions": {}}
@@ -105,5 +120,6 @@ class IOComponent(HiveComponent):
                     stats["size"] += sz
                     ext = os.path.splitext(file)[1]
                     stats["extensions"][ext] = stats["extensions"].get(ext, 0) + 1
-                except (OSError, PermissionError): pass
+                except (OSError, PermissionError):
+                    pass
         return stats

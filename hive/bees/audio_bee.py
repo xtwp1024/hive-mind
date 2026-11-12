@@ -15,12 +15,12 @@ Phase 4 P2: 音频处理
     result = audio_bee.extract_knowledge("/path/to/podcast.wav", topic="Python")
 """
 
+import json
 import logging
 import re
-import json
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from hive.bees.base_bee import BaseBee
 from hive.core.dna import BeeDNA
@@ -52,6 +52,7 @@ class AudioBee(BaseBee):
         """懒加载 BrainInterface"""
         if self._brain is None:
             from hive.utils.brain_interface import get_brain
+
             self._brain = get_brain()
         return self._brain
 
@@ -113,14 +114,14 @@ class AudioBee(BaseBee):
                 "transcription": transcription,
                 "audio_path": audio_path,
                 "action": "transcribe",
-                "bee_id": self.id
+                "bee_id": self.id,
             }
         else:
             return {
                 "status": "error",
                 "message": "Transcription failed",
                 "audio_path": audio_path,
-                "bee_id": self.id
+                "bee_id": self.id,
             }
 
     def _do_extract_knowledge(
@@ -163,7 +164,7 @@ class AudioBee(BaseBee):
         response = brain.consult(
             prompt=extract_prompt,
             system_prompt="你是一个专业的知识提取专家，擅长从文本中提取结构化知识。",
-            model="glm-4"  # 用聪明模型提取
+            model="glm-4",  # 用聪明模型提取
         )
 
         if not response:
@@ -172,13 +173,14 @@ class AudioBee(BaseBee):
                 "message": "Knowledge extraction failed",
                 "transcription": text,
                 "audio_path": audio_path,
-                "bee_id": self.id
+                "bee_id": self.id,
             }
 
         # 3. 解析 JSON
         try:
             import re
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+
+            json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
                 knowledge = json.loads(json_match.group())
                 return {
@@ -186,7 +188,7 @@ class AudioBee(BaseBee):
                     "transcription": text,
                     "knowledge": knowledge,
                     "audio_path": audio_path,
-                    "bee_id": self.id
+                    "bee_id": self.id,
                 }
         except (json.JSONDecodeError, AttributeError):
             pass
@@ -197,7 +199,7 @@ class AudioBee(BaseBee):
             "transcription": text,
             "extraction_raw": response,
             "audio_path": audio_path,
-            "bee_id": self.id
+            "bee_id": self.id,
         }
 
     def _do_summarize(
@@ -232,7 +234,7 @@ class AudioBee(BaseBee):
         summary = brain.consult(
             prompt=summarize_prompt,
             system_prompt="你是一个专业的总结专家，擅长提炼关键信息。",
-            model="glm-4"
+            model="glm-4",
         )
 
         if summary:
@@ -241,7 +243,7 @@ class AudioBee(BaseBee):
                 "transcription": text,
                 "summary": summary,
                 "audio_path": audio_path,
-                "bee_id": self.id
+                "bee_id": self.id,
             }
         else:
             return {
@@ -249,16 +251,13 @@ class AudioBee(BaseBee):
                 "message": "Summarization failed",
                 "transcription": text,
                 "audio_path": audio_path,
-                "bee_id": self.id
+                "bee_id": self.id,
             }
 
     # ===== 快捷方法 =====
 
     def transcribe(
-        self,
-        audio_path: str,
-        language: Optional[str] = None,
-        prompt: Optional[str] = None
+        self, audio_path: str, language: Optional[str] = None, prompt: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         转录音频文件
@@ -271,18 +270,17 @@ class AudioBee(BaseBee):
         Returns:
             包含转录文本的结果字典
         """
-        return self.specialized_task({
-            "audio_path": audio_path,
-            "action": "transcribe",
-            "language": language,
-            "prompt": prompt,
-        })
+        return self.specialized_task(
+            {
+                "audio_path": audio_path,
+                "action": "transcribe",
+                "language": language,
+                "prompt": prompt,
+            }
+        )
 
     def extract_knowledge(
-        self,
-        audio_path: str,
-        topic: Optional[str] = None,
-        language: Optional[str] = None
+        self, audio_path: str, topic: Optional[str] = None, language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         从音频中提取结构化知识
@@ -295,18 +293,16 @@ class AudioBee(BaseBee):
         Returns:
             包含知识点、术语、总结的结果字典
         """
-        return self.specialized_task({
-            "audio_path": audio_path,
-            "action": "extract_knowledge",
-            "topic": topic,
-            "language": language,
-        })
+        return self.specialized_task(
+            {
+                "audio_path": audio_path,
+                "action": "extract_knowledge",
+                "topic": topic,
+                "language": language,
+            }
+        )
 
-    def summarize(
-        self,
-        audio_path: str,
-        language: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def summarize(self, audio_path: str, language: Optional[str] = None) -> Dict[str, Any]:
         """
         总结音频内容
 
@@ -317,11 +313,13 @@ class AudioBee(BaseBee):
         Returns:
             包含总结的结果字典
         """
-        return self.specialized_task({
-            "audio_path": audio_path,
-            "action": "summarize",
-            "language": language,
-        })
+        return self.specialized_task(
+            {
+                "audio_path": audio_path,
+                "action": "summarize",
+                "language": language,
+            }
+        )
 
 
-__all__ = ['AudioBee']
+__all__ = ["AudioBee"]

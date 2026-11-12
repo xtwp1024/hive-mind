@@ -83,15 +83,16 @@ import logging
 import threading
 import time
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
-from collections import defaultdict
 
 try:
     import secrets
+
     HAS_SECRETS = True
 except ImportError:
     HAS_SECRETS = False
@@ -101,6 +102,7 @@ logger = logging.getLogger("Hive.NodeAuth")
 
 class PermissionLevel(str, Enum):
     """权限等级"""
+
     READ = "read"
     WRITE = "write"
     ADMIN = "admin"
@@ -109,6 +111,7 @@ class PermissionLevel(str, Enum):
 
 class SignatureAlgorithm(str, Enum):
     """签名算法"""
+
     HMAC_SHA256 = "hmac-sha256"
     HMAC_SHA512 = "hmac-sha512"
 
@@ -346,9 +349,7 @@ class IdentityManager:
             if node_id in self._identities:
                 existing = self._identities[node_id]
                 if existing.public_key != public_key:
-                    logger.warning(
-                        f"🔐 [IdentityManager] 节点 {node_id} 公钥变更，拒绝更新"
-                    )
+                    logger.warning(f"🔐 [IdentityManager] 节点 {node_id} 公钥变更，拒绝更新")
                     return False
                 return True
 
@@ -748,7 +749,14 @@ class AccessControlList:
 
     ROLES = {
         "guest": ["knowledge.read", "task.read", "node.read"],
-        "member": ["knowledge.read", "knowledge.write", "task.read", "task.write", "node.read", "sync.write"],
+        "member": [
+            "knowledge.read",
+            "knowledge.write",
+            "task.read",
+            "task.write",
+            "node.read",
+            "sync.write",
+        ],
         "admin": ["*"],
     }
 
@@ -981,9 +989,7 @@ class NodeAuthenticationEngine:
         identity = self._identity_manager.generate_node_identity(node_id, metadata)
 
         with self._lock:
-            self._signature_verifiers[identity.node_id] = SignatureVerifier(
-                identity.private_key
-            )
+            self._signature_verifiers[identity.node_id] = SignatureVerifier(identity.private_key)
 
         if self._acl:
             self._acl.assign_role(identity.node_id, "admin")
@@ -1044,9 +1050,7 @@ class NodeAuthenticationEngine:
             (bool, str) - (是否通过, 消息)
         """
         if self.require_api_key and api_key:
-            valid, key_obj = self._api_key_manager.validate_api_key(
-                api_key, required_permission
-            )
+            valid, key_obj = self._api_key_manager.validate_api_key(api_key, required_permission)
             if not valid:
                 return False, f"API Key 验证失败"
             if key_obj and key_obj.node_id != node_id:
@@ -1060,9 +1064,7 @@ class NodeAuthenticationEngine:
             if not verifier:
                 return False, f"未知节点: {node_id}"
 
-            valid, msg = verifier.verify_request(
-                payload, signature, timestamp
-            )
+            valid, msg = verifier.verify_request(payload, signature, timestamp)
             if not valid:
                 return False, f"签名验证失败: {msg}"
 

@@ -6,6 +6,7 @@ class Node:
         self.data = data
         self.next = None
 
+
 class LinkedList:
     """Represents a singly linked list."""
 
@@ -51,16 +52,18 @@ class LinkedList:
         while current:
             elements.append(str(current.data))
             current = current.next
-        return ' -> '.join(elements)
+        return " -> ".join(elements)
+
 
 def bubble_sort(arr: list) -> list:
     """Sort a list using the bubble sort algorithm."""
     n = len(arr)
     for i in range(n):
-        for j in range(0, n-i-1):
-            if arr[j] > arr[j+1]:
-                arr[j], arr[j+1] = arr[j+1], arr[j]
+        for j in range(0, n - i - 1):
+            if arr[j] > arr[j + 1]:
+                arr[j], arr[j + 1] = arr[j + 1], arr[j]
     return arr
+
 
 def quick_sort(arr: list) -> list:
     """Sort a list using the quick sort algorithm."""
@@ -72,6 +75,7 @@ def quick_sort(arr: list) -> list:
     right = [x for x in arr if x > pivot]
     return quick_sort(left) + middle + quick_sort(right)
 
+
 def merge_sort(arr: list) -> list:
     """Sort a list using the merge sort algorithm."""
     if len(arr) <= 1:
@@ -80,6 +84,7 @@ def merge_sort(arr: list) -> list:
     left = merge_sort(arr[:mid])
     right = merge_sort(arr[mid:])
     return merge(left, right)
+
 
 def merge(left: list, right: list) -> list:
     """Merge two sorted lists into one sorted list."""
@@ -94,6 +99,7 @@ def merge(left: list, right: list) -> list:
     merged.extend(left[left_idx:])
     merged.extend(right[right_idx:])
     return merged
+
 
 # Unit tests
 if __name__ == "__main__":
@@ -112,12 +118,36 @@ if __name__ == "__main__":
     assert str(linked_list) == "3 -> 4 -> 1", "LinkedList remove test failed"
 
     # Test bubble_sort
-    assert bubble_sort([64, 34, 25, 12, 22, 11, 90]) == [11, 12, 22, 25, 34, 64, 90], "Bubble sort test failed"
+    assert bubble_sort([64, 34, 25, 12, 22, 11, 90]) == [
+        11,
+        12,
+        22,
+        25,
+        34,
+        64,
+        90,
+    ], "Bubble sort test failed"
 
     # Test quick_sort
-    assert quick_sort([64, 34, 25, 12, 22, 11, 90]) == [11, 12, 22, 25, 34, 64, 90], "Quick sort test failed"
+    assert quick_sort([64, 34, 25, 12, 22, 11, 90]) == [
+        11,
+        12,
+        22,
+        25,
+        34,
+        64,
+        90,
+    ], "Quick sort test failed"
 
     # Test merge_sort
-    assert merge_sort([64, 34, 25, 12, 22, 11, 90]) == [11, 12, 22, 25, 34, 64, 90], "Merge sort test failed"
+    assert merge_sort([64, 34, 25, 12, 22, 11, 90]) == [
+        11,
+        12,
+        22,
+        25,
+        34,
+        64,
+        90,
+    ], "Merge sort test failed"
 
     print("All tests passed.")
