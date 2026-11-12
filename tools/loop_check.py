@@ -16,6 +16,15 @@ R6 元审视新增「附加守卫」（三项编号与语义不变）：
       就会让这行输出变成假陈述。
       R8 口径修订：SCOPE 行的 P0 状态同改为从 LOOP.md 的 P0 标题派生，不再
       写死「P0-1/P0-3 未清」——完成任一项即成假陈述（同 R7 形态）。
+  [+] CI 配置闭合 — R12 元审视新增。R9 让三份 workflow 从「不触发」变为
+      真实运行后验收环境已变：YAML 被改坏会让 CI 变成 0 jobs 空跑（R9 实证
+      ScannerError），而静态三项完全无感。故要求 workflow 在位、配置守卫
+      测试在位且可编译、且守卫真的调用 yaml.safe_load（AST 防写死，沿用
+      test_workflow_yaml_r9.py 自身的守卫纪律）。独立函数，不改动 R6 的
+      check_acceptance_chain() 语义，其 4 项回归原样通过。
+      R12 口径修订：分诊台账 open 归零后，SCOPE 不再输出「≠ 0 个 open
+      历史失败已修」这类病句，改述「已全部收口」，并保留 open 数量派生串
+      以兼容 test_loop_check_acceptance_chain.py 的既有断言。
 
 只做静态检查，不 import 任何项目模块（不触发第三方依赖 / 服务启动）。
 ⚠ PASS 只代表「能解析、能编译 + 验收链工具自洽」，不代表服务能跑，
@@ -47,12 +56,31 @@ ACCEPTANCE_TOOLS = ("tools/smoke_runtime.py", "tools/triage_check.py")
 TRIAGE_TOOL = "tools/triage_check.py"
 LOOP_DOC = "LOOP.md"
 
+# R12：CI 配置闭合的唯一真源声明。R9 接通 master 后每次 push 都会触发
+# 3 个 Actions run，workflow 从「静态配置」升级为「验收环境的一部分」：
+# YAML 解析失败 / 分支写错 / 守卫被删，都会让云端静默少跑一层而本地
+# loop_check.py 三项全 PASS。这份清单让体检能兜住「守卫是否还在、是否
+# 还真的解析 YAML」，而不是只检查测试文件存在。
+CI_WORKFLOWS = (
+    ".github/workflows/test.yml",
+    ".github/workflows/lint.yml",
+    ".github/workflows/pwp-qa.yml",
+)
+CI_GUARD_TESTS = (
+    "tests/utils/test_workflow_yaml_r9.py",
+    "tests/utils/test_r12_ci_workflow.py",
+)
+
 
 def git(*args: str, cwd: Path = ROOT) -> str:
     try:
         return subprocess.run(
-            ["git", *args], cwd=str(cwd), capture_output=True,
-            text=True, timeout=30, check=True,
+            ["git", *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
         ).stdout.strip()
     except (subprocess.SubprocessError, OSError) as exc:
         return f"__ERROR__{exc}"
@@ -173,10 +201,13 @@ def ledger_open_count(root: Path | None = None) -> int | None:
         if not isinstance(node, ast.Assign):
             continue
         for target in node.targets:
-            if (isinstance(target, ast.Name) and target.id == "EXPECTED_OPEN"
-                    and isinstance(node.value, ast.Constant)
-                    and isinstance(node.value.value, int)
-                    and not isinstance(node.value.value, bool)):
+            if (
+                isinstance(target, ast.Name)
+                and target.id == "EXPECTED_OPEN"
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, int)
+                and not isinstance(node.value.value, bool)
+            ):
                 return node.value.value
     return None
 
@@ -235,8 +266,11 @@ def check_acceptance_chain(root: Path | None = None) -> tuple[list[str], str]:
     if triage.is_file():
         try:
             proc = subprocess.run(
-                [sys.executable, str(triage)], cwd=str(base),
-                capture_output=True, text=True, timeout=30,
+                [sys.executable, str(triage)],
+                cwd=str(base),
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
         except (subprocess.SubprocessError, OSError) as exc:
             issues.append(f"分诊台账自证无法执行: {exc}")
@@ -249,6 +283,51 @@ def check_acceptance_chain(root: Path | None = None) -> tuple[list[str], str]:
     return issues, f"{len(ACCEPTANCE_TOOLS)} 个工具 / 分诊台账自证"
 
 
+def check_ci_config_chain(root: Path | None = None) -> tuple[list[str], str]:
+    """R12 附加守卫：CI 配置闭合（workflow 在位 + 守卫真的解析 YAML）。
+
+    纯静态、无第三方依赖、不 import 项目模块、不连网、不启动服务。root 可注入，
+    便于回归在临时目录构造「workflow 缺失 / 守卫缺失 / 守卫退化成硬编码」三种
+    失效态反证，全程不改写真实工作区（沿用 R6 / R-20261010-11 纪律）。
+
+    只检查「守卫在位且仍是真解析」，不代替 pytest 跑这些守卫、也不判断 CI
+    云端结论（排队中不写成绿）——完整四层验收见 LOOP.md 二。
+    """
+    base = root or ROOT
+    issues: list[str] = []
+    for rel in CI_WORKFLOWS:
+        if not (base / rel).is_file():
+            issues.append(f"CI workflow 缺失: {rel}")
+    present = 0
+    for rel in CI_GUARD_TESTS:
+        path = base / rel
+        if not path.is_file():
+            issues.append(f"CI 配置守卫缺失: {rel}")
+            continue
+        try:
+            py_compile.compile(str(path), cfile=None, doraise=True)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(f"CI 配置守卫不可编译: {rel}: {str(exc).splitlines()[-1][:100]}")
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, SyntaxError) as exc:
+            issues.append(f"CI 配置守卫无法 AST 解析: {rel}: {exc}")
+            continue
+        # 防写死守卫：文件必须真的调用 yaml.safe_load，退化成字符串断言会判红
+        has_yaml_parse = any(
+            isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "safe_load"
+            for n in ast.walk(tree)
+        )
+        if not has_yaml_parse:
+            issues.append(f"CI 配置守卫未解析 YAML（缺 yaml.safe_load 调用）: {rel}")
+            continue
+        present += 1
+    return issues, f"{len(CI_WORKFLOWS)} 份 workflow / {present} 个 YAML 解析守卫"
+
+
 def main() -> int:
     files = tracked_py()
     if not files:
@@ -259,6 +338,7 @@ def main() -> int:
     n_targets, bad_imports = check_imports(files)
     bad_mirror, mirror_status = check_mirror()
     bad_chain, chain_status = check_acceptance_chain()
+    bad_ci, ci_status = check_ci_config_chain()
 
     print(f"[1/3] 语法       {len(files)} 个 .py，失败 {len(bad_syntax)}")
     for x in bad_syntax[:10]:
@@ -272,15 +352,33 @@ def main() -> int:
     print(f"[+ ] 验收链闭合 问题 {len(bad_chain)} | {chain_status}（R6 附加守卫）")
     for x in bad_chain[:5]:
         print("      X", x)
+    print(f"[+ ] CI 配置闭合 问题 {len(bad_ci)} | {ci_status}（R12 附加守卫）")
+    for x in bad_ci[:5]:
+        print("      X", x)
 
-    ok = not (bad_syntax or bad_imports or bad_mirror or bad_chain)
-    print("SCOPE : 静态三项（语法/import 闭合/镜像一致）+ R6 附加守卫（验收链闭合）；"
-          "不含运行时，运行时另跑 tools/smoke_runtime.py --cycles 1")
-    print("SCOPE : 四层验收 = ① 本静态体检 ② 1 周期冒烟 ③ 带范围的两套 pytest"
-          "（tests/ 子集 + hive/tests/ 全量；数字必须带集合范围）"
-          " ④ python tools/triage_check.py --report <全量报告> 对账")
+    ok = not (bad_syntax or bad_imports or bad_mirror or bad_chain or bad_ci)
+    print(
+        "SCOPE : 静态三项（语法/import 闭合/镜像一致）+ R6 附加守卫（验收链闭合）"
+        "+ R12 附加守卫（CI 配置闭合）；"
+        "不含运行时，运行时另跑 tools/smoke_runtime.py --cycles 1"
+    )
+    print(
+        "SCOPE : 四层验收 = ① 本静态体检 ② 1 周期冒烟 ③ 带范围的两套 pytest"
+        "（tests/ 子集 + hive/tests/ 全量；数字必须带集合范围）"
+        " ④ python tools/triage_check.py --report <全量报告> 对账"
+    )
     n_open = ledger_open_count()
-    open_desc = f"{n_open} 个 open 历史失败" if n_open is not None else "open 历史失败"
+    # R12：open 归零后「≠ 0 个 open 历史失败已修」是病句（把「已修」挂到
+    # 一个为 0 的集合上）。保留派生出的数量串以兼容既有回归断言，但按
+    # 0 / 非 0 / 无法派生 三态分别表述，不再制造假陈述。
+    if n_open is None:
+        open_desc = "open 历史失败（数量未能派生，以分诊台账为准）"
+        ledger_desc = open_desc
+    else:
+        open_desc = f"{n_open} 个 open 历史失败"
+        ledger_desc = (
+            f"{open_desc}（分诊台账已全部收口）" if n_open == 0 else f"{open_desc}未全部收口"
+        )
     p0 = p0_open_ids()
     if p0 is None:
         p0_desc = "P0 状态以 LOOP.md 为准"
@@ -288,8 +386,11 @@ def main() -> int:
         p0_desc = "/".join(p0) + " 未清"
     else:
         p0_desc = "P0 已清零（以 LOOP.md 为准）"
-    print(f"SCOPE : PASS ≠ 服务能跑 ≠ {open_desc}已修；{p0_desc}；"
-          "完整运行时状态见 LOOP.md「三、当前快照」")
+    print(
+        f"SCOPE : PASS ≠ 服务能跑 ≠ 服务可用；{ledger_desc}；{p0_desc}；"
+        "CI 云端结论以 gh api 实测为准，排队中不写成已绿；"
+        "完整运行时状态见 LOOP.md「三、当前快照」"
+    )
     print("RESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
