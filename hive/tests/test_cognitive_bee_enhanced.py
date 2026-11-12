@@ -17,6 +17,7 @@ import tempfile
 import shutil
 import json
 import time
+import sys
 
 from hive.bees.cognitive_bee import (
     CognitiveBee,
@@ -330,7 +331,8 @@ class TestReportToEvolution:
     """测试报告到进化协调器"""
 
     def test_report_to_evolution_coordinator_import_error(self):
-        """测试进化协调器不可用时的处理"""
+        """R11 契约核对：协调器现已可导入，默认路径返回 reported=True；
+        只有显式注入 ImportError 才走 coordinator_unavailable 回退分支。"""
         with patch('hive.bees.base_bee.get_logger'):
             dna = BeeDNA(species="CognitiveBee", id="test_cog_013")
             queue = MagicMock()
@@ -338,8 +340,14 @@ class TestReportToEvolution:
             
             result = bee.report_to_evolution_coordinator()
             
-            assert result["reported"] == False
-            assert result["reason"] == "coordinator_unavailable"
+            assert result["reported"] is True
+            for key in ("strengths", "weaknesses", "overall_intelligence", "timestamp"):
+                assert key in result
+            
+            with patch.dict(sys.modules, {"hive.core.swarm_evolution": None}):
+                fallback = bee.report_to_evolution_coordinator()
+            assert fallback["reported"] is False
+            assert fallback["reason"] == "coordinator_unavailable"
 
 
 class TestCognitiveBeeIntegration:

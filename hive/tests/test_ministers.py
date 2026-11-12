@@ -313,28 +313,27 @@ class TestEngineerBee(unittest.TestCase):
         
         advice = self.engineer.advise(context)
         
-        # 验证返回结构
+        # R11 契约核对：advise() 由 BaseMinister 统一实现，返回分析结果 + 建议 + 风险
         self.assertEqual(advice["minister"], "EngineerBee")
-        self.assertIn("requirements_analysis", advice)
-        self.assertIn("architecture_assessment", advice)
-        self.assertIn("technical_debt", advice)
-        self.assertIn("improvements", advice)
-        self.assertIn("feasibility", advice)
-        self.assertIn("recommendations", advice)
-        self.assertIn("confidence", advice)
-        self.assertIn("timestamp", advice)
+        for key in ("analysis", "recommendations", "priority", "risks",
+                    "confidence", "timestamp"):
+            self.assertIn(key, advice)
+        # 旧契约字段已移除（Ministers 只做战略决策，不再直接做工程评估）
+        for legacy in ("requirements_analysis", "architecture_assessment",
+                       "technical_debt", "improvements", "feasibility"):
+            self.assertNotIn(legacy, advice)
         
         # 验证数据类型
-        self.assertIsInstance(advice["requirements_analysis"], dict)
-        self.assertIsInstance(advice["technical_debt"], list)
-        self.assertIsInstance(advice["improvements"], list)
+        self.assertIsInstance(advice["analysis"], dict)
         self.assertIsInstance(advice["recommendations"], list)
+        self.assertIsInstance(advice["risks"], list)
+        self.assertIsInstance(advice["priority"], str)
         
         # 验证决策被记录
         self.assertEqual(len(self.engineer.decisions), 1)
     
     def test_advise_with_technical_debt(self):
-        """测试识别技术债务"""
+        """R11 契约核对：技术债务评估已从 advise() 移除，风险统一走 risks 通道。"""
         context = {
             "system_requirements": [],
             "constraints": [],
@@ -346,12 +345,15 @@ class TestEngineerBee(unittest.TestCase):
         
         advice = self.engineer.advise(context)
         
-        # 应该识别出技术债务
-        self.assertGreater(len(advice["technical_debt"]), 0)
-        self.assertEqual(advice["technical_debt"][0]["type"], "poor_modularity")
+        self.assertNotIn("technical_debt", advice)
+        self.assertIsInstance(advice["risks"], list)
+        self.assertTrue(advice["risks"])
+        risk = advice["risks"][0]
+        for key in ("type", "severity", "description"):
+            self.assertIn(key, risk)
     
     def test_execute_strategy_method(self):
-        """测试EngineerBee.execute_strategy()方法"""
+        """R11 契约核对：execute_strategy() 现返回 _aggregate_results 的汇总结果。"""
         strategy = {
             "name": "architecture_refactor",
             "objectives": ["improve_modularity", "reduce_coupling"],
@@ -362,38 +364,27 @@ class TestEngineerBee(unittest.TestCase):
         
         result = self.engineer.execute_strategy(strategy)
         
-        # 验证返回结构
-        self.assertIn("status", result)
         self.assertEqual(result["status"], "success")
-        self.assertIn("strategy_name", result)
-        self.assertEqual(result["strategy_name"], "architecture_refactor")
-        self.assertIn("architecture", result)
-        self.assertIn("implementation_plan", result)
-        self.assertIn("implementation_results", result)
-        self.assertIn("validation", result)
-        self.assertIn("quality_metrics", result)
-        self.assertIn("timestamp", result)
+        for key in ("total_tasks", "completed_tasks", "success_rate"):
+            self.assertIn(key, result)
+        # 旧契约字段属于「Minister 直接实现架构」的旧版本，现只做任务分解汇总
+        for legacy in ("strategy_name", "architecture", "implementation_plan",
+                       "implementation_results", "validation", "quality_metrics",
+                       "timestamp"):
+            self.assertNotIn(legacy, result)
         
-        # 验证架构设计
-        architecture = result["architecture"]
-        self.assertEqual(architecture["style"], "modular")
-        self.assertIn("layers", architecture)
-        
-        # 验证质量指标
-        quality = result["quality_metrics"]
-        self.assertIn("code_coverage", quality)
-        self.assertIn("complexity", quality)
-        self.assertIn("maintainability_index", quality)
+        # 无 tasks 字段时分解出 0 个任务，仍判 success / success_rate=0
+        self.assertEqual(result["total_tasks"], 0)
+        self.assertEqual(result["completed_tasks"], 0)
         
         # 验证战略被记录
         self.assertEqual(len(self.engineer.strategies), 1)
     
     def test_specialized_task(self):
-        """测试specialized_task方法"""
+        """R11 契约核对：Ministers 不直接执行任务，统一返回 delegated 委托语义。"""
         with tempfile.TemporaryDirectory() as tmpdir:
             target_path = Path(tmpdir)
             
-            # 创建测试结构
             src_dir = target_path / "src"
             src_dir.mkdir()
             tests_dir = target_path / "tests"
@@ -401,23 +392,11 @@ class TestEngineerBee(unittest.TestCase):
             
             analysis = self.engineer.specialized_task(target_path)
             
-            # 验证返回结构
-            self.assertIn("project_path", analysis)
-            self.assertIn("architecture_type", analysis)
-            self.assertIn("components", analysis)
-            self.assertIn("dependencies", analysis)
-            self.assertIn("quality_assessment", analysis)
-            self.assertIn("recommendations", analysis)
-            
-            # 验证分析结果
-            self.assertEqual(analysis["architecture_type"], "modular")
-            self.assertIn("src", analysis["components"])
-            self.assertIn("tests", analysis["components"])
-            
-            # 验证质量评估
-            quality = analysis["quality_assessment"]
-            self.assertEqual(quality["has_tests"], True)
-            self.assertEqual(quality["overall_quality"], "good")
+            self.assertEqual(analysis["status"], "delegated")
+            self.assertEqual(analysis["message"], "Ministers delegate tasks to Workers")
+            for legacy in ("project_path", "architecture_type", "components",
+                           "dependencies", "quality_assessment", "recommendations"):
+                self.assertNotIn(legacy, analysis)
     
     async def test_assign_task_bee_interface(self):
         """测试BeeInterface.assign_task()方法"""
@@ -435,28 +414,32 @@ class TestEngineerBee(unittest.TestCase):
         self.assertIsNone(result)  # Ministers 默认不直接执行
     
     def test_get_bee_status_bee_interface(self):
-        """测试BeeInterface.get_bee_status()方法"""
+        """R11 契约核对：EngineerBee 重写 get_bee_status()，返回工程蜂运行态。"""
         status = self.engineer.get_bee_status()
         
         self.assertIsInstance(status, dict)
         self.assertEqual(status["id"], "engineer_1")
-        self.assertEqual(status["species"], "EngineerBee")
-        self.assertEqual(status["role"], "minister")
-        self.assertIn("engineering_db_size", status)
+        for key in ("name", "active", "mutation_pool_size"):
+            self.assertIn(key, status)
+        # 旧契约字段来自 MinisterInterface 默认实现，EngineerBee 已重写
+        for legacy in ("species", "role", "engineering_db_size"):
+            self.assertNotIn(legacy, status)
     
     def test_get_statistics_bee_interface(self):
-        """测试BeeInterface.get_statistics()方法"""
-        # 先执行一些操作
+        """R11 契约核对：get_statistics() = get_minister_status() + 工程统计。"""
         context = {"system_requirements": []}
         self.engineer.advise(context)
         
         stats = self.engineer.get_statistics()
         
         self.assertIsInstance(stats, dict)
-        self.assertIn("total_assessments", stats)
-        self.assertIn("total_strategies", stats)
-        self.assertIn("projects_analyzed", stats)
-        self.assertIn("architectures_designed", stats)
+        for key in ("total_assessments", "total_strategies",
+                    "history_cache_size", "minister_type", "species"):
+            self.assertIn(key, stats)
+        self.assertEqual(stats["minister_type"], "EngineerBee")
+        self.assertEqual(stats["decisions_made"], 1)
+        for legacy in ("projects_analyzed", "architectures_designed"):
+            self.assertNotIn(legacy, stats)
 
 
 class TestAlchemistBee(unittest.TestCase):

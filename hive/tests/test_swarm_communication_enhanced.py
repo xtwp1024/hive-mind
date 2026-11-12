@@ -383,8 +383,13 @@ class TestRequestResponsePattern:
         comm._handle_response(response_msg)
         
         with comm._pending_lock:
-            assert test_corr_id not in comm.pending_responses
+            # R11 契约核对：_handle_response 只写回 (event, message) 并 set event；
+            # pop 由 send_and_wait() 负责，旧断言要求此处已清理属职责迁移前语义
+            assert test_corr_id in comm.pending_responses
             assert event.is_set()
+            stored_event, stored_msg = comm.pending_responses[test_corr_id]
+            assert stored_event is event
+            assert stored_msg is response_msg
 
     def test_handle_response_no_pending(self):
         """测试处理没有等待者的响应"""

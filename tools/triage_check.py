@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""hive-mind 历史失败分诊台账 — R4/P1-8 建立，R5/P1-9② 续修，R7/P1-9③ 续修 — 单一真源 + 可复现校验命令。
+"""hive-mind 历史失败分诊台账 — R4/P1-8 建立，R5/P1-9② / R7/P1-9③ / R11/P1-9① 续修 — 单一真源 + 可复现校验命令。
 
 问题背景（R3 台账原话）：「全仓库 pytest -q 有 20 个 hive/tests/ 历史失败，
 台账与 CI 若只跑 tests/ 子集，这 20 个失败会被静默忽略」。本文件把「20 个
@@ -48,7 +48,7 @@ CATEGORIES = {
     "状态污染/顺序依赖",      # 单例/磁盘残留导致单跑 PASS、全量 FAIL
     "依赖缺失",             # 缺第三方包或配置文件（本项目实测 0 条）
 }
-DISPOSITIONS = {"已修(R4)", "已修(R5)", "已修(R7)", "立下一轮(P1-9)", "待人工"}
+DISPOSITIONS = {"已修(R4)", "已修(R5)", "已修(R7)", "已修(R11)", "立下一轮(P1-9)", "待人工"}
 FIXED_DISP_PREFIX = "已修"   # status=fixed <=> 去向以此开头；台账支持多轮陆续修复
 STATUSES = {"open", "fixed"}
 
@@ -56,33 +56,35 @@ STATUSES = {"open", "fixed"}
 # 不是推测。evidence 记的是实测断言/异常，不是「应该是什么」。
 # R5 续修：#11~#16 六条「测试自身缺陷」已修，evidence 末尾追加 R5 实测记录；
 # R7 续修：#2/#9 两条「状态污染/顺序依赖」已修，evidence 末尾追加 R7 实测记录。
+# R11 续修：P1-9① 的 10 条「断言过期」逐条核对产品当前契约后改断言（只改测试、
+# 不改产品行为），evidence 末尾追加 R11 运行时实测记录；#18 仍留 open（需行为决策）。
 # 台账支持多轮陆续修复（status=fixed <=> 去向以「已修」开头），不写死某一轮。
 LEDGER = [
     # id, nodeid, category, evidence, disposition, status
     (1, "hive/tests/test_cognitive_bee_enhanced.py::TestReportToEvolution::test_report_to_evolution_coordinator_import_error",
-     "断言过期", ":341 assert True == False；hive.core.swarm_evolution 现已可导入，report_to_evolution_coordinator 返回 reported=True，测试前提「协调器不可用」不再成立",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", ":341 assert True == False；hive.core.swarm_evolution 现已可导入，report_to_evolution_coordinator 返回 reported=True，测试前提「协调器不可用」不再成立；【R11 已修】实测 hive.core.swarm_evolution 可导入 ⇒ reported=True + strengths/weaknesses/overall_intelligence/timestamp；旧「coordinator_unavailable」需 patch.dict(sys.modules, {...: None}) 注入 ImportError 才成立，测试现同时覆盖默认与回退两路径",
+     "已修(R11)", "fixed"),
     (2, "hive/tests/test_evolution_integration.py::TestSwarmCommunicationIntegration::test_register_bee",
      "状态污染/顺序依赖", "全量 AssertionError: 1 != 2；单独跑 19 failed/53 passed 时该用例 PASS。get_swarm_communication() 单例 registered_bees 跨用例累积。【R7 已修】setUp 快照-清空 registered_bees + addCleanup 复原，每个用例从空注册表出发；整文件 21 passed（修复前 1 failed/20 passed）；旧实现注入反证精确复现 1 != 2",
      "已修(R7)", "fixed"),
     (3, "hive/tests/test_ministers.py::TestEngineerBee::test_advise_method",
-     "断言过期", "advise() 实返 {minister, analysis, recommendations, priority, risks, confidence, timestamp}；断言的 requirements_analysis/technical_debt 等旧契约不存在",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", "advise() 实返 {minister, analysis, recommendations, priority, risks, confidence, timestamp}；断言的 requirements_analysis/technical_debt 等旧契约不存在；【R11 已修】实测 advise() 由 BaseMinister 统一实现，返回 minister/analysis/recommendations/priority/risks/confidence/timestamp，并 assertNotIn 五个旧字段",
+     "已修(R11)", "fixed"),
     (4, "hive/tests/test_ministers.py::TestEngineerBee::test_advise_with_technical_debt",
-     "断言过期", ":350 KeyError: 'technical_debt'；同 #3，advise() 契约已变",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", ":350 KeyError: 'technical_debt'；同 #3，advise() 契约已变；【R11 已修】实测技术债务评估已移除，风险统一走 risks[{type,severity,description}]，测试改断言并显式 assertNotIn technical_debt",
+     "已修(R11)", "fixed"),
     (5, "hive/tests/test_ministers.py::TestEngineerBee::test_execute_strategy_method",
-     "断言过期", "execute_strategy() 实返 {status: success, total_tasks, completed_tasks, success_rate}；断言的 strategy_name/architecture 等旧契约不存在",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", "execute_strategy() 实返 {status: success, total_tasks, completed_tasks, success_rate}；断言的 strategy_name/architecture 等旧契约不存在；【R11 已修】实测 execute_strategy() 返回 _aggregate_results 的 status/total_tasks/completed_tasks/success_rate；无 tasks 字段时 0 任务仍 success，旧字段全部 assertNotIn",
+     "已修(R11)", "fixed"),
     (6, "hive/tests/test_ministers.py::TestEngineerBee::test_get_bee_status_bee_interface",
-     "断言过期", ":443 KeyError: 'species'；get_bee_status() 返回结构已变（get_statistics() 才有 species=engineer、minister_type=EngineerBee）",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", ":443 KeyError: 'species'；get_bee_status() 返回结构已变（get_statistics() 才有 species=engineer、minister_type=EngineerBee）；【R11 已修】实测 EngineerBee 重写 get_bee_status() 返回 id/name/active/mutation_pool_size，旧 species/role/engineering_db_size 已移除",
+     "已修(R11)", "fixed"),
     (7, "hive/tests/test_ministers.py::TestEngineerBee::test_get_statistics_bee_interface",
-     "断言过期", "实返含 total_assessments/total_strategies 等；断言的 projects_analyzed/architectures_designed 不存在",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", "实返含 total_assessments/total_strategies 等；断言的 projects_analyzed/architectures_designed 不存在；【R11 已修】实测 get_statistics() = get_minister_status() + history_cache_size/total_assessments/total_strategies，含 minister_type=EngineerBee，旧 projects_analyzed/architectures_designed 已移除",
+     "已修(R11)", "fixed"),
     (8, "hive/tests/test_ministers.py::TestEngineerBee::test_specialized_task",
-     "断言过期", "实返 {status: delegated, message: Ministers delegate tasks to Workers}；断言的 project_path/architecture_type 属旧实现",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", "实返 {status: delegated, message: Ministers delegate tasks to Workers}；断言的 project_path/architecture_type 属旧实现；【R11 已修】实测 specialized_task() 返回 {status: delegated, message: Ministers delegate tasks to Workers}，测试改断言并对六个旧字段 assertNotIn",
+     "已修(R11)", "fixed"),
     (9, "hive/tests/test_phase3_evolution.py::TestCapabilityGapAnalyzer::test_get_latest_report",
      "状态污染/顺序依赖", "断言 assertIsNone(report) 但返回真实 GapAnalysisReport；get_latest_report() glob hive/data/gap_analyzer/report_*.json，该目录已有 7+ 历史落盘产物（被 .gitignore 的 Data/ 覆盖）。【R7 已修】setUp 把 _persistence_path 重定向到独立空临时目录 + addCleanup 回收，既不读共享残留也不再写新残留；整类 8 passed（修复前该用例 FAIL）；旧实现注入反证在临时残留目录下精确复现 is not None",
      "已修(R7)", "fixed"),
@@ -103,21 +105,21 @@ LEDGER = [
     (16, "hive/tests/test_phase3_evolution.py::TestDNAAdaptiveEngine::test_get_status_single",
      "测试自身缺陷", ":855 AttributeError: create_mock_dna；同 #11。【R5 已修】随 #11 一并修复，实测 PASS", "已修(R5)", "fixed"),
     (17, "hive/tests/test_phase3_evolution.py::TestParameterState::test_record_value",
-     "断言过期", "断言 len(historical_values)==3、len(historical_gradients)==2；record_value() 只 append 传入值、不播种 initial value，两次调用后实测 2 != 3",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", "断言 len(historical_values)==3、len(historical_gradients)==2；record_value() 只 append 传入值、不播种 initial value，两次调用后实测 2 != 3；【R11 已修】实测 record_value() 只 append 传入值、不播种 current_value；两次调用后 historical_values=[0.2,0.3]、gradients 长度 1（0.1）、current_value=0.3",
+     "已修(R11)", "fixed"),
     (18, "hive/tests/test_phase4_multimodal.py::TestImageEncoder::test_nonexistent_image",
      "真缺陷·待行为决策", "断言 assertFalse(result.success) 但为 True；encode() 用 Path(x).exists() 判定路径，不存在的路径字符串落入 else 分支被当作 base64 原样处理 → 静默成功。修法需引入输入校验、改变对外行为，本轮不擅改",
      "立下一轮(P1-9)", "open"),
     (19, "hive/tests/test_phase4_multimodal.py::TestTaskTypeClassifier::test_classify_empty",
-     "断言过期", "断言 TaskType.QUESTION_ANSWERING，实测 UNKNOWN；multimodal_task_decoder.py:229 对空 prompt/空 modalities 显式返回 (UNKNOWN, 0.0)，属当前正确行为",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", "断言 TaskType.QUESTION_ANSWERING，实测 UNKNOWN；multimodal_task_decoder.py:229 对空 prompt/空 modalities 显式返回 (UNKNOWN, 0.0)，属当前正确行为；【R11 已修】实测 classify("") 显式返回 (TaskType.UNKNOWN, 0.0)，属当前正确行为，断言与 confidence 一并更新",
+     "已修(R11)", "fixed"),
     (20, "hive/tests/test_swarm_communication_enhanced.py::TestRequestResponsePattern::test_handle_response_matches_correlation",
-     "断言过期", ":386 断言 test_corr_123 已不在 pending_responses；_handle_response() 只写回 (event, message) 并 set event，pop 由 send_and_wait() 在 :544 负责。清理职责已迁移，测试仍按旧语义断言",
-     "立下一轮(P1-9)", "open"),
+     "断言过期", ":386 断言 test_corr_123 已不在 pending_responses；_handle_response() 只写回 (event, message) 并 set event，pop 由 send_and_wait() 在 :544 负责。清理职责已迁移，测试仍按旧语义断言；【R11 已修】实测 _handle_response() 只写回 (event, message) 并 set event，pop 由 send_and_wait() 负责；测试改为断言 pending 中存回同一 event 与同一 message",
+     "已修(R11)", "fixed"),
 ]
 
 EXPECTED_TOTAL = 20          # R4 实测基线；变更必须是有意的台账更新，不能静默漂移
-EXPECTED_OPEN = 11           # 20 - 9（#10 R4 已修 1 条 + #11~#16 R5 已修 6 条 + #2/#9 R7 已修 2 条）
+EXPECTED_OPEN = 1            # 20 - 19（#10 R4 1 条 + #11~#16 R5 6 条 + #2/#9 R7 2 条 + P1-9① 10 条 R11）；唯一 open = #18
 EXPECTED_MISSING_DEPS = 0    # R4 实测：20 条里没有一条是缺依赖/缺配置
 
 
@@ -218,7 +220,7 @@ def main(argv: list[str]) -> int:
             return 2
 
     print("=" * 68)
-    print("hive-mind 历史失败分诊台账校验 (R4 建立 / R5 续修 / R7 续修)")
+    print("hive-mind 历史失败分诊台账校验 (R4 建立 / R5 / R7 / R11 续修)")
     print("=" * 68)
 
     print("[1/3] 台账完整性")

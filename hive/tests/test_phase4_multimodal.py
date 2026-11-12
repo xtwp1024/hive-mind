@@ -574,7 +574,9 @@ class TestTaskTypeClassifier(unittest.TestCase):
         """测试空输入分类"""
         task_type, confidence = self.classifier.classify("")
 
-        self.assertEqual(task_type, self.TaskType.QUESTION_ANSWERING)
+        # R11 契约核对：空 prompt 且无输入模态时显式返回 (UNKNOWN, 0.0)
+        self.assertEqual(task_type, self.TaskType.UNKNOWN)
+        self.assertEqual(confidence, 0.0)
 
     def test_detect_output_format_json(self):
         """测试 JSON 输出格式检测"""

@@ -893,8 +893,11 @@ class TestParameterState(unittest.TestCase):
         state.record_value(0.2)
         state.record_value(0.3)
 
-        self.assertEqual(len(state.historical_values), 3)
-        self.assertEqual(len(state.historical_gradients), 2)
+        # R11 契约核对：record_value() 只 append 传入值，不播种 current_value
+        self.assertEqual(list(state.historical_values), [0.2, 0.3])
+        self.assertEqual(len(state.historical_gradients), 1)
+        self.assertAlmostEqual(state.historical_gradients[0], 0.1)
+        self.assertEqual(state.current_value, 0.3)
 
     def test_get_trend_improving(self):
         """测试获取上升趋势"""
