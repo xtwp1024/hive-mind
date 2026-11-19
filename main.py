@@ -220,8 +220,11 @@ async def _execute_single_cycle(cycle_count: int, max_cycles: int, queen: QueenB
 
     emit("cycle_start", cycle=cycle_count, total=max_cycles)
 
-    # 1. 任务分配
-    dna_batch = _handle_warmup_phase(cycle_count, engineer)
+    # 1. 同步分配链（含 warmup 补容）在线程中运行，避免 hunt_sync 的
+    # asyncio.run() 嵌套主事件循环；等待分配完成后再部署，保持周期顺序。
+    dna_batch = await asyncio.get_running_loop().run_in_executor(
+        None, _handle_warmup_phase, cycle_count, engineer
+    )
 
     # 2. 部署蜂群
     emit("bees_deploying", count=len(dna_batch), cycle=cycle_count)

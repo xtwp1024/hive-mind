@@ -16,11 +16,12 @@ from tools import loop_check
 
 
 def test_real_repo_p0_scope_matches_ledger():
-    """真实台账：P0-1 已标 ✅ 故不在 open 里，P0-3 仍在。"""
+    """真实台账：P0-1/P0-3 已完成；完整服务验收 P0-2 仍 open。"""
     ids = loop_check.p0_open_ids()
     assert ids is not None, "LOOP.md 的 P0 标题未能解析"
     assert "P0-1" not in ids, ids
-    assert "P0-3" in ids, ids
+    assert "P0-3" not in ids, ids
+    assert "P0-2" in ids, ids
 
 
 def test_main_scope_is_projected_from_ledger(capsys, monkeypatch):

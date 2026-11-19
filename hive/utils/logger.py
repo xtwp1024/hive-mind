@@ -135,8 +135,6 @@ def setup_logging(
         log_file.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_processor = structlog.processors.JSONRenderer(ensure_ascii=False)
-
-        processors.append(structlog.stdlib.ProcessorFormatter.wrap_for_formatter)
     else:
         file_processor = None
 
